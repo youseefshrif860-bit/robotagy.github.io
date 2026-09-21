@@ -44,12 +44,12 @@
         <label>رقم المجموعة:</label>
         <input type="text" id="group" required>
 
-        <label>التخصص / الكورس:</label>
+        <label>الكورس:</label>
         <select id="course" required>
-            <option value="" disabled selected>اختر التخصص</option>
+            <option value="" disabled selected>اختر الكورس</option>
             <option value="PLC">PLC</option>
             <option value="Classic Control">Classic Control</option>
-            <option value="Motor Drive">Motor Drive (الحد الأقصى طالبين)</option>
+            <option value="Motor Drive">Motor Drive</option>
         </select>
 
         <label>تاريخ الحضور:</label>
@@ -79,7 +79,7 @@
                     <th>الاسم</th>
                     <th>الهاتف</th>
                     <th>المجموعة</th>
-                    <th>التخصص</th>
+                    <th>الكورس</th>
                     <th>التاريخ</th>
                     <th>الوقت</th>
                     <th>تحكم</th>
@@ -139,7 +139,7 @@
         }
     }
 
-    // إرسال البيانات والتحقق من العدد الأقصى المسموح
+    // إرسال البيانات والتحقق من العدد الأقصى خفياً
     document.getElementById('regForm').addEventListener('submit', function(e) {
         e.preventDefault();
         
@@ -147,17 +147,15 @@
         const date = document.getElementById('date').value;
         const time = document.getElementById('time').value;
 
-        // تحديد الحد الأقصى (2 للـ Motor Drive، و8 لباقي التخصصات)
+        // الحدود الأقصى (مخفية تماماً عن الطالب)
         const maxLimit = (course === 'Motor Drive') ? 2 : 8;
 
-        // جلب التسجيلات الحالية للتحقق من العدد في نفس الموعد والتخصص
         database.ref('students').once('value', (snapshot) => {
             let currentCount = 0;
             
             if (snapshot.exists()) {
                 snapshot.forEach((child) => {
                     const data = child.val();
-                    // إذا كان نفس التاريخ ونفس الوقت ونفس التخصص
                     if (data.date === date && data.time === time && data.course === course) {
                         currentCount++;
                     }
@@ -165,11 +163,10 @@
             }
 
             if (currentCount >= maxLimit) {
-                alert(`عفواً، هذا الموعد ممتلئ لهذا التخصص (${course}). الحد الأقصى هو ${maxLimit} طلاب. يرجى اختيار موعد آخر.`);
+                alert('عفواً، هذا الموعد ممتلئ لهذا الكورس. يرجى اختيار موعد آخر.');
                 return;
             }
 
-            // إذا العدد متاح، يتم الحفظ
             const record = {
                 name: document.getElementById('name').value,
                 phone: document.getElementById('phone').value,
@@ -210,7 +207,7 @@
         document.getElementById('student-view').style.display = 'block';
     }
 
-    // سحب البيانات وعرضها في الجدول مع التخصص
+    // سحب البيانات وعرضها في الجدول مع الكورس
     function loadTable() {
         const tbody = document.querySelector('#dataTable tbody');
         
