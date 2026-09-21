@@ -188,10 +188,10 @@
         });
     });
 
-    // الدخول للإدارة
+    // الدخول للإدارة بالرقم السري 2004
     function checkAdmin() {
         const pass = prompt('الرجاء إدخال الرقم السري للإدارة:');
-        if (pass === 'youssef2004') {
+        if (pass === '2004') {
             document.getElementById('student-view').style.display = 'none';
             document.getElementById('admin-view').style.display = 'block';
             loadTable();
