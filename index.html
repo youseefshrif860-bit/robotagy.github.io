@@ -16,6 +16,8 @@
         table { width: 100%; border-collapse: collapse; margin-top: 15px; background-color: white; color: black; border-radius: 5px; overflow: hidden; }
         th, td { border: 1px solid #ddd; padding: 10px; text-align: center; }
         th { background-color: #fcc01a; color: #3b1e5a; }
+        .delete-btn { background-color: #ff4d4d; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer; font-weight: bold; }
+        .delete-all-btn { background-color: #cc0000; color: white; border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer; font-weight: bold; margin-bottom: 15px; }
     </style>
 
     <!-- مكتبات Firebase -->
@@ -56,9 +58,12 @@
 </div>
 
 <!-- واجهة الإدارة -->
-<div class="container" id="admin-view" style="max-width: 800px;">
+<div class="container" id="admin-view" style="max-width: 850px;">
     <h2 style="text-align: center; color: #fcc01a;">لوحة تحكم م. يوسف شريف</h2>
-    <button class="admin-btn" onclick="closeAdmin()" style="margin-bottom: 15px;">رجوع لصفحة التسجيل</button>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+        <button class="admin-btn" onclick="closeAdmin()">رجوع لصفحة التسجيل</button>
+        <button class="delete-all-btn" onclick="deleteAllData()">حذف كل التسجيلات دفعة واحدة</button>
+    </div>
     <div style="overflow-x: auto;">
         <table id="dataTable">
             <thead>
@@ -68,6 +73,7 @@
                     <th>المجموعة</th>
                     <th>التاريخ</th>
                     <th>الوقت</th>
+                    <th>تحكم</th>
                 </tr>
             </thead>
             <tbody></tbody>
@@ -102,14 +108,14 @@
 
         if (!dateVal) return;
 
-        const day = new Date(dateVal).getDay(); // 0=الأحد، 1=الاثنين ... 6=السبت
+        const day = new Date(dateVal).getDay(); 
 
-        if (day === 5) { // الجمعة
+        if (day === 5) { 
             alert('عفواً، المعمل مغلق يوم الجمعة');
             document.getElementById('date').value = '';
             timeSelect.innerHTML = '<option value="" disabled selected>اختر التاريخ أولاً</option>';
         } 
-        else if (day === 0 || day === 4 || day === 6) { // أحد، خميس، سبت
+        else if (day === 0 || day === 4 || day === 6) { 
             const options = ['من 12 ظهراً إلى 3 عصراً', 'من 3 عصراً إلى 6 مساءً', 'من 6 مساءً إلى 9 مساءً'];
             options.forEach(opt => {
                 let o = document.createElement('option');
@@ -117,7 +123,7 @@
                 timeSelect.appendChild(o);
             });
         } 
-        else { // اثنين، ثلاثاء، أربعاء
+        else { 
             let o = document.createElement('option');
             o.value = 'من 8 مساءً إلى 11 مساءً'; 
             o.text = 'من 8 مساءً إلى 11 مساءً';
@@ -138,7 +144,6 @@
             timestamp: new Date().toLocaleString()
         };
         
-        // حفظ البيانات في قاعدة البيانات
         database.ref('students').push(record)
         .then(() => {
             document.getElementById('msg').innerText = 'تم تسجيل حضورك بنجاح!';
@@ -148,7 +153,6 @@
         })
         .catch((error) => {
             alert('حدث خطأ أثناء التسجيل: ' + error.message);
-            console.error(error);
         });
     });
 
@@ -169,7 +173,7 @@
         document.getElementById('student-view').style.display = 'block';
     }
 
-    // سحب البيانات وعرضها في الجدول لحظياً
+    // سحب البيانات وعرضها في الجدول مع زر الحذف الفردي
     function loadTable() {
         const tbody = document.querySelector('#dataTable tbody');
         
@@ -177,6 +181,7 @@
             tbody.innerHTML = '';
             if (snapshot.exists()) {
                 snapshot.forEach((childSnapshot) => {
+                    const studentId = childSnapshot.key;
                     const row = childSnapshot.val();
                     tbody.innerHTML += `<tr>
                         <td>${row.name || ''}</td>
@@ -184,14 +189,39 @@
                         <td>${row.group || ''}</td>
                         <td>${row.date || ''}</td>
                         <td>${row.time || ''}</td>
+                        <td><button class="delete-btn" onclick="deleteStudent('${studentId}')">حذف</button></td>
                     </tr>`;
                 });
             } else {
-                tbody.innerHTML = `<tr><td colspan="5" style="text-align: center;">لا توجد بيانات مسجلة حتى الآن</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="6" style="text-align: center;">لا توجد بيانات مسجلة حتى الآن</td></tr>`;
             }
-        }, (error) => {
-            console.error("خطأ في قراءة البيانات: ", error);
         });
+    }
+
+    // حذف طالب واحد
+    function deleteStudent(id) {
+        if (confirm('هل أنت متأكد من حذف هذا التسجيل؟')) {
+            database.ref('students/' + id).remove()
+            .then(() => {
+                // سيتم تحديث الجدول تلقائياً بفضل الـ listener
+            })
+            .catch((error) => {
+                alert('حدث خطأ أثناء الحذف: ' + error.message);
+            });
+        }
+    }
+
+    // حذف جميع التسجيلات دفعة واحدة
+    function deleteAllData() {
+        if (confirm('تحذير: هل أنت متأكد من حذف جميع تسجيلات الطلاب بالكامل؟ لا يمكن التراجع عن هذا القرار.')) {
+            database.ref('students').remove()
+            .then(() => {
+                alert('تم تفريغ جميع البيانات بنجاح.');
+            })
+            .catch((error) => {
+                alert('حدث خطأ أثناء الحذف: ' + error.message);
+            });
+        }
     }
 </script>
 </body>
