@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>تسجيل حضور معمل روبوتاجي</title>
+    <style>
+        body { font-family: Tahoma, Arial, sans-serif; background-color: #3b1e5a; color: white; margin: 0; padding: 20px; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        .logo { font-size: 28px; font-weight: bold; color: #fcc01a; }
+        .admin-btn { background-color: #fcc01a; color: #3b1e5a; border: none; padding: 10px 15px; font-weight: bold; cursor: pointer; border-radius: 5px; }
+        .container { background-color: #4c2673; padding: 20px; border-radius: 10px; max-width: 500px; margin: auto; box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
+        input, select { width: 100%; padding: 10px; margin-top: 8px; margin-bottom: 15px; border-radius: 5px; border: none; box-sizing: border-box; font-family: Tahoma; }
+        .submit-btn { background-color: #fcc01a; color: #3b1e5a; border: none; padding: 12px; width: 100%; font-size: 16px; font-weight: bold; border-radius: 5px; cursor: pointer; }
+        #admin-view { display: none; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; background-color: white; color: black; border-radius: 5px; overflow: hidden; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: center; }
+        th { background-color: #fcc01a; color: #3b1e5a; }
+    </style>
+</head>
+<body>
+
+<div class="header">
+    <div class="logo">روبوتاجي</div>
+    <button class="admin-btn" onclick="checkAdmin()">الإدارة</button>
+</div>
+
+<!-- واجهة الطلاب -->
+<div class="container" id="student-view">
+    <h2 style="text-align: center; color: #fcc01a;">تسجيل الحضور</h2>
+    <form id="regForm">
+        <label>الاسم:</label>
+        <input type="text" id="name" required>
+
+        <label>رقم الهاتف:</label>
+        <input type="tel" id="phone" required>
+
+        <label>رقم المجموعة:</label>
+        <input type="text" id="group" required>
+
+        <label>تاريخ الحضور:</label>
+        <input type="date" id="date" required onchange="updateTimeOptions()">
+
+        <label>وقت الحضور:</label>
+        <select id="time" required>
+            <option value="" disabled selected>اختر التاريخ أولاً</option>
+        </select>
+
+        <button type="submit" class="submit-btn">تأكيد التسجيل</button>
+    </form>
+    <p id="msg" style="text-align:center; color:#fcc01a; font-weight:bold; margin-top: 15px;"></p>
+</div>
+
+<!-- واجهة الإدارة -->
+<div class="container" id="admin-view" style="max-width: 800px;">
+    <h2 style="text-align: center; color: #fcc01a;">لوحة تحكم م. يوسف شريف</h2>
+    <button class="admin-btn" onclick="closeAdmin()" style="margin-bottom: 15px;">رجوع لصفحة التسجيل</button>
+    <div style="overflow-x: auto;">
+        <table id="dataTable">
+            <thead>
+                <tr>
+                    <th>الاسم</th>
+                    <th>الهاتف</th>
+                    <th>المجموعة</th>
+                    <th>التاريخ</th>
+                    <th>الوقت</th>
+                </tr>
+            </thead>
+            <tbody></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    // منع اختيار تاريخ قديم
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('date').setAttribute('min', today);
+
+    function updateTimeOptions() {
+        const dateVal = document.getElementById('date').value;
+        const timeSelect = document.getElementById('time');
+        timeSelect.innerHTML = ''; 
+
+        if (!dateVal) return;
+
+        const day = new Date(dateVal).getDay(); // 0=الأحد، 1=الاثنين ... 6=السبت
+
+        if (day === 5) { // الجمعة
+            alert('عفواً، المعمل مغلق يوم الجمعة');
+            document.getElementById('date').value = '';
+            timeSelect.innerHTML = '<option value="" disabled selected>اختر التاريخ أولاً</option>';
+        } 
+        else if (day === 0 || day === 4 || day === 6) { // أحد، خميس، سبت
+            const options = ['من 12 ظهراً إلى 3 عصراً', 'من 3 عصراً إلى 6 مساءً', 'من 6 مساءً إلى 9 مساءً'];
+            options.forEach(opt => {
+                let o = document.createElement('option');
+                o.value = opt; o.text = opt;
+                timeSelect.appendChild(o);
+            });
+        } 
+        else { // اثنين، ثلاثاء، أربعاء
+            let o = document.createElement('option');
+            o.value = 'من 8 مساءً إلى 11 مساءً'; 
+            o.text = 'من 8 مساءً إلى 11 مساءً';
+            timeSelect.appendChild(o);
+        }
+    }
+
+    // حفظ البيانات
+    document.getElementById('regForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const record = {
+            name: document.getElementById('name').value,
+            phone: document.getElementById('phone').value,
+            group: document.getElementById('group').value,
+            date: document.getElementById('date').value,
+            time: document.getElementById('time').value
+        };
+        
+        let data = JSON.parse(localStorage.getItem('robotagyLabData') || '[]');
+        data.push(record);
+        localStorage.setItem('robotagyLabData', JSON.stringify(data));
+
+        document.getElementById('msg').innerText = 'تم تسجيل حضورك بنجاح!';
+        this.reset();
+        document.getElementById('time').innerHTML = '<option value="" disabled selected>اختر التاريخ أولاً</option>';
+        setTimeout(() => document.getElementById('msg').innerText = '', 4000);
+    });
+
+    // الدخول للإدارة
+    function checkAdmin() {
+        const pass = prompt('الرجاء إدخال الرقم السري للإدارة:');
+        if (pass === '2004') {
+            document.getElementById('student-view').style.display = 'none';
+            document.getElementById('admin-view').style.display = 'block';
+            loadTable();
+        } else if (pass !== null) {
+            alert('الرقم السري غير صحيح!');
+        }
+    }
+
+    function closeAdmin() {
+        document.getElementById('admin-view').style.display = 'none';
+        document.getElementById('student-view').style.display = 'block';
+    }
+
+    function loadTable() {
+        const data = JSON.parse(localStorage.getItem('robotagyLabData') || '[]');
+        const tbody = document.querySelector('#dataTable tbody');
+        tbody.innerHTML = '';
+        data.forEach(row => {
+            tbody.innerHTML += `<tr>
+                <td>${row.name}</td>
+                <td>${row.phone}</td>
+                <td>${row.group}</td>
+                <td>${row.date}</td>
+                <td>${row.time}</td>
+            </tr>`;
+        });
+    }
+</script>
+</body>
+</html>
