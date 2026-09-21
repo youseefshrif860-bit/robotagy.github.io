@@ -44,6 +44,14 @@
         <label>رقم المجموعة:</label>
         <input type="text" id="group" required>
 
+        <label>التخصص / الكورس:</label>
+        <select id="course" required>
+            <option value="" disabled selected>اختر التخصص</option>
+            <option value="PLC">PLC</option>
+            <option value="Classic Control">Classic Control</option>
+            <option value="Motor Drive">Motor Drive (الحد الأقصى طالبين)</option>
+        </select>
+
         <label>تاريخ الحضور:</label>
         <input type="date" id="date" required onchange="updateTimeOptions()">
 
@@ -58,7 +66,7 @@
 </div>
 
 <!-- واجهة الإدارة -->
-<div class="container" id="admin-view" style="max-width: 850px;">
+<div class="container" id="admin-view" style="max-width: 900px;">
     <h2 style="text-align: center; color: #fcc01a;">لوحة تحكم م. يوسف شريف</h2>
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
         <button class="admin-btn" onclick="closeAdmin()">رجوع لصفحة التسجيل</button>
@@ -71,6 +79,7 @@
                     <th>الاسم</th>
                     <th>الهاتف</th>
                     <th>المجموعة</th>
+                    <th>التخصص</th>
                     <th>التاريخ</th>
                     <th>الوقت</th>
                     <th>تحكم</th>
@@ -93,7 +102,6 @@
       appId: "1:994345653468:web:4fbab3bdc2e09061089019"
     };
     
-    // تشغيل قاعدة البيانات
     firebase.initializeApp(firebaseConfig);
     const database = firebase.database();
 
@@ -131,28 +139,57 @@
         }
     }
 
-    // إرسال البيانات إلى Firebase
+    // إرسال البيانات والتحقق من العدد الأقصى المسموح
     document.getElementById('regForm').addEventListener('submit', function(e) {
         e.preventDefault();
         
-        const record = {
-            name: document.getElementById('name').value,
-            phone: document.getElementById('phone').value,
-            group: document.getElementById('group').value,
-            date: document.getElementById('date').value,
-            time: document.getElementById('time').value,
-            timestamp: new Date().toLocaleString()
-        };
-        
-        database.ref('students').push(record)
-        .then(() => {
-            document.getElementById('msg').innerText = 'تم تسجيل حضورك بنجاح!';
-            this.reset();
-            document.getElementById('time').innerHTML = '<option value="" disabled selected>اختر التاريخ أولاً</option>';
-            setTimeout(() => document.getElementById('msg').innerText = '', 4000);
-        })
-        .catch((error) => {
-            alert('حدث خطأ أثناء التسجيل: ' + error.message);
+        const course = document.getElementById('course').value;
+        const date = document.getElementById('date').value;
+        const time = document.getElementById('time').value;
+
+        // تحديد الحد الأقصى (2 للـ Motor Drive، و8 لباقي التخصصات)
+        const maxLimit = (course === 'Motor Drive') ? 2 : 8;
+
+        // جلب التسجيلات الحالية للتحقق من العدد في نفس الموعد والتخصص
+        database.ref('students').once('value', (snapshot) => {
+            let currentCount = 0;
+            
+            if (snapshot.exists()) {
+                snapshot.forEach((child) => {
+                    const data = child.val();
+                    // إذا كان نفس التاريخ ونفس الوقت ونفس التخصص
+                    if (data.date === date && data.time === time && data.course === course) {
+                        currentCount++;
+                    }
+                });
+            }
+
+            if (currentCount >= maxLimit) {
+                alert(`عفواً، هذا الموعد ممتلئ لهذا التخصص (${course}). الحد الأقصى هو ${maxLimit} طلاب. يرجى اختيار موعد آخر.`);
+                return;
+            }
+
+            // إذا العدد متاح، يتم الحفظ
+            const record = {
+                name: document.getElementById('name').value,
+                phone: document.getElementById('phone').value,
+                group: document.getElementById('group').value,
+                course: course,
+                date: date,
+                time: time,
+                timestamp: new Date().toLocaleString()
+            };
+            
+            database.ref('students').push(record)
+            .then(() => {
+                document.getElementById('msg').innerText = 'تم تسجيل حضورك بنجاح!';
+                document.getElementById('regForm').reset();
+                document.getElementById('time').innerHTML = '<option value="" disabled selected>اختر التاريخ أولاً</option>';
+                setTimeout(() => document.getElementById('msg').innerText = '', 4000);
+            })
+            .catch((error) => {
+                alert('حدث خطأ أثناء التسجيل: ' + error.message);
+            });
         });
     });
 
@@ -173,7 +210,7 @@
         document.getElementById('student-view').style.display = 'block';
     }
 
-    // سحب البيانات وعرضها في الجدول مع زر الحذف الفردي
+    // سحب البيانات وعرضها في الجدول مع التخصص
     function loadTable() {
         const tbody = document.querySelector('#dataTable tbody');
         
@@ -187,13 +224,14 @@
                         <td>${row.name || ''}</td>
                         <td>${row.phone || ''}</td>
                         <td>${row.group || ''}</td>
+                        <td style="font-weight: bold; color: #3b1e5a;">${row.course || ''}</td>
                         <td>${row.date || ''}</td>
                         <td>${row.time || ''}</td>
                         <td><button class="delete-btn" onclick="deleteStudent('${studentId}')">حذف</button></td>
                     </tr>`;
                 });
             } else {
-                tbody.innerHTML = `<tr><td colspan="6" style="text-align: center;">لا توجد بيانات مسجلة حتى الآن</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="7" style="text-align: center;">لا توجد بيانات مسجلة حتى الآن</td></tr>`;
             }
         });
     }
@@ -201,26 +239,14 @@
     // حذف طالب واحد
     function deleteStudent(id) {
         if (confirm('هل أنت متأكد من حذف هذا التسجيل؟')) {
-            database.ref('students/' + id).remove()
-            .then(() => {
-                // سيتم تحديث الجدول تلقائياً بفضل الـ listener
-            })
-            .catch((error) => {
-                alert('حدث خطأ أثناء الحذف: ' + error.message);
-            });
+            database.ref('students/' + id).remove().catch((error) => alert('خطأ في الحذف: ' + error.message));
         }
     }
 
     // حذف جميع التسجيلات دفعة واحدة
     function deleteAllData() {
-        if (confirm('تحذير: هل أنت متأكد من حذف جميع تسجيلات الطلاب بالكامل؟ لا يمكن التراجع عن هذا القرار.')) {
-            database.ref('students').remove()
-            .then(() => {
-                alert('تم تفريغ جميع البيانات بنجاح.');
-            })
-            .catch((error) => {
-                alert('حدث خطأ أثناء الحذف: ' + error.message);
-            });
+        if (confirm('تحذير: هل أنت متأكد من حذف جميع تسجيلات الطلاب بالكامل؟')) {
+            database.ref('students').remove().then(() => alert('تم تفريغ جميع البيانات بنجاح.'));
         }
     }
 </script>
