@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>تسجيل حضور معمل روبوتاجي</title>
+    <title>معمل روبوتاجي</title>
     <style>
         body { font-family: Tahoma, Arial, sans-serif; background-color: #3b1e5a; color: white; margin: 0; padding: 20px; }
         .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
@@ -33,7 +33,6 @@
 
 <!-- واجهة الطلاب -->
 <div class="container" id="student-view">
-    <h2 style="text-align: center; color: #fcc01a;">تسجيل الحضور</h2>
     <form id="regForm">
         <label>الاسم:</label>
         <input type="text" id="name" required>
@@ -178,7 +177,7 @@
             
             database.ref('students').push(record)
             .then(() => {
-                document.getElementById('msg').innerText = 'تم تسجيل حضورك بنجاح!';
+                document.getElementById('msg').innerText = 'تم تسجيل الموعد بنجاح';
                 document.getElementById('regForm').reset();
                 document.getElementById('time').innerHTML = '<option value="" disabled selected>اختر التاريخ أولاً</option>';
                 setTimeout(() => document.getElementById('msg').innerText = '', 4000);
@@ -192,7 +191,7 @@
     // الدخول للإدارة
     function checkAdmin() {
         const pass = prompt('الرجاء إدخال الرقم السري للإدارة:');
-        if (pass === '2004') {
+        if (pass === 'youssef2004') {
             document.getElementById('student-view').style.display = 'none';
             document.getElementById('admin-view').style.display = 'block';
             loadTable();
@@ -206,7 +205,7 @@
         document.getElementById('student-view').style.display = 'block';
     }
 
-    // سحب البيانات وترتيبها تناسقياً حسب التاريخ ثم عرضها
+    // سحب البيانات وترتيبها تصاعدياً حسب التاريخ
     function loadTable() {
         const tbody = document.querySelector('#dataTable tbody');
         
@@ -222,7 +221,7 @@
                     });
                 });
 
-                // ترتيب الطلاب تصاعدياً حسب التاريخ (من القريب للبعيد)
+                // ترتيب الطلاب تصاعدياً حسب التاريخ
                 studentsArray.sort((a, b) => new Date(a.date) - new Date(b.date));
 
                 studentsArray.forEach((row) => {
