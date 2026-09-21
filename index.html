@@ -17,6 +17,10 @@
         th, td { border: 1px solid #ddd; padding: 10px; text-align: center; }
         th { background-color: #fcc01a; color: #3b1e5a; }
     </style>
+
+    <!-- مكتبات Firebase -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
 </head>
 <body>
 
@@ -72,6 +76,21 @@
 </div>
 
 <script>
+    // إعدادات مشروع Firebase الخاص بك
+    const firebaseConfig = {
+      apiKey: "AIzaSyDEl0FbR_gjtOwRxOBS8_YWN_4HfyzyddU",
+      authDomain: "robotagy-1f557.firebaseapp.com",
+      databaseURL: "https://robotagy-1f557-default-rtdb.firebaseio.com",
+      projectId: "robotagy-1f557",
+      storageBucket: "robotagy-1f557.firebasestorage.app",
+      messagingSenderId: "994345653468",
+      appId: "1:994345653468:web:4fbab3bdc2e09061089019"
+    };
+    
+    // تشغيل قاعدة البيانات
+    firebase.initializeApp(firebaseConfig);
+    const database = firebase.database();
+
     // منع اختيار تاريخ قديم
     const today = new Date().toISOString().split('T')[0];
     document.getElementById('date').setAttribute('min', today);
@@ -106,25 +125,31 @@
         }
     }
 
-    // حفظ البيانات
+    // إرسال البيانات إلى Firebase
     document.getElementById('regForm').addEventListener('submit', function(e) {
         e.preventDefault();
+        
         const record = {
             name: document.getElementById('name').value,
             phone: document.getElementById('phone').value,
             group: document.getElementById('group').value,
             date: document.getElementById('date').value,
-            time: document.getElementById('time').value
+            time: document.getElementById('time').value,
+            timestamp: new Date().toLocaleString()
         };
         
-        let data = JSON.parse(localStorage.getItem('robotagyLabData') || '[]');
-        data.push(record);
-        localStorage.setItem('robotagyLabData', JSON.stringify(data));
-
-        document.getElementById('msg').innerText = 'تم تسجيل حضورك بنجاح!';
-        this.reset();
-        document.getElementById('time').innerHTML = '<option value="" disabled selected>اختر التاريخ أولاً</option>';
-        setTimeout(() => document.getElementById('msg').innerText = '', 4000);
+        // حفظ البيانات في قاعدة البيانات
+        database.ref('students').push(record)
+        .then(() => {
+            document.getElementById('msg').innerText = 'تم تسجيل حضورك بنجاح!';
+            this.reset();
+            document.getElementById('time').innerHTML = '<option value="" disabled selected>اختر التاريخ أولاً</option>';
+            setTimeout(() => document.getElementById('msg').innerText = '', 4000);
+        })
+        .catch((error) => {
+            alert('حدث خطأ أثناء التسجيل: ' + error.message);
+            console.error(error);
+        });
     });
 
     // الدخول للإدارة
@@ -144,18 +169,28 @@
         document.getElementById('student-view').style.display = 'block';
     }
 
+    // سحب البيانات وعرضها في الجدول لحظياً
     function loadTable() {
-        const data = JSON.parse(localStorage.getItem('robotagyLabData') || '[]');
         const tbody = document.querySelector('#dataTable tbody');
-        tbody.innerHTML = '';
-        data.forEach(row => {
-            tbody.innerHTML += `<tr>
-                <td>${row.name}</td>
-                <td>${row.phone}</td>
-                <td>${row.group}</td>
-                <td>${row.date}</td>
-                <td>${row.time}</td>
-            </tr>`;
+        
+        database.ref('students').on('value', (snapshot) => {
+            tbody.innerHTML = '';
+            if (snapshot.exists()) {
+                snapshot.forEach((childSnapshot) => {
+                    const row = childSnapshot.val();
+                    tbody.innerHTML += `<tr>
+                        <td>${row.name || ''}</td>
+                        <td>${row.phone || ''}</td>
+                        <td>${row.group || ''}</td>
+                        <td>${row.date || ''}</td>
+                        <td>${row.time || ''}</td>
+                    </tr>`;
+                });
+            } else {
+                tbody.innerHTML = `<tr><td colspan="5" style="text-align: center;">لا توجد بيانات مسجلة حتى الآن</td></tr>`;
+            }
+        }, (error) => {
+            console.error("خطأ في قراءة البيانات: ", error);
         });
     }
 </script>
