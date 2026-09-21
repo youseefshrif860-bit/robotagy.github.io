@@ -147,7 +147,6 @@
         const date = document.getElementById('date').value;
         const time = document.getElementById('time').value;
 
-        // الحدود الأقصى (مخفية تماماً عن الطالب)
         const maxLimit = (course === 'Motor Drive') ? 2 : 8;
 
         database.ref('students').once('value', (snapshot) => {
@@ -207,16 +206,26 @@
         document.getElementById('student-view').style.display = 'block';
     }
 
-    // سحب البيانات وعرضها في الجدول مع الكورس
+    // سحب البيانات وترتيبها تناسقياً حسب التاريخ ثم عرضها
     function loadTable() {
         const tbody = document.querySelector('#dataTable tbody');
         
         database.ref('students').on('value', (snapshot) => {
             tbody.innerHTML = '';
             if (snapshot.exists()) {
+                let studentsArray = [];
+                
                 snapshot.forEach((childSnapshot) => {
-                    const studentId = childSnapshot.key;
-                    const row = childSnapshot.val();
+                    studentsArray.push({
+                        id: childSnapshot.key,
+                        ...childSnapshot.val()
+                    });
+                });
+
+                // ترتيب الطلاب تصاعدياً حسب التاريخ (من القريب للبعيد)
+                studentsArray.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+                studentsArray.forEach((row) => {
                     tbody.innerHTML += `<tr>
                         <td>${row.name || ''}</td>
                         <td>${row.phone || ''}</td>
@@ -224,7 +233,7 @@
                         <td style="font-weight: bold; color: #3b1e5a;">${row.course || ''}</td>
                         <td>${row.date || ''}</td>
                         <td>${row.time || ''}</td>
-                        <td><button class="delete-btn" onclick="deleteStudent('${studentId}')">حذف</button></td>
+                        <td><button class="delete-btn" onclick="deleteStudent('${row.id}')">حذف</button></td>
                     </tr>`;
                 });
             } else {
