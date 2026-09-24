@@ -22,7 +22,7 @@
         /* أزرار الأيام الجديدة */
         .date-btn { background-color: #fcc01a; color: #3b1e5a; border: none; padding: 15px; font-size: 18px; font-weight: bold; cursor: pointer; border-radius: 5px; text-align: center; width: 100%; margin-bottom: 10px; transition: 0.3s; }
         .date-btn:hover { background-color: #e5ad17; }
-        .back-btn { background-color: white; color: #3b1e5a; border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer; font-weight: bold; margin-bottom: 15px; }
+        .back-btn { background-color: white; color: #3b1e5a; border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer; font-weight: bold; margin-bottom: 0; }
     </style>
 
     <!-- مكتبات Firebase -->
@@ -74,7 +74,7 @@
     <h2 style="text-align: center; color: #fcc01a;">لوحة تحكم م. يوسف شريف</h2>
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
         <button class="admin-btn" onclick="closeAdmin()">تسجيل الخروج من الإدارة</button>
-        <button class="delete-all-btn" onclick="deleteAllData()">حذف كل التسجيلات دفعة واحدة</button>
+        <button class="delete-all-btn" style="margin-bottom: 0;" onclick="deleteAllData()">حذف كل التسجيلات بالكامل</button>
     </div>
 
     <!-- قائمة الأيام -->
@@ -85,7 +85,10 @@
 
     <!-- تفاصيل اليوم المختار -->
     <div id="date-details" style="display: none;">
-        <button class="back-btn" onclick="backToDates()">الرجوع لقائمة الأيام ↲</button>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            <button class="back-btn" onclick="backToDates()">الرجوع لقائمة الأيام ↲</button>
+            <button class="delete-all-btn" style="margin-bottom: 0;" onclick="deleteAllInDay()">حذف تسجيلات هذا اليوم</button>
+        </div>
         <h3 id="selected-date-title" style="text-align: center; color: #fcc01a; margin-top: 0;"></h3>
         <div style="overflow-x: auto;">
             <table id="dataTable">
@@ -219,7 +222,7 @@
     function closeAdmin() {
         document.getElementById('admin-view').style.display = 'none';
         document.getElementById('student-view').style.display = 'block';
-        backToDates(); // إعادة ضبط لوحة الإدارة للقائمة الرئيسية
+        backToDates(); 
     }
 
     let allStudents = [];
@@ -239,7 +242,6 @@
             }
             renderDatesList();
             
-            // تحديث الجدول اللحظي لو كان المدير فاتح يوم معين
             if (currentSelectedDate) {
                 showDateDetails(currentSelectedDate);
             }
@@ -251,10 +253,7 @@
         const container = document.getElementById('dates-container');
         container.innerHTML = '';
 
-        // استخراج التواريخ بدون تكرار
         const uniqueDates = [...new Set(allStudents.map(s => s.date))];
-        
-        // ترتيب التواريخ من الأقدم للأحدث
         uniqueDates.sort((a, b) => new Date(a) - new Date(b));
 
         if (uniqueDates.length === 0) {
@@ -263,9 +262,7 @@
         }
 
         uniqueDates.forEach(date => {
-            // حساب عدد الطلاب في هذا اليوم
             const studentsInDay = allStudents.filter(s => s.date === date).length;
-            
             const btn = document.createElement('button');
             btn.className = 'date-btn';
             btn.innerText = `التسجيلات يوم: ${date}  (عدد الطلاب: ${studentsInDay})`;
@@ -284,10 +281,8 @@
         const tbody = document.querySelector('#dataTable tbody');
         tbody.innerHTML = '';
 
-        // تصفية الطلاب لليوم المحدد فقط
         let filteredStudents = allStudents.filter(s => s.date === date);
 
-        // ترتيب الكورس والوقت
         const courseOrder = { 'Classic Control': 1, 'PLC': 2, 'Motor Drive': 3 };
         const timeOrder = {
             'من 12 ظهراً إلى 3 عصراً': 1,
@@ -297,13 +292,11 @@
         };
 
         filteredStudents.sort((a, b) => {
-            // 1. الفرز بالكورس أولاً
             const cA = courseOrder[a.course] || 99;
             const cB = courseOrder[b.course] || 99;
             if (cA < cB) return -1;
             if (cA > cB) return 1;
 
-            // 2. الفرز بالوقت ثانياً (لو نفس الكورس)
             const tA = timeOrder[a.time] || 99;
             const tB = timeOrder[b.time] || 99;
             if (tA < tB) return -1;
@@ -339,9 +332,36 @@
         }
     }
 
-    // حذف جميع التسجيلات دفعة واحدة
+    // حذف جميع تسجيلات اليوم المحدد
+    function deleteAllInDay() {
+        if (!currentSelectedDate) return;
+        
+        if (confirm(`تحذير: هل أنت متأكد من حذف جميع تسجيلات يوم ${currentSelectedDate}؟\nلا يمكن التراجع عن هذا القرار.`)) {
+            
+            // جمع الطلاب الخاصين بهذا اليوم لتجهيزهم للحذف الجماعي
+            const studentsToDelete = allStudents.filter(s => s.date === currentSelectedDate);
+            let updates = {};
+            
+            // تهيئة تحديثات قاعدة البيانات لتعيين قيمة الطلاب المحذوفين بـ null
+            studentsToDelete.forEach(student => {
+                updates[student.id] = null;
+            });
+
+            // تنفيذ الحذف الجماعي
+            database.ref('students').update(updates)
+            .then(() => {
+                alert('تم حذف جميع تسجيلات هذا اليوم بنجاح.');
+                backToDates(); // الرجوع لقائمة الأيام تلقائياً بعد الحذف
+            })
+            .catch((error) => {
+                alert('خطأ في الحذف: ' + error.message);
+            });
+        }
+    }
+
+    // حذف جميع التسجيلات دفعة واحدة (لكل الأيام)
     function deleteAllData() {
-        if (confirm('تحذير: هل أنت متأكد من حذف جميع تسجيلات الطلاب بالكامل؟')) {
+        if (confirm('تحذير نهائي: هل أنت متأكد من حذف جميع تسجيلات الطلاب في كل الأيام بالكامل؟')) {
             database.ref('students').remove()
             .then(() => {
                 alert('تم تفريغ جميع البيانات بنجاح.');
