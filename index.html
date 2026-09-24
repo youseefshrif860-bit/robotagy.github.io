@@ -205,10 +205,24 @@
         document.getElementById('student-view').style.display = 'block';
     }
 
-    // سحب البيانات وترتيبها تصاعدياً حسب التاريخ
+    // سحب البيانات وترتيبها متقدم (التاريخ -> الوقت -> الكورس)
     function loadTable() {
         const tbody = document.querySelector('#dataTable tbody');
         
+        // تعريف أوزان الترتيب للوقت والكورس
+        const timeOrder = {
+            'من 12 ظهراً إلى 3 عصراً': 1,
+            'من 3 عصراً إلى 6 مساءً': 2,
+            'من 6 مساءً إلى 9 مساءً': 3,
+            'من 8 مساءً إلى 11 مساءً': 4
+        };
+
+        const courseOrder = {
+            'Classic Control': 1,
+            'PLC': 2,
+            'Motor Drive': 3
+        };
+
         database.ref('students').on('value', (snapshot) => {
             tbody.innerHTML = '';
             if (snapshot.exists()) {
@@ -221,8 +235,28 @@
                     });
                 });
 
-                // ترتيب الطلاب تصاعدياً حسب التاريخ
-                studentsArray.sort((a, b) => new Date(a.date) - new Date(b.date));
+                // دالة الفرز المتعددة
+                studentsArray.sort((a, b) => {
+                    // 1. الفرز بالتاريخ
+                    const dateA = new Date(a.date);
+                    const dateB = new Date(b.date);
+                    if (dateA < dateB) return -1;
+                    if (dateA > dateB) return 1;
+
+                    // 2. الفرز بالوقت (إذا كان نفس التاريخ)
+                    const tA = timeOrder[a.time] || 99;
+                    const tB = timeOrder[b.time] || 99;
+                    if (tA < tB) return -1;
+                    if (tA > tB) return 1;
+
+                    // 3. الفرز بالكورس (إذا كان نفس التاريخ ونفس الوقت)
+                    const cA = courseOrder[a.course] || 99;
+                    const cB = courseOrder[b.course] || 99;
+                    if (cA < cB) return -1;
+                    if (cA > cB) return 1;
+
+                    return 0;
+                });
 
                 studentsArray.forEach((row) => {
                     tbody.innerHTML += `<tr>
