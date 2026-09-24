@@ -205,11 +205,11 @@
         document.getElementById('student-view').style.display = 'block';
     }
 
-    // سحب البيانات وترتيبها متقدم (التاريخ -> الوقت -> الكورس)
+    // سحب البيانات وترتيبها متقدم (التاريخ -> الكورس -> الوقت)
     function loadTable() {
         const tbody = document.querySelector('#dataTable tbody');
         
-        // تعريف أوزان الترتيب للوقت والكورس
+        // تعريف أوزان الترتيب
         const timeOrder = {
             'من 12 ظهراً إلى 3 عصراً': 1,
             'من 3 عصراً إلى 6 مساءً': 2,
@@ -243,17 +243,17 @@
                     if (dateA < dateB) return -1;
                     if (dateA > dateB) return 1;
 
-                    // 2. الفرز بالوقت (إذا كان نفس التاريخ)
-                    const tA = timeOrder[a.time] || 99;
-                    const tB = timeOrder[b.time] || 99;
-                    if (tA < tB) return -1;
-                    if (tA > tB) return 1;
-
-                    // 3. الفرز بالكورس (إذا كان نفس التاريخ ونفس الوقت)
+                    // 2. الفرز بالكورس (إذا كان نفس التاريخ)
                     const cA = courseOrder[a.course] || 99;
                     const cB = courseOrder[b.course] || 99;
                     if (cA < cB) return -1;
                     if (cA > cB) return 1;
+
+                    // 3. الفرز بالوقت (إذا كان نفس التاريخ ونفس الكورس)
+                    const tA = timeOrder[a.time] || 99;
+                    const tB = timeOrder[b.time] || 99;
+                    if (tA < tB) return -1;
+                    if (tA > tB) return 1;
 
                     return 0;
                 });
