@@ -19,14 +19,13 @@
         .delete-btn { background-color: #ff4d4d; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer; font-weight: bold; }
         .delete-all-btn { background-color: #cc0000; color: white; border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer; font-weight: bold; margin-bottom: 15px; }
         
-        /* أزرار الأيام والإضافة */
-        .date-btn { background-color: #fcc01a; color: #3b1e5a; border: none; padding: 15px; font-size: 18px; font-weight: bold; cursor: pointer; border-radius: 5px; text-align: center; width: 100%; margin-bottom: 10px; transition: 0.3s; }
-        .date-btn:hover { background-color: #e5ad17; }
+        /* أزرار التنقل */
+        .nav-btn { background-color: #fcc01a; color: #3b1e5a; border: none; padding: 15px; font-size: 18px; font-weight: bold; cursor: pointer; border-radius: 5px; text-align: center; width: 100%; margin-bottom: 10px; transition: 0.3s; }
+        .nav-btn:hover { background-color: #e5ad17; }
         .back-btn { background-color: white; color: #3b1e5a; border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer; font-weight: bold; margin-bottom: 0; }
         .add-btn { background-color: #28a745; color: white; border: none; padding: 10px; font-weight: bold; cursor: pointer; border-radius: 5px; width: 100%; margin-bottom: 15px; }
         .add-btn:hover { background-color: #218838; }
         
-        /* تصميم الـ Checkbox الخاص بالحضور */
         .attendance-check { width: 22px; height: 22px; cursor: pointer; accent-color: #3b1e5a; }
     </style>
 
@@ -63,7 +62,6 @@
 
         <label>مواعيد الحضور:</label>
         <div id="appointments-container">
-            <!-- صف الموعد الأول -->
             <div class="appointment-row" style="display: flex; gap: 10px; margin-bottom: 10px; align-items: center;">
                 <input type="date" class="date-input" required onchange="updateTimeOptions(this)" style="margin:0; width: 50%;">
                 <select class="time-input" required style="margin:0; width: 50%;">
@@ -87,19 +85,29 @@
         <button class="delete-all-btn" style="margin-bottom: 0;" onclick="deleteAllData()">حذف كل التسجيلات بالكامل</button>
     </div>
 
-    <!-- قائمة الأيام -->
+    <!-- المستوى الأول: قائمة الأيام -->
     <div id="dates-list">
         <h3 style="text-align: center; color: white;">أيام الحجز المسجلة</h3>
         <div id="dates-container"></div>
     </div>
 
-    <!-- تفاصيل اليوم المختار -->
-    <div id="date-details" style="display: none;">
+    <!-- المستوى الثاني: قائمة الفترات لليوم المختار -->
+    <div id="periods-list" style="display: none;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
             <button class="back-btn" onclick="backToDates()">الرجوع لقائمة الأيام ↲</button>
             <button class="delete-all-btn" style="margin-bottom: 0;" onclick="deleteAllInDay()">حذف تسجيلات هذا اليوم</button>
         </div>
         <h3 id="selected-date-title" style="text-align: center; color: #fcc01a; margin-top: 0;"></h3>
+        <div id="periods-container"></div>
+    </div>
+
+    <!-- المستوى الثالث: تفاصيل جدول الطلاب للفترة المختارة -->
+    <div id="period-details" style="display: none;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+            <button class="back-btn" onclick="backToPeriods()">الرجوع للفترات ↲</button>
+            <button class="delete-all-btn" style="margin-bottom: 0;" onclick="deleteAllInPeriod()">حذف تسجيلات هذه الفترة</button>
+        </div>
+        <h3 id="selected-period-title" style="text-align: center; color: #fcc01a; margin-top: 0;"></h3>
         <div style="overflow-x: auto;">
             <table id="dataTable">
                 <thead>
@@ -138,7 +146,6 @@
     const today = new Date().toISOString().split('T')[0];
     document.querySelector('.date-input').setAttribute('min', today);
 
-    // دالة تحديث الأوقات (تم إلغاء الـ alert المزعج)
     function updateTimeOptions(element) {
         const dateVal = element.value;
         const timeSelect = element.parentElement.querySelector('.time-input');
@@ -149,20 +156,13 @@
         const day = new Date(dateVal).getDay(); 
 
         if (day === 5) { 
-            // وضع خيار بأن المعمل مغلق لمنع التسجيل في هذا اليوم بدون إزعاج الطالب برسالة
             let o = document.createElement('option');
-            o.value = '';
-            o.text = 'المعمل مغلق يوم الجمعة';
-            o.disabled = true;
-            o.selected = true;
+            o.value = ''; o.text = 'المعمل مغلق يوم الجمعة'; o.disabled = true; o.selected = true;
             timeSelect.appendChild(o);
         } 
         else if (day === 0 || day === 4 || day === 6) { 
             let defaultOpt = document.createElement('option');
-            defaultOpt.value = '';
-            defaultOpt.text = 'اختر الوقت';
-            defaultOpt.disabled = true;
-            defaultOpt.selected = true;
+            defaultOpt.value = ''; defaultOpt.text = 'اختر الوقت'; defaultOpt.disabled = true; defaultOpt.selected = true;
             timeSelect.appendChild(defaultOpt);
 
             const options = ['من 12 ظهراً إلى 3 عصراً', 'من 3 عصراً إلى 6 مساءً', 'من 6 مساءً إلى 9 مساءً'];
@@ -174,26 +174,20 @@
         } 
         else { 
             let defaultOpt = document.createElement('option');
-            defaultOpt.value = '';
-            defaultOpt.text = 'اختر الوقت';
-            defaultOpt.disabled = true;
-            defaultOpt.selected = true;
+            defaultOpt.value = ''; defaultOpt.text = 'اختر الوقت'; defaultOpt.disabled = true; defaultOpt.selected = true;
             timeSelect.appendChild(defaultOpt);
 
             let o = document.createElement('option');
-            o.value = 'من 8 مساءً إلى 11 مساءً'; 
-            o.text = 'من 8 مساءً إلى 11 مساءً';
+            o.value = 'من 8 مساءً إلى 11 مساءً'; o.text = 'من 8 مساءً إلى 11 مساءً';
             timeSelect.appendChild(o);
         }
     }
 
-    // إضافة صف موعد جديد
     function addAppointment() {
         const container = document.getElementById('appointments-container');
         const row = document.createElement('div');
         row.className = 'appointment-row';
         row.style = 'display: flex; gap: 10px; margin-bottom: 10px; align-items: center;';
-        
         row.innerHTML = `
             <input type="date" class="date-input" min="${today}" required onchange="updateTimeOptions(this)" style="margin:0; width: 45%;">
             <select class="time-input" required style="margin:0; width: 45%;">
@@ -207,12 +201,10 @@
     // إرسال البيانات
     document.getElementById('regForm').addEventListener('submit', function(e) {
         e.preventDefault();
-        
         const name = document.getElementById('name').value;
         const phone = document.getElementById('phone').value;
         const group = document.getElementById('group').value;
         const course = document.getElementById('course').value;
-
         const maxLimit = (course === 'Motor Drive') ? 2 : 8;
 
         const appointmentRows = document.querySelectorAll('.appointment-row');
@@ -227,7 +219,6 @@
             
             if(tempSet.has(key)) hasDuplicate = true;
             tempSet.add(key);
-            
             appointments.push({ date: d, time: t });
         });
 
@@ -253,23 +244,13 @@
 
             let promises = [];
             appointments.forEach(app => {
-                const record = {
-                    name: name,
-                    phone: phone,
-                    group: group,
-                    course: course,
-                    date: app.date,
-                    time: app.time,
-                    attended: false,
-                    timestamp: new Date().toLocaleString()
-                };
+                const record = { name, phone, group, course, date: app.date, time: app.time, attended: false, timestamp: new Date().toLocaleString() };
                 promises.push(database.ref('students').push(record));
             });
 
             Promise.all(promises).then(() => {
                 document.getElementById('msg').innerText = 'تم تسجيل جميع المواعيد بنجاح';
                 document.getElementById('regForm').reset();
-                
                 document.getElementById('appointments-container').innerHTML = `
                     <div class="appointment-row" style="display: flex; gap: 10px; margin-bottom: 10px; align-items: center;">
                         <input type="date" class="date-input" min="${today}" required onchange="updateTimeOptions(this)" style="margin:0; width: 50%;">
@@ -278,11 +259,8 @@
                         </select>
                     </div>
                 `;
-                
                 setTimeout(() => document.getElementById('msg').innerText = '', 4000);
-            }).catch((error) => {
-                alert('حدث خطأ أثناء التسجيل: ' + error.message);
-            });
+            }).catch(error => alert('حدث خطأ أثناء التسجيل: ' + error.message));
         });
     });
 
@@ -306,27 +284,49 @@
 
     let allStudents = [];
     let currentSelectedDate = null;
+    let currentSelectedPeriod = null;
 
+    // جلب البيانات الأساسية
     function loadData() {
         database.ref('students').on('value', (snapshot) => {
             allStudents = [];
             if (snapshot.exists()) {
-                snapshot.forEach((childSnapshot) => {
-                    allStudents.push({
-                        id: childSnapshot.key,
-                        ...childSnapshot.val()
-                    });
+                snapshot.forEach(childSnapshot => {
+                    allStudents.push({ id: childSnapshot.key, ...childSnapshot.val() });
                 });
             }
-            renderDatesList();
             
+            // تحديث الشاشات تلقائياً في حالة الحذف أو التعديل
             if (currentSelectedDate) {
-                showDateDetails(currentSelectedDate);
+                let studentsInDay = allStudents.filter(s => s.date === currentSelectedDate);
+                if (studentsInDay.length === 0) {
+                    backToDates();
+                    renderDatesList();
+                } else {
+                    if (currentSelectedPeriod) {
+                        let studentsInPeriod = studentsInDay.filter(s => s.time === currentSelectedPeriod);
+                        if (studentsInPeriod.length === 0) {
+                            backToPeriods();
+                            renderPeriodsList(currentSelectedDate);
+                        } else {
+                            showPeriodDetails(currentSelectedDate, currentSelectedPeriod);
+                        }
+                    } else {
+                        renderPeriodsList(currentSelectedDate);
+                    }
+                }
+            } else {
+                renderDatesList();
             }
         });
     }
 
+    // عرض قائمة الأيام
     function renderDatesList() {
+        document.getElementById('dates-list').style.display = 'block';
+        document.getElementById('periods-list').style.display = 'none';
+        document.getElementById('period-details').style.display = 'none';
+
         const container = document.getElementById('dates-container');
         container.innerHTML = '';
 
@@ -341,49 +341,68 @@
         uniqueDates.forEach(date => {
             const studentsInDay = allStudents.filter(s => s.date === date).length;
             const btn = document.createElement('button');
-            btn.className = 'date-btn';
-            btn.innerText = `التسجيلات يوم: ${date}  (عدد الطلاب: ${studentsInDay})`;
-            btn.onclick = () => showDateDetails(date);
+            btn.className = 'nav-btn';
+            btn.innerText = `يوم: ${date}  (عدد الطلاب الكلي: ${studentsInDay})`;
+            btn.onclick = () => renderPeriodsList(date);
             container.appendChild(btn);
         });
     }
 
-    function showDateDetails(date) {
+    // عرض قائمة الفترات لليوم المختار
+    function renderPeriodsList(date) {
         currentSelectedDate = date;
+        currentSelectedPeriod = null;
+        
         document.getElementById('dates-list').style.display = 'none';
-        document.getElementById('date-details').style.display = 'block';
-        document.getElementById('selected-date-title').innerText = `جدول يوم: ${date}`;
+        document.getElementById('period-details').style.display = 'none';
+        document.getElementById('periods-list').style.display = 'block';
+        
+        document.getElementById('selected-date-title').innerText = `إدارة فترات يوم: ${date}`;
 
-        const tbody = document.querySelector('#dataTable tbody');
-        tbody.innerHTML = '';
+        const container = document.getElementById('periods-container');
+        container.innerHTML = '';
 
-        let filteredStudents = allStudents.filter(s => s.date === date);
+        let studentsInDay = allStudents.filter(s => s.date === date);
+        const uniquePeriods = [...new Set(studentsInDay.map(s => s.time))];
 
-        const courseOrder = { 'Classic Control': 1, 'PLC': 2, 'Motor Drive': 3 };
         const timeOrder = {
             'من 12 ظهراً إلى 3 عصراً': 1,
             'من 3 عصراً إلى 6 مساءً': 2,
             'من 6 مساءً إلى 9 مساءً': 3,
             'من 8 مساءً إلى 11 مساءً': 4
         };
+        
+        uniquePeriods.sort((a, b) => (timeOrder[a] || 99) - (timeOrder[b] || 99));
 
-        filteredStudents.sort((a, b) => {
-            const cA = courseOrder[a.course] || 99;
-            const cB = courseOrder[b.course] || 99;
-            if (cA < cB) return -1;
-            if (cA > cB) return 1;
-
-            const tA = timeOrder[a.time] || 99;
-            const tB = timeOrder[b.time] || 99;
-            if (tA < tB) return -1;
-            if (tA > tB) return 1;
-
-            return 0;
+        uniquePeriods.forEach(period => {
+            const studentsInPeriod = studentsInDay.filter(s => s.time === period).length;
+            const btn = document.createElement('button');
+            btn.className = 'nav-btn';
+            btn.innerText = `فترة: ${period} (الطلاب: ${studentsInPeriod})`;
+            btn.onclick = () => showPeriodDetails(date, period);
+            container.appendChild(btn);
         });
+    }
 
-        filteredStudents.forEach((row) => {
+    // عرض جدول الطلاب للفترة المختارة
+    function showPeriodDetails(date, period) {
+        currentSelectedPeriod = period;
+        document.getElementById('periods-list').style.display = 'none';
+        document.getElementById('period-details').style.display = 'block';
+        
+        document.getElementById('selected-period-title').innerText = `جدول فترة (${period}) ليوم ${date}`;
+
+        const tbody = document.querySelector('#dataTable tbody');
+        tbody.innerHTML = '';
+
+        let filteredStudents = allStudents.filter(s => s.date === date && s.time === period);
+
+        // الترتيب حسب الكورس داخل نفس الفترة
+        const courseOrder = { 'Classic Control': 1, 'PLC': 2, 'Motor Drive': 3 };
+        filteredStudents.sort((a, b) => (courseOrder[a.course] || 99) - (courseOrder[b.course] || 99));
+
+        filteredStudents.forEach(row => {
             const isChecked = row.attended ? 'checked' : '';
-            
             tbody.innerHTML += `<tr>
                 <td>${row.name || ''}</td>
                 <td>${row.phone || ''}</td>
@@ -400,52 +419,53 @@
         });
     }
 
+    // تحديث الحضور
     function updateAttendance(id, status) {
-        database.ref('students/' + id).update({
-            attended: status
-        }).catch(error => alert('حدث خطأ أثناء تحديث الحضور: ' + error.message));
+        database.ref('students/' + id).update({ attended: status }).catch(error => alert('خطأ في التحديث: ' + error.message));
     }
 
+    // دوال الرجوع
     function backToDates() {
         currentSelectedDate = null;
-        document.getElementById('date-details').style.display = 'none';
-        document.getElementById('dates-list').style.display = 'block';
+        currentSelectedPeriod = null;
+        renderDatesList();
     }
 
+    function backToPeriods() {
+        currentSelectedPeriod = null;
+        renderPeriodsList(currentSelectedDate);
+    }
+
+    // دوال الحذف
     function deleteStudent(id) {
         if (confirm('هل أنت متأكد من حذف هذا الموعد؟')) {
-            database.ref('students/' + id).remove().catch((error) => alert('خطأ في الحذف: ' + error.message));
+            database.ref('students/' + id).remove().catch(error => alert('خطأ: ' + error.message));
+        }
+    }
+
+    function deleteAllInPeriod() {
+        if (!currentSelectedDate || !currentSelectedPeriod) return;
+        if (confirm(`تحذير: هل أنت متأكد من حذف جميع تسجيلات فترة (${currentSelectedPeriod})؟\nلا يمكن التراجع.`)) {
+            const studentsToDelete = allStudents.filter(s => s.date === currentSelectedDate && s.time === currentSelectedPeriod);
+            let updates = {};
+            studentsToDelete.forEach(student => updates[student.id] = null);
+            database.ref('students').update(updates).then(() => alert('تم حذف الفترة بنجاح.')).catch(error => alert('خطأ: ' + error.message));
         }
     }
 
     function deleteAllInDay() {
         if (!currentSelectedDate) return;
-        
-        if (confirm(`تحذير: هل أنت متأكد من حذف جميع تسجيلات يوم ${currentSelectedDate}؟\nلا يمكن التراجع عن هذا القرار.`)) {
+        if (confirm(`تحذير: هل أنت متأكد من حذف جميع تسجيلات يوم ${currentSelectedDate} بالكامل؟\nلا يمكن التراجع.`)) {
             const studentsToDelete = allStudents.filter(s => s.date === currentSelectedDate);
             let updates = {};
-            
-            studentsToDelete.forEach(student => {
-                updates[student.id] = null;
-            });
-
-            database.ref('students').update(updates)
-            .then(() => {
-                alert('تم حذف جميع تسجيلات هذا اليوم بنجاح.');
-                backToDates(); 
-            })
-            .catch((error) => alert('خطأ في الحذف: ' + error.message));
+            studentsToDelete.forEach(student => updates[student.id] = null);
+            database.ref('students').update(updates).then(() => alert('تم حذف اليوم بنجاح.')).catch(error => alert('خطأ: ' + error.message));
         }
     }
 
     function deleteAllData() {
         if (confirm('تحذير نهائي: هل أنت متأكد من حذف جميع تسجيلات الطلاب في كل الأيام بالكامل؟')) {
-            database.ref('students').remove()
-            .then(() => {
-                alert('تم تفريغ جميع البيانات بنجاح.');
-                backToDates();
-            })
-            .catch((error) => alert('خطأ في الحذف: ' + error.message));
+            database.ref('students').remove().then(() => alert('تم تفريغ البيانات.')).catch(error => alert('خطأ: ' + error.message));
         }
     }
 </script>
