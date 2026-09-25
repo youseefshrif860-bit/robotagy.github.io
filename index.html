@@ -135,11 +135,10 @@
     firebase.initializeApp(firebaseConfig);
     const database = firebase.database();
 
-    // منع اختيار تاريخ قديم لأول موعد عند تحميل الصفحة
     const today = new Date().toISOString().split('T')[0];
     document.querySelector('.date-input').setAttribute('min', today);
 
-    // تحديث الأوقات بناءً على التاريخ المختار (تعمل مع أي صف موعد)
+    // دالة تحديث الأوقات (تم إلغاء الـ alert المزعج)
     function updateTimeOptions(element) {
         const dateVal = element.value;
         const timeSelect = element.parentElement.querySelector('.time-input');
@@ -150,11 +149,22 @@
         const day = new Date(dateVal).getDay(); 
 
         if (day === 5) { 
-            alert('عفواً، المعمل مغلق يوم الجمعة');
-            element.value = '';
-            timeSelect.innerHTML = '<option value="" disabled selected>اختر التاريخ أولاً</option>';
+            // وضع خيار بأن المعمل مغلق لمنع التسجيل في هذا اليوم بدون إزعاج الطالب برسالة
+            let o = document.createElement('option');
+            o.value = '';
+            o.text = 'المعمل مغلق يوم الجمعة';
+            o.disabled = true;
+            o.selected = true;
+            timeSelect.appendChild(o);
         } 
         else if (day === 0 || day === 4 || day === 6) { 
+            let defaultOpt = document.createElement('option');
+            defaultOpt.value = '';
+            defaultOpt.text = 'اختر الوقت';
+            defaultOpt.disabled = true;
+            defaultOpt.selected = true;
+            timeSelect.appendChild(defaultOpt);
+
             const options = ['من 12 ظهراً إلى 3 عصراً', 'من 3 عصراً إلى 6 مساءً', 'من 6 مساءً إلى 9 مساءً'];
             options.forEach(opt => {
                 let o = document.createElement('option');
@@ -163,6 +173,13 @@
             });
         } 
         else { 
+            let defaultOpt = document.createElement('option');
+            defaultOpt.value = '';
+            defaultOpt.text = 'اختر الوقت';
+            defaultOpt.disabled = true;
+            defaultOpt.selected = true;
+            timeSelect.appendChild(defaultOpt);
+
             let o = document.createElement('option');
             o.value = 'من 8 مساءً إلى 11 مساءً'; 
             o.text = 'من 8 مساءً إلى 11 مساءً';
@@ -187,7 +204,7 @@
         container.appendChild(row);
     }
 
-    // إرسال البيانات (المواعيد المتعددة) والتحقق من العدد الأقصى
+    // إرسال البيانات
     document.getElementById('regForm').addEventListener('submit', function(e) {
         e.preventDefault();
         
@@ -198,7 +215,6 @@
 
         const maxLimit = (course === 'Motor Drive') ? 2 : 8;
 
-        // تجميع كل المواعيد المختارة
         const appointmentRows = document.querySelectorAll('.appointment-row');
         let appointments = [];
         let hasDuplicate = false;
@@ -209,7 +225,6 @@
             const t = row.querySelector('.time-input').value;
             const key = d + '|' + t;
             
-            // التحقق من أن الطالب لم يختر نفس الموعد مرتين في نفس الاستمارة
             if(tempSet.has(key)) hasDuplicate = true;
             tempSet.add(key);
             
@@ -221,24 +236,21 @@
             return;
         }
 
-        // جلب البيانات من القاعدة للتحقق من السعة
         database.ref('students').once('value', (snapshot) => {
             let dbData = [];
             if (snapshot.exists()) {
                 snapshot.forEach(child => dbData.push(child.val()));
             }
 
-            // فحص سعة كل موعد تم اختياره
             for (let i = 0; i < appointments.length; i++) {
                 const app = appointments[i];
                 let currentCount = dbData.filter(d => d.date === app.date && d.time === app.time && d.course === course).length;
                 if (currentCount >= maxLimit) {
                     alert(`عفواً، الموعد يوم (${app.date}) في الفترة (${app.time}) ممتلئ لهذا الكورس. يرجى اختيار موعد آخر أو حذفه.`);
-                    return; // توقيف التسجيل بالكامل لو موعد واحد ممتلئ
+                    return; 
                 }
             }
 
-            // لو كل المواعيد متاحة، نقوم بحفظها كلها
             let promises = [];
             appointments.forEach(app => {
                 const record = {
@@ -254,12 +266,10 @@
                 promises.push(database.ref('students').push(record));
             });
 
-            // بعد حفظ جميع المواعيد
             Promise.all(promises).then(() => {
                 document.getElementById('msg').innerText = 'تم تسجيل جميع المواعيد بنجاح';
                 document.getElementById('regForm').reset();
                 
-                // إعادة المواعيد لصف واحد فقط
                 document.getElementById('appointments-container').innerHTML = `
                     <div class="appointment-row" style="display: flex; gap: 10px; margin-bottom: 10px; align-items: center;">
                         <input type="date" class="date-input" min="${today}" required onchange="updateTimeOptions(this)" style="margin:0; width: 50%;">
@@ -276,7 +286,7 @@
         });
     });
 
-    // الدخول للإدارة بالرقم السري 2004
+    // الدخول للإدارة
     function checkAdmin() {
         const pass = prompt('الرجاء إدخال الرقم السري للإدارة:');
         if (pass === '2004') {
@@ -297,7 +307,6 @@
     let allStudents = [];
     let currentSelectedDate = null;
 
-    // جلب البيانات الأساسية للإدارة
     function loadData() {
         database.ref('students').on('value', (snapshot) => {
             allStudents = [];
@@ -317,7 +326,6 @@
         });
     }
 
-    // عرض قائمة الأيام
     function renderDatesList() {
         const container = document.getElementById('dates-container');
         container.innerHTML = '';
@@ -340,7 +348,6 @@
         });
     }
 
-    // عرض تفاصيل اليوم المحدد
     function showDateDetails(date) {
         currentSelectedDate = date;
         document.getElementById('dates-list').style.display = 'none';
@@ -393,28 +400,24 @@
         });
     }
 
-    // تحديث حالة الحضور في قاعدة البيانات
     function updateAttendance(id, status) {
         database.ref('students/' + id).update({
             attended: status
         }).catch(error => alert('حدث خطأ أثناء تحديث الحضور: ' + error.message));
     }
 
-    // الرجوع للقائمة
     function backToDates() {
         currentSelectedDate = null;
         document.getElementById('date-details').style.display = 'none';
         document.getElementById('dates-list').style.display = 'block';
     }
 
-    // حذف طالب واحد
     function deleteStudent(id) {
         if (confirm('هل أنت متأكد من حذف هذا الموعد؟')) {
             database.ref('students/' + id).remove().catch((error) => alert('خطأ في الحذف: ' + error.message));
         }
     }
 
-    // حذف جميع تسجيلات اليوم المحدد
     function deleteAllInDay() {
         if (!currentSelectedDate) return;
         
@@ -435,7 +438,6 @@
         }
     }
 
-    // حذف جميع التسجيلات دفعة واحدة (لكل الأيام)
     function deleteAllData() {
         if (confirm('تحذير نهائي: هل أنت متأكد من حذف جميع تسجيلات الطلاب في كل الأيام بالكامل؟')) {
             database.ref('students').remove()
