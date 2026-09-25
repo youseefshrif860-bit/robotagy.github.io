@@ -286,7 +286,6 @@
     let currentSelectedDate = null;
     let currentSelectedPeriod = null;
 
-    // جلب البيانات الأساسية
     function loadData() {
         database.ref('students').on('value', (snapshot) => {
             allStudents = [];
@@ -296,7 +295,6 @@
                 });
             }
             
-            // تحديث الشاشات تلقائياً في حالة الحذف أو التعديل
             if (currentSelectedDate) {
                 let studentsInDay = allStudents.filter(s => s.date === currentSelectedDate);
                 if (studentsInDay.length === 0) {
@@ -321,7 +319,6 @@
         });
     }
 
-    // عرض قائمة الأيام
     function renderDatesList() {
         document.getElementById('dates-list').style.display = 'block';
         document.getElementById('periods-list').style.display = 'none';
@@ -339,16 +336,18 @@
         }
 
         uniqueDates.forEach(date => {
-            const studentsInDay = allStudents.filter(s => s.date === date).length;
+            // حساب عدد الفترات الفريدة المسجلة في هذا اليوم
+            const studentsInDay = allStudents.filter(s => s.date === date);
+            const periodsCount = new Set(studentsInDay.map(s => s.time)).size;
+            
             const btn = document.createElement('button');
             btn.className = 'nav-btn';
-            btn.innerText = `يوم: ${date}  (عدد الطلاب الكلي: ${studentsInDay})`;
+            btn.innerText = `يوم: ${date}  (عدد الفترات: ${periodsCount})`;
             btn.onclick = () => renderPeriodsList(date);
             container.appendChild(btn);
         });
     }
 
-    // عرض قائمة الفترات لليوم المختار
     function renderPeriodsList(date) {
         currentSelectedDate = date;
         currentSelectedPeriod = null;
@@ -384,7 +383,6 @@
         });
     }
 
-    // عرض جدول الطلاب للفترة المختارة
     function showPeriodDetails(date, period) {
         currentSelectedPeriod = period;
         document.getElementById('periods-list').style.display = 'none';
@@ -397,7 +395,6 @@
 
         let filteredStudents = allStudents.filter(s => s.date === date && s.time === period);
 
-        // الترتيب حسب الكورس داخل نفس الفترة
         const courseOrder = { 'Classic Control': 1, 'PLC': 2, 'Motor Drive': 3 };
         filteredStudents.sort((a, b) => (courseOrder[a.course] || 99) - (courseOrder[b.course] || 99));
 
@@ -419,12 +416,10 @@
         });
     }
 
-    // تحديث الحضور
     function updateAttendance(id, status) {
         database.ref('students/' + id).update({ attended: status }).catch(error => alert('خطأ في التحديث: ' + error.message));
     }
 
-    // دوال الرجوع
     function backToDates() {
         currentSelectedDate = null;
         currentSelectedPeriod = null;
@@ -436,7 +431,6 @@
         renderPeriodsList(currentSelectedDate);
     }
 
-    // دوال الحذف
     function deleteStudent(id) {
         if (confirm('هل أنت متأكد من حذف هذا الموعد؟')) {
             database.ref('students/' + id).remove().catch(error => alert('خطأ: ' + error.message));
