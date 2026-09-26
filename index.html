@@ -9,9 +9,9 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <script>
-        // التحديث التلقائي للنسخة (v=11) لحل مشكلة اختفاء التقرير
-        if (window.location.href.indexOf('?v=11') === -1) {
-            window.location.replace(window.location.href.split('?')[0] + '?v=11');
+        // التحديث التلقائي للنسخة (v=12) لفلترة التواريخ المستقبلية
+        if (window.location.href.indexOf('?v=12') === -1) {
+            window.location.replace(window.location.href.split('?')[0] + '?v=12');
         }
     </script>
 
@@ -227,12 +227,12 @@
         <strong style="color: #3b1e5a; display: block; margin-bottom: 15px; font-size: 18px; border-bottom: 2px solid #fcc01a; padding-bottom: 5px;" id="report-name"></strong>
         <div style="margin-bottom: 15px; font-size: 15px; color: black; line-height: 1.8;">
             <div>رقم الهاتف: <b id="report-phone" style="color: #3b1e5a; font-family: Tahoma;"></b></div>
-            <div>إجمالي المواعيد المسجلة: <b id="report-total" style="color: #3b1e5a;"></b></div>
+            <div>إجمالي المواعيد المسجلة (حتى اليوم): <b id="report-total" style="color: #3b1e5a;"></b></div>
             <div>مرات الغياب (لم يحضر): <b id="report-absent" style="color: red;"></b></div>
             <div>تاريخ آخر حضور: <b id="report-last" style="color: green;"></b></div>
         </div>
         
-        <strong style="color: #000; display: block; margin-bottom: 10px; font-size: 14px;">التفاصيل:</strong>
+        <strong style="color: #000; display: block; margin-bottom: 10px; font-size: 14px;">التفاصيل (للمواعيد السابقة والحالية فقط):</strong>
         <div style="overflow-x: auto; max-height: 200px; border: 1px solid #ddd; border-radius: 5px; margin-bottom: 15px;">
             <table style="width: 100%; font-size: 13px; margin-top: 0; border-radius: 0;">
                 <thead>
@@ -269,6 +269,7 @@
 
     const normalizeText = (str) => String(str || '').replace(/[\s\u200B-\u200D\uFEFF]/g, '').trim();
 
+    // متغير ثابت يحمل تاريخ اليوم الحالي في كل مرة تفتح فيها الصفحة
     const today = new Date().toISOString().split('T')[0];
     document.querySelector('.date-input').setAttribute('min', today);
 
@@ -492,7 +493,7 @@
     let blockedPhonesList = [];
     let currentSelectedDate = null;
     let currentSelectedPeriod = null;
-    let currentSelectedStudent = null; // المتغير الجديد لحفظ حالة التقرير المفتوح
+    let currentSelectedStudent = null; 
 
     function loadData() {
         database.ref('students').on('value', (snapshot) => {
@@ -503,7 +504,6 @@
                 });
             }
             
-            // تحديث نافذة التقرير لحظياً لو كانت مفتوحة بفضل المتغير الثابت
             if (currentSelectedStudent) {
                 selectStudent(currentSelectedStudent);
             }
@@ -556,18 +556,23 @@
     }
 
     function selectStudent(studentName) {
-        currentSelectedStudent = studentName; // حفظ الاسم في الذاكرة لمنع اختفاء النافذة
+        currentSelectedStudent = studentName;
         document.getElementById('search-student').value = '';
         document.getElementById('search-suggestions').style.display = 'none';
         
-        let studentRecords = allStudents.filter(s => s.name === studentName);
-        if(studentRecords.length === 0) {
+        // جلب جميع تسجيلات الطالب (بما فيها المستقبلية) عشان نقدر نجيب رقم موبايله للحظر
+        let allStudentRecords = allStudents.filter(s => s.name === studentName);
+        if(allStudentRecords.length === 0) {
             closeReportModal();
             return;
         }
         
-        studentRecords.sort((a,b) => new Date(b.date) - new Date(a.date));
-        let studentPhone = studentRecords[0].phone; 
+        // استخراج رقم الهاتف من أي تسجيلة للطالب قبل الفلترة
+        allStudentRecords.sort((a,b) => new Date(b.date) - new Date(a.date));
+        let studentPhone = allStudentRecords[0].phone; 
+        
+        // --- فلترة السجلات: استبعاد التواريخ المستقبلية من التقرير نهائياً ---
+        let studentRecords = allStudentRecords.filter(s => s.date <= today);
         
         let total = studentRecords.length;
         let attendedRecords = studentRecords.filter(s => s.attended);
@@ -599,21 +604,27 @@
             blockBtn.onclick = () => toggleBlockStudent(studentPhone, studentName, false);
         }
 
-        studentRecords.sort((a,b) => new Date(a.date) - new Date(b.date));
         let tbody = document.getElementById('report-tbody');
         tbody.innerHTML = '';
-        studentRecords.forEach(rec => {
-            let statusHTML = rec.attended 
-                ? '<span style="color:green; font-weight:bold;">حاضر ✔</span>' 
-                : `<input type="checkbox" class="attendance-check" title="تحديد كحاضر" onchange="updateAttendance('${rec.id}', this.checked)">`;
-                
-            tbody.innerHTML += `<tr>
-                <td style="padding: 8px;">${rec.course || ''}</td>
-                <td style="padding: 8px;">${rec.date || ''}</td>
-                <td style="padding: 8px;">${rec.time || ''}</td>
-                <td style="padding: 8px;">${statusHTML}</td>
-            </tr>`;
-        });
+        
+        if (studentRecords.length === 0) {
+            // لو الطالب مواعيده كلها في المستقبل (بعد النهارده)
+            tbody.innerHTML = `<tr><td colspan="4" style="padding: 10px; color: red; text-align: center; font-weight: bold;">لا توجد مواعيد سابقة أو حالية (تسجيلات الطالب في تواريخ قادمة)</td></tr>`;
+        } else {
+            studentRecords.sort((a,b) => new Date(a.date) - new Date(b.date));
+            studentRecords.forEach(rec => {
+                let statusHTML = rec.attended 
+                    ? '<span style="color:green; font-weight:bold;">حاضر ✔</span>' 
+                    : `<input type="checkbox" class="attendance-check" title="تحديد كحاضر" onchange="updateAttendance('${rec.id}', this.checked)">`;
+                    
+                tbody.innerHTML += `<tr>
+                    <td style="padding: 8px;">${rec.course || ''}</td>
+                    <td style="padding: 8px;">${rec.date || ''}</td>
+                    <td style="padding: 8px;">${rec.time || ''}</td>
+                    <td style="padding: 8px;">${statusHTML}</td>
+                </tr>`;
+            });
+        }
         
         document.getElementById('report-modal').style.display = 'flex';
     }
@@ -638,7 +649,7 @@
     }
 
     function closeReportModal() { 
-        currentSelectedStudent = null; // مسح الاسم من الذاكرة عند الإغلاق
+        currentSelectedStudent = null; 
         document.getElementById('report-modal').style.display = 'none'; 
     }
 
