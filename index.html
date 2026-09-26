@@ -4,14 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     
-    <!-- كود إجبار المتصفح على مسح الكاش وتحديث الموقع تلقائياً -->
+    <!-- كود إجبار المتصفح على مسح الكاش وتحديث الموقع تلقائياً للنسخة الجديدة -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <script>
-        // التحديث التلقائي للنسخة الجديدة الصارمة (v=4)
-        if (window.location.href.indexOf('?v=4') === -1) {
-            window.location.replace(window.location.href.split('?')[0] + '?v=4');
+        // التحديث التلقائي للنسخة الصارمة جداً (v=5)
+        if (window.location.href.indexOf('?v=5') === -1) {
+            window.location.replace(window.location.href.split('?')[0] + '?v=5');
         }
     </script>
 
@@ -280,9 +280,14 @@
         document.getElementById('error-modal').style.display = 'none';
     }
 
-    // الاعتماد على async/await لضمان عدم تخطي أوامر المنع
+    // القفل البرمجي الشامل لمنع تداخل الطلبات السريعة (Race Condition)
+    let isSubmitting = false;
+
     document.getElementById('regForm').addEventListener('submit', async function(e) {
         e.preventDefault();
+        
+        if (isSubmitting) return; // رفض قاطع لأي ضغطة إضافية أثناء المعالجة
+        isSubmitting = true;
         
         const submitBtn = document.getElementById('main-submit-btn');
         submitBtn.disabled = true;
@@ -295,6 +300,7 @@
             submitBtn.innerText = 'تأكيد التسجيل';
             submitBtn.style.opacity = '1';
             submitBtn.style.cursor = 'pointer';
+            isSubmitting = false; // فك القفل بعد انتهاء كل شيء
         }
 
         const name = document.getElementById('name').value;
@@ -326,48 +332,41 @@
         }
 
         try {
-            // جلب قاعدة البيانات بنظام await لضمان القراءة الكاملة قبل أي قرار
-            const snapshot = await database.ref('students').get();
+            // استخدام once لقراءة البيانات من السيرفر مباشرة لتجنب أخطاء الـ Cache
+            const snapshot = await database.ref('students').once('value');
             let dbData = [];
             if (snapshot.exists()) {
                 snapshot.forEach(child => dbData.push(child.val()));
             }
 
-            // دالة صارمة لمسح أي مسافات زائدة وضمان تطابق النصوص 100%
-            const safeMatch = (val1, val2) => {
-                if (!val1 || !val2) return false;
-                return String(val1).replace(/\s+/g, '') === String(val2).replace(/\s+/g, '');
-            };
+            // دالة صارمة جداً للمقارنة تتجاهل المسافات وأي فواصل مخفية
+            const normalize = (str) => String(str || '').replace(/\s+/g, '').trim();
 
-            // التحقق من كل المواعيد المختارة
             for (let i = 0; i < appointments.length; i++) {
                 const app = appointments[i];
                 
-                // حساب عدد الطلاب المسجلين لنفس الكورس ونفس اليوم والوقت بدقة متناهية
+                // حساب دقيق من السيرفر
                 let currentCountInDB = dbData.filter(d => 
-                    safeMatch(d.date, app.date) && 
-                    safeMatch(d.time, app.time) && 
-                    safeMatch(d.course, course)
+                    normalize(d.date) === normalize(app.date) && 
+                    normalize(d.time) === normalize(app.time) && 
+                    normalize(d.course) === normalize(course)
                 ).length;
                 
-                // لو العدد وصل للحد الأقصى أو تخطاه
                 if (currentCountInDB >= maxLimit) {
                     showErrorModal(`عفواً، الموعد يوم <b>(${app.date})</b> في الفترة <b>(${app.time})</b> ممتلئ لكورس <b>(${course})</b>.<br><br>الحد الأقصى المسموح هو (${maxLimit}) طلاب وقد اكتمل.<br>يرجى اختيار موعد آخر أو حذفه.`);
                     resetBtn();
-                    return; // إيقاف تام لدالة التسجيل بأكملها ومنع الحفظ نهائياً
+                    return; // إيقاف فوري للعملية
                 }
             }
 
-            // إذا نجح التحقق ولم تعمل دالة return، نقوم بحفظ البيانات
             let promises = [];
             appointments.forEach(app => {
                 const record = { name, phone, group, course, date: app.date, time: app.time, attended: false, timestamp: new Date().toLocaleString() };
                 promises.push(database.ref('students').push(record));
             });
 
-            await Promise.all(promises);
+            await Promise.all(promises); // انتظار التأكيد من السيرفر
 
-            // تفعيل نافذة النجاح
             const list = document.getElementById('modal-appointments-list');
             list.innerHTML = '';
             appointments.forEach(app => {
@@ -388,7 +387,6 @@
             
             resetBtn();
             
-            // إخفاء نافذة النجاح تلقائياً بعد 5 ثواني
             setTimeout(() => {
                 closeSuccessModal();
             }, 5000);
