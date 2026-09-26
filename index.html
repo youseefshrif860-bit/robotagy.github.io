@@ -214,6 +214,8 @@
         const phone = document.getElementById('phone').value;
         const group = document.getElementById('group').value;
         const course = document.getElementById('course').value;
+        
+        // تحديد الحد الأقصى بناءً على الكورس المختار
         const maxLimit = (course === 'Motor Drive') ? 2 : 8;
 
         const appointmentRows = document.querySelectorAll('.appointment-row');
@@ -242,11 +244,12 @@
                 snapshot.forEach(child => dbData.push(child.val()));
             }
 
+            // التحقق من السعة لكل موعد تم اختياره
             for (let i = 0; i < appointments.length; i++) {
                 const app = appointments[i];
                 let currentCount = dbData.filter(d => d.date === app.date && d.time === app.time && d.course === course).length;
                 if (currentCount >= maxLimit) {
-                    alert(`عفواً، الموعد يوم (${app.date}) في الفترة (${app.time}) ممتلئ لهذا الكورس. يرجى اختيار موعد آخر أو حذفه.`);
+                    alert(`عفواً، الموعد يوم (${app.date}) في الفترة (${app.time}) ممتلئ لكورس (${course}). يرجى اختيار موعد آخر أو حذفه.`);
                     return; 
                 }
             }
@@ -286,6 +289,7 @@
                     </div>
                 `;
                 
+                // إخفاء الرسالة بعد 10 ثواني
                 setTimeout(() => msgDiv.innerHTML = '', 10000);
             }).catch(error => alert('حدث خطأ أثناء التسجيل: ' + error.message));
         });
