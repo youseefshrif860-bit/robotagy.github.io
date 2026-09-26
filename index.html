@@ -74,7 +74,7 @@
 
         <button type="submit" class="submit-btn">تأكيد التسجيل</button>
     </form>
-    <p id="msg" style="text-align:center; color:#fcc01a; font-weight:bold; margin-top: 15px;"></p>
+    <div id="msg" style="text-align:center; font-weight:bold; margin-top: 15px;"></div>
 </div>
 
 <!-- واجهة تسجيل الدخول للإدارة -->
@@ -258,7 +258,16 @@
             });
 
             Promise.all(promises).then(() => {
-                document.getElementById('msg').innerText = 'تم تسجيل جميع المواعيد بنجاح';
+                let successText = '<span style="color: #4CAF50; font-size: 18px;">✅ تم تأكيد حجز المواعيد التالية بنجاح:</span><br><br>';
+                appointments.forEach(app => {
+                    successText += `<span style="display: block; background-color: #3b1e5a; color: white; padding: 8px; border-radius: 5px; margin-bottom: 5px; border: 1px solid #fcc01a;">
+                                      📅 يوم <b>${app.date}</b> - ⏰ فترة <b>${app.time}</b>
+                                    </span>`;
+                });
+                
+                const msgDiv = document.getElementById('msg');
+                msgDiv.innerHTML = successText;
+
                 document.getElementById('regForm').reset();
                 document.getElementById('appointments-container').innerHTML = `
                     <div class="appointment-row" style="display: flex; gap: 10px; margin-bottom: 10px; align-items: center;">
@@ -268,7 +277,8 @@
                         </select>
                     </div>
                 `;
-                setTimeout(() => document.getElementById('msg').innerText = '', 4000);
+                
+                setTimeout(() => msgDiv.innerHTML = '', 10000);
             }).catch(error => alert('حدث خطأ أثناء التسجيل: ' + error.message));
         });
     });
@@ -293,7 +303,6 @@
 
         auth.signInWithEmailAndPassword(email, pass)
             .then((userCredential) => {
-                // نجاح تسجيل الدخول
                 document.getElementById('login-view').style.display = 'none';
                 document.getElementById('admin-view').style.display = 'block';
                 document.getElementById('loginForm').reset();
