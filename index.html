@@ -74,7 +74,6 @@
 
         <button type="submit" class="submit-btn">تأكيد التسجيل</button>
     </form>
-    <!-- تم إزالة margin-top من هنا ليكون التنسيق داخل المربع الأخضر -->
     <div id="msg"></div>
 </div>
 
@@ -259,11 +258,11 @@
             });
 
             Promise.all(promises).then(() => {
-                // التصميم الرسمي والاحترافي لرسالة التأكيد
+                // التصميم الرسمي: إطار بلون روبوتاجي، خلفية بيضاء، وكتابة سوداء
                 let successText = `
-                <div style="border: 2px solid #28a745; background-color: rgba(40, 167, 69, 0.1); padding: 15px; border-radius: 5px; text-align: right; margin-top: 20px;">
-                    <strong style="color: #28a745; display: block; margin-bottom: 10px; font-size: 16px;">تم تأكيد التسجيل بنجاح. بيان المواعيد:</strong>
-                    <ul style="margin: 0; padding-right: 20px; color: white; line-height: 1.8; font-size: 14px;">
+                <div style="border: 2px solid #fcc01a; background-color: white; padding: 15px; border-radius: 5px; text-align: right; margin-top: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
+                    <strong style="color: black; display: block; margin-bottom: 10px; font-size: 16px;">تم تأكيد التسجيل بنجاح. بيان المواعيد:</strong>
+                    <ul style="margin: 0; padding-right: 20px; color: black; line-height: 1.8; font-size: 14px;">
                 `;
                 
                 appointments.forEach(app => {
