@@ -12,7 +12,7 @@
         .container { background-color: #4c2673; padding: 20px; border-radius: 10px; max-width: 500px; margin: auto; box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
         input, select { width: 100%; padding: 10px; margin-top: 8px; margin-bottom: 15px; border-radius: 5px; border: none; box-sizing: border-box; font-family: Tahoma; }
         .submit-btn { background-color: #fcc01a; color: #3b1e5a; border: none; padding: 12px; width: 100%; font-size: 16px; font-weight: bold; border-radius: 5px; cursor: pointer; }
-        #admin-view { display: none; }
+        #admin-view, #login-view { display: none; }
         table { width: 100%; border-collapse: collapse; margin-top: 15px; background-color: white; color: black; border-radius: 5px; overflow: hidden; }
         th, td { border: 1px solid #ddd; padding: 10px; text-align: center; }
         th { background-color: #fcc01a; color: #3b1e5a; }
@@ -24,7 +24,6 @@
         .nav-btn:hover { background-color: #e5ad17; }
         .back-btn { background-color: white; color: #3b1e5a; border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer; font-weight: bold; margin-bottom: 0; }
         .add-btn { background-color: #28a745; color: white; border: none; padding: 10px; font-weight: bold; cursor: pointer; border-radius: 5px; width: 100%; margin-bottom: 15px; }
-        .add-btn:hover { background-color: #218838; }
         
         .attendance-check { width: 22px; height: 22px; cursor: pointer; accent-color: #3b1e5a; }
     </style>
@@ -32,12 +31,13 @@
     <!-- مكتبات Firebase -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
 </head>
 <body>
 
 <div class="header">
     <div class="logo">روبوتاجي</div>
-    <button class="admin-btn" onclick="checkAdmin()">الإدارة</button>
+    <button class="admin-btn" onclick="showLogin()">الإدارة</button>
 </div>
 
 <!-- واجهة الطلاب -->
@@ -77,11 +77,27 @@
     <p id="msg" style="text-align:center; color:#fcc01a; font-weight:bold; margin-top: 15px;"></p>
 </div>
 
+<!-- واجهة تسجيل الدخول للإدارة -->
+<div class="container" id="login-view">
+    <h2 style="text-align: center; color: #fcc01a;">تسجيل الدخول للإدارة</h2>
+    <form id="loginForm">
+        <label>البريد الإلكتروني:</label>
+        <input type="email" id="admin-email" required placeholder="admin@robotagy.com">
+        
+        <label>الرقم السري:</label>
+        <input type="password" id="admin-password" required placeholder="••••••••">
+        
+        <button type="submit" class="submit-btn">دخول</button>
+        <button type="button" class="back-btn" style="width: 100%; margin-top: 10px;" onclick="closeLogin()">إلغاء والعودة</button>
+    </form>
+    <p id="login-msg" style="text-align:center; color:#ff4d4d; font-weight:bold; margin-top: 15px;"></p>
+</div>
+
 <!-- واجهة الإدارة -->
 <div class="container" id="admin-view" style="max-width: 950px;">
     <h2 style="text-align: center; color: #fcc01a;">لوحة تحكم م. يوسف شريف</h2>
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-        <button class="admin-btn" onclick="closeAdmin()">تسجيل الخروج من الإدارة</button>
+        <button class="admin-btn" onclick="logoutAdmin()">تسجيل الخروج</button>
         <button class="delete-all-btn" style="margin-bottom: 0;" onclick="deleteAllData()">حذف كل التسجيلات بالكامل</button>
     </div>
 
@@ -142,6 +158,7 @@
     
     firebase.initializeApp(firebaseConfig);
     const database = firebase.database();
+    const auth = firebase.auth();
 
     const today = new Date().toISOString().split('T')[0];
     document.querySelector('.date-input').setAttribute('min', today);
@@ -152,7 +169,6 @@
         timeSelect.innerHTML = ''; 
 
         if (!dateVal) return;
-
         const day = new Date(dateVal).getDay(); 
 
         if (day === 5) { 
@@ -164,21 +180,15 @@
             let defaultOpt = document.createElement('option');
             defaultOpt.value = ''; defaultOpt.text = 'اختر الوقت'; defaultOpt.disabled = true; defaultOpt.selected = true;
             timeSelect.appendChild(defaultOpt);
-
-            const options = ['من 12 ظهراً إلى 3 عصراً', 'من 3 عصراً إلى 6 مساءً', 'من 6 مساءً إلى 9 مساءً'];
-            options.forEach(opt => {
-                let o = document.createElement('option');
-                o.value = opt; o.text = opt;
-                timeSelect.appendChild(o);
+            ['من 12 ظهراً إلى 3 عصراً', 'من 3 عصراً إلى 6 مساءً', 'من 6 مساءً إلى 9 مساءً'].forEach(opt => {
+                let o = document.createElement('option'); o.value = opt; o.text = opt; timeSelect.appendChild(o);
             });
         } 
         else { 
             let defaultOpt = document.createElement('option');
             defaultOpt.value = ''; defaultOpt.text = 'اختر الوقت'; defaultOpt.disabled = true; defaultOpt.selected = true;
             timeSelect.appendChild(defaultOpt);
-
-            let o = document.createElement('option');
-            o.value = 'من 8 مساءً إلى 11 مساءً'; o.text = 'من 8 مساءً إلى 11 مساءً';
+            let o = document.createElement('option'); o.value = 'من 8 مساءً إلى 11 مساءً'; o.text = 'من 8 مساءً إلى 11 مساءً';
             timeSelect.appendChild(o);
         }
     }
@@ -198,7 +208,6 @@
         container.appendChild(row);
     }
 
-    // إرسال البيانات
     document.getElementById('regForm').addEventListener('submit', function(e) {
         e.preventDefault();
         const name = document.getElementById('name').value;
@@ -264,23 +273,46 @@
         });
     });
 
-    // الدخول للإدارة
-    function checkAdmin() {
-        const pass = prompt('الرجاء إدخال الرقم السري للإدارة:');
-        if (pass === '2004') {
-            document.getElementById('student-view').style.display = 'none';
-            document.getElementById('admin-view').style.display = 'block';
-            loadData();
-        } else if (pass !== null) {
-            alert('الرقم السري غير صحيح!');
-        }
+    // ----------------- نظام تسجيل الدخول (Authentication) -----------------
+    
+    function showLogin() {
+        document.getElementById('student-view').style.display = 'none';
+        document.getElementById('login-view').style.display = 'block';
     }
 
-    function closeAdmin() {
-        document.getElementById('admin-view').style.display = 'none';
+    function closeLogin() {
+        document.getElementById('login-view').style.display = 'none';
         document.getElementById('student-view').style.display = 'block';
-        backToDates(); 
+        document.getElementById('login-msg').innerText = '';
     }
+
+    document.getElementById('loginForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const email = document.getElementById('admin-email').value;
+        const pass = document.getElementById('admin-password').value;
+
+        auth.signInWithEmailAndPassword(email, pass)
+            .then((userCredential) => {
+                // نجاح تسجيل الدخول
+                document.getElementById('login-view').style.display = 'none';
+                document.getElementById('admin-view').style.display = 'block';
+                document.getElementById('loginForm').reset();
+                loadData();
+            })
+            .catch((error) => {
+                document.getElementById('login-msg').innerText = 'بيانات الدخول غير صحيحة!';
+            });
+    });
+
+    function logoutAdmin() {
+        auth.signOut().then(() => {
+            document.getElementById('admin-view').style.display = 'none';
+            document.getElementById('student-view').style.display = 'block';
+            backToDates(); 
+        });
+    }
+
+    // ----------------- نهاية نظام تسجيل الدخول -----------------
 
     let allStudents = [];
     let currentSelectedDate = null;
@@ -336,7 +368,6 @@
         }
 
         uniqueDates.forEach(date => {
-            // حساب عدد الفترات الفريدة المسجلة في هذا اليوم
             const studentsInDay = allStudents.filter(s => s.date === date);
             const periodsCount = new Set(studentsInDay.map(s => s.time)).size;
             
