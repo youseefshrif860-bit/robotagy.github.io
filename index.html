@@ -9,9 +9,9 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <script>
-        // التحديث التلقائي للنسخة (v=7)
-        if (window.location.href.indexOf('?v=7') === -1) {
-            window.location.replace(window.location.href.split('?')[0] + '?v=7');
+        // التحديث التلقائي للنسخة (v=8) لضمان تفعيل مربع البحث فوراً
+        if (window.location.href.indexOf('?v=8') === -1) {
+            window.location.replace(window.location.href.split('?')[0] + '?v=8');
         }
     </script>
 
@@ -72,6 +72,17 @@
             margin-top: 20px;
         }
         .modal-close-btn:hover { background-color: #218838; }
+
+        /* ستايل قائمة الاقتراحات للبحث */
+        #search-suggestions {
+            position: absolute; width: 100%; background: white; color: black; z-index: 1001;
+            max-height: 150px; overflow-y: auto; border-radius: 5px; box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+            display: none; top: 100%; left: 0;
+        }
+        .suggestion-item {
+            padding: 10px; cursor: pointer; border-bottom: 1px solid #ddd; font-size: 14px;
+        }
+        .suggestion-item:hover { background-color: #fcc01a; color: #3b1e5a; font-weight: bold; }
     </style>
 
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
@@ -164,6 +175,12 @@
         <button class="delete-all-btn" style="margin-bottom: 0;" onclick="deleteAllData()">حذف كل التسجيلات بالكامل</button>
     </div>
 
+    <!-- مربع البحث الذكي (يظهر في لوحة الإدارة فقط) -->
+    <div style="position: relative; margin-bottom: 20px;">
+        <input type="text" id="search-student" placeholder="ابحث عن اسم الطالب هنا لإنشاء تقرير..." oninput="handleSearch(this.value)" autocomplete="off" style="margin: 0; border: 2px solid #fcc01a; background: #fff; color: #000; font-weight: bold;">
+        <div id="search-suggestions"></div>
+    </div>
+
     <div id="dates-list">
         <h3 style="text-align: center; color: white;">أيام الحجز المسجلة</h3>
         <div id="dates-container"></div>
@@ -201,6 +218,34 @@
                 <tbody></tbody>
             </table>
         </div>
+    </div>
+</div>
+
+<!-- نافذة تقرير الطالب (التي تظهر بعد اختياره من البحث) -->
+<div class="modal-overlay" id="report-modal">
+    <div class="modal-content" style="max-width: 600px;">
+        <strong style="color: #3b1e5a; display: block; margin-bottom: 15px; font-size: 18px; border-bottom: 2px solid #fcc01a; padding-bottom: 5px;" id="report-name"></strong>
+        <div style="margin-bottom: 15px; font-size: 15px; color: black; line-height: 1.8;">
+            <div>إجمالي المواعيد المسجلة: <b id="report-total" style="color: #3b1e5a;"></b></div>
+            <div>مرات الغياب (لم يحضر): <b id="report-absent" style="color: red;"></b></div>
+            <div>تاريخ آخر حضور: <b id="report-last" style="color: green;"></b></div>
+        </div>
+        
+        <strong style="color: #000; display: block; margin-bottom: 10px; font-size: 14px;">التفاصيل:</strong>
+        <div style="overflow-x: auto; max-height: 200px; border: 1px solid #ddd; border-radius: 5px;">
+            <table style="width: 100%; font-size: 13px; margin-top: 0; border-radius: 0;">
+                <thead>
+                    <tr>
+                        <th style="padding: 8px;">الكورس</th>
+                        <th style="padding: 8px;">التاريخ</th>
+                        <th style="padding: 8px;">الوقت</th>
+                        <th style="padding: 8px;">الحالة</th>
+                    </tr>
+                </thead>
+                <tbody id="report-tbody"></tbody>
+            </table>
+        </div>
+        <button class="modal-close-btn" style="background-color: #3b1e5a;" onclick="closeReportModal()">إغلاق التقرير</button>
     </div>
 </div>
 
@@ -331,19 +376,16 @@
         }
 
         try {
-            // جلب كامل السجلات بطريقة قاطعة من السيرفر باستخدام get()
             const snapshot = await database.ref('students').get();
             let dbData = [];
             
             if (snapshot.exists()) {
                 const data = snapshot.val();
-                // استخراج البيانات وتجنب ثغرة Firebase forEach نهائياً
                 Object.keys(data).forEach(key => {
                     dbData.push(data[key]);
                 });
             }
 
-            // التخلص من أي مسافات نهائياً لضمان المقارنة الصارمة
             const normalize = (str) => String(str || '').replace(/[\s\u200B-\u200D\uFEFF]/g, '').trim();
 
             for (let i = 0; i < appointments.length; i++) {
@@ -438,7 +480,7 @@
         });
     }
 
-    // ----------------- عرض الإدارة -----------------
+    // ----------------- عرض الإدارة والبحث الذكي -----------------
 
     let allStudents = [];
     let currentSelectedDate = null;
@@ -476,6 +518,79 @@
             }
         });
     }
+
+    // دالة للبحث الذكي وظهور الاقتراحات
+    function handleSearch(query) {
+        const container = document.getElementById('search-suggestions');
+        if (!query.trim()) { 
+            container.style.display = 'none'; 
+            return; 
+        }
+        
+        let uniqueNames = [...new Set(allStudents.map(s => s.name))];
+        let matches = uniqueNames.filter(n => n && n.toLowerCase().includes(query.toLowerCase()));
+        
+        if (matches.length === 0) {
+            container.innerHTML = '<div class="suggestion-item" style="color:red;">لا يوجد طالب بهذا الاسم</div>';
+        } else {
+            container.innerHTML = matches.map(n => `<div class="suggestion-item" onclick="selectStudent('${n}')">${n}</div>`).join('');
+        }
+        container.style.display = 'block';
+    }
+
+    // دالة لاختيار الطالب وعرض التقرير
+    function selectStudent(studentName) {
+        document.getElementById('search-student').value = '';
+        document.getElementById('search-suggestions').style.display = 'none';
+        
+        let studentRecords = allStudents.filter(s => s.name === studentName);
+        if(studentRecords.length === 0) return;
+        
+        let total = studentRecords.length;
+        let attendedRecords = studentRecords.filter(s => s.attended);
+        let absent = total - attendedRecords.length;
+        
+        let lastAttended = 'لم يحضر أي موعد بعد';
+        if(attendedRecords.length > 0) {
+            attendedRecords.sort((a,b) => new Date(b.date) - new Date(a.date));
+            lastAttended = attendedRecords[0].date;
+        }
+        
+        document.getElementById('report-name').innerText = 'تقرير الطالب: ' + studentName;
+        document.getElementById('report-total').innerText = total;
+        document.getElementById('report-absent').innerText = absent;
+        document.getElementById('report-last').innerText = lastAttended;
+        
+        studentRecords.sort((a,b) => new Date(a.date) - new Date(b.date));
+        
+        let tbody = document.getElementById('report-tbody');
+        tbody.innerHTML = '';
+        studentRecords.forEach(rec => {
+            let statusHTML = rec.attended 
+                ? '<span style="color:green; font-weight:bold;">حاضر ✔</span>' 
+                : '<span style="color:red; font-weight:bold;">غائب ✘</span>';
+                
+            tbody.innerHTML += `<tr>
+                <td style="padding: 8px;">${rec.course || ''}</td>
+                <td style="padding: 8px;">${rec.date || ''}</td>
+                <td style="padding: 8px;">${rec.time || ''}</td>
+                <td style="padding: 8px;">${statusHTML}</td>
+            </tr>`;
+        });
+        
+        document.getElementById('report-modal').style.display = 'flex';
+    }
+
+    function closeReportModal() {
+        document.getElementById('report-modal').style.display = 'none';
+    }
+
+    // لإخفاء قائمة الاقتراحات عند الضغط في أي مكان خارج المربع
+    document.addEventListener('click', function(e) {
+        if(e.target.id !== 'search-student') {
+            document.getElementById('search-suggestions').style.display = 'none';
+        }
+    });
 
     function renderDatesList() {
         document.getElementById('dates-list').style.display = 'block';
