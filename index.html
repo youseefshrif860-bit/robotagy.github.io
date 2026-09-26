@@ -9,9 +9,9 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <script>
-        // التحديث التلقائي للنسخة (v=8) لضمان تفعيل مربع البحث فوراً
-        if (window.location.href.indexOf('?v=8') === -1) {
-            window.location.replace(window.location.href.split('?')[0] + '?v=8');
+        // التحديث التلقائي للنسخة (v=9) لضمان تفعيل الحظر الذكي
+        if (window.location.href.indexOf('?v=9') === -1) {
+            window.location.replace(window.location.href.split('?')[0] + '?v=9');
         }
     </script>
 
@@ -142,12 +142,12 @@
     </div>
 </div>
 
-<!-- نافذة التنبيه المنبثقة (الخطأ / الموعد ممتلئ) -->
+<!-- نافذة التنبيه المنبثقة (الخطأ / الموعد ممتلئ / الحظر) -->
 <div class="modal-overlay" id="error-modal">
     <div class="modal-content" style="border-color: #ff4d4d;">
         <strong style="color: #ff4d4d; display: block; margin-bottom: 10px; font-size: 16px;">تنبيه هام</strong>
         <p id="error-modal-msg" style="margin: 0; color: black; line-height: 1.8; font-size: 14px; font-weight: bold;"></p>
-        <button class="modal-close-btn" style="background-color: #ff4d4d;" onclick="closeErrorModal()">رجوع لتعديل الموعد</button>
+        <button class="modal-close-btn" style="background-color: #ff4d4d;" onclick="closeErrorModal()">إغلاق التنبيه</button>
     </div>
 </div>
 
@@ -175,9 +175,9 @@
         <button class="delete-all-btn" style="margin-bottom: 0;" onclick="deleteAllData()">حذف كل التسجيلات بالكامل</button>
     </div>
 
-    <!-- مربع البحث الذكي (يظهر في لوحة الإدارة فقط) -->
+    <!-- مربع البحث الذكي -->
     <div style="position: relative; margin-bottom: 20px;">
-        <input type="text" id="search-student" placeholder="ابحث عن اسم الطالب هنا لإنشاء تقرير..." oninput="handleSearch(this.value)" autocomplete="off" style="margin: 0; border: 2px solid #fcc01a; background: #fff; color: #000; font-weight: bold;">
+        <input type="text" id="search-student" placeholder="ابحث عن اسم الطالب هنا لإنشاء تقرير وإدارة الحظر..." oninput="handleSearch(this.value)" autocomplete="off" style="margin: 0; border: 2px solid #fcc01a; background: #fff; color: #000; font-weight: bold;">
         <div id="search-suggestions"></div>
     </div>
 
@@ -221,18 +221,19 @@
     </div>
 </div>
 
-<!-- نافذة تقرير الطالب (التي تظهر بعد اختياره من البحث) -->
+<!-- نافذة تقرير الطالب والتحكم في الحظر -->
 <div class="modal-overlay" id="report-modal">
     <div class="modal-content" style="max-width: 600px;">
         <strong style="color: #3b1e5a; display: block; margin-bottom: 15px; font-size: 18px; border-bottom: 2px solid #fcc01a; padding-bottom: 5px;" id="report-name"></strong>
         <div style="margin-bottom: 15px; font-size: 15px; color: black; line-height: 1.8;">
+            <div>رقم الهاتف: <b id="report-phone" style="color: #3b1e5a; font-family: Tahoma;"></b></div>
             <div>إجمالي المواعيد المسجلة: <b id="report-total" style="color: #3b1e5a;"></b></div>
             <div>مرات الغياب (لم يحضر): <b id="report-absent" style="color: red;"></b></div>
             <div>تاريخ آخر حضور: <b id="report-last" style="color: green;"></b></div>
         </div>
         
         <strong style="color: #000; display: block; margin-bottom: 10px; font-size: 14px;">التفاصيل:</strong>
-        <div style="overflow-x: auto; max-height: 200px; border: 1px solid #ddd; border-radius: 5px;">
+        <div style="overflow-x: auto; max-height: 200px; border: 1px solid #ddd; border-radius: 5px; margin-bottom: 15px;">
             <table style="width: 100%; font-size: 13px; margin-top: 0; border-radius: 0;">
                 <thead>
                     <tr>
@@ -245,7 +246,9 @@
                 <tbody id="report-tbody"></tbody>
             </table>
         </div>
-        <button class="modal-close-btn" style="background-color: #3b1e5a;" onclick="closeReportModal()">إغلاق التقرير</button>
+        
+        <button id="block-btn" style="width: 100%; padding: 12px; margin-bottom: 10px; font-size: 15px; color: white; border: none; border-radius: 5px; font-weight: bold; cursor: pointer;"></button>
+        <button class="modal-close-btn" style="background-color: #3b1e5a; margin-top: 0;" onclick="closeReportModal()">إغلاق التقرير</button>
     </div>
 </div>
 
@@ -263,6 +266,8 @@
     firebase.initializeApp(firebaseConfig);
     const database = firebase.database();
     const auth = firebase.auth();
+
+    const normalizeText = (str) => String(str || '').replace(/[\s\u200B-\u200D\uFEFF]/g, '').trim();
 
     const today = new Date().toISOString().split('T')[0];
     document.querySelector('.date-input').setAttribute('min', today);
@@ -312,21 +317,16 @@
         container.appendChild(row);
     }
 
-    function closeSuccessModal() {
-        document.getElementById('success-modal').style.display = 'none';
-    }
-    
+    function closeSuccessModal() { document.getElementById('success-modal').style.display = 'none'; }
     function showErrorModal(message) {
         document.getElementById('error-modal-msg').innerHTML = message;
         document.getElementById('error-modal').style.display = 'flex';
     }
-    
-    function closeErrorModal() {
-        document.getElementById('error-modal').style.display = 'none';
-    }
+    function closeErrorModal() { document.getElementById('error-modal').style.display = 'none'; }
 
     let isSubmitting = false;
 
+    // دالة التسجيل الأساسية للطالب (مع فحص الحظر)
     document.getElementById('regForm').addEventListener('submit', async function(e) {
         e.preventDefault();
         
@@ -376,25 +376,40 @@
         }
 
         try {
-            const snapshot = await database.ref('students').get();
-            let dbData = [];
+            // 1. فحص الحظر برقم الهاتف أولاً
+            const blockedSnap = await database.ref('blocked_phones').get();
+            let isBlocked = false;
+            const normalizedInputPhone = normalizeText(phone);
             
-            if (snapshot.exists()) {
-                const data = snapshot.val();
-                Object.keys(data).forEach(key => {
-                    dbData.push(data[key]);
+            if (blockedSnap.exists()) {
+                const blockedData = blockedSnap.val();
+                Object.keys(blockedData).forEach(key => {
+                    if (normalizeText(blockedData[key].phone) === normalizedInputPhone) {
+                        isBlocked = true;
+                    }
                 });
             }
 
-            const normalize = (str) => String(str || '').replace(/[\s\u200B-\u200D\uFEFF]/g, '').trim();
+            if (isBlocked) {
+                showErrorModal('عفواً، لا يمكنك التسجيل في الوقت الحالي. يرجى مراجعة إدارة المعمل.');
+                resetBtn();
+                return;
+            }
+
+            // 2. فحص السعة الاستيعابية للمواعيد
+            const snapshot = await database.ref('students').get();
+            let dbData = [];
+            if (snapshot.exists()) {
+                const data = snapshot.val();
+                Object.keys(data).forEach(key => dbData.push(data[key]));
+            }
 
             for (let i = 0; i < appointments.length; i++) {
                 const app = appointments[i];
-                
                 let currentCountInDB = dbData.filter(d => 
-                    normalize(d.date) === normalize(app.date) && 
-                    normalize(d.time) === normalize(app.time) && 
-                    normalize(d.course) === normalize(course)
+                    normalizeText(d.date) === normalizeText(app.date) && 
+                    normalizeText(d.time) === normalizeText(app.time) && 
+                    normalizeText(d.course) === normalizeText(course)
                 ).length;
                 
                 if (currentCountInDB >= maxLimit) {
@@ -404,6 +419,7 @@
                 }
             }
 
+            // 3. إتمام التسجيل
             let promises = [];
             appointments.forEach(app => {
                 const record = { name, phone, group, course, date: app.date, time: app.time, attended: false, timestamp: new Date().toLocaleString() };
@@ -419,7 +435,6 @@
             });
             
             document.getElementById('success-modal').style.display = 'flex';
-
             document.getElementById('regForm').reset();
             document.getElementById('appointments-container').innerHTML = `
                 <div class="appointment-row" style="display: flex; gap: 10px; margin-bottom: 10px; align-items: center;">
@@ -431,10 +446,7 @@
             `;
             
             resetBtn();
-            
-            setTimeout(() => {
-                closeSuccessModal();
-            }, 5000);
+            setTimeout(() => { closeSuccessModal(); }, 5000);
 
         } catch (error) {
             showErrorModal('حدث خطأ أثناء الاتصال بقاعدة البيانات: ' + error.message);
@@ -442,7 +454,7 @@
         }
     });
 
-    // ----------------- نظام تسجيل الدخول -----------------
+    // ----------------- نظام تسجيل الدخول والإدارة -----------------
     
     function showLogin() {
         document.getElementById('student-view').style.display = 'none';
@@ -480,13 +492,13 @@
         });
     }
 
-    // ----------------- عرض الإدارة والبحث الذكي -----------------
-
     let allStudents = [];
+    let blockedPhonesList = [];
     let currentSelectedDate = null;
     let currentSelectedPeriod = null;
 
     function loadData() {
+        // جلب الطلاب
         database.ref('students').on('value', (snapshot) => {
             allStudents = [];
             if (snapshot.exists()) {
@@ -494,32 +506,37 @@
                     allStudents.push({ id: childSnapshot.key, ...childSnapshot.val() });
                 });
             }
-            
             if (currentSelectedDate) {
                 let studentsInDay = allStudents.filter(s => s.date === currentSelectedDate);
                 if (studentsInDay.length === 0) {
                     backToDates();
-                    renderDatesList();
-                } else {
-                    if (currentSelectedPeriod) {
-                        let studentsInPeriod = studentsInDay.filter(s => s.time === currentSelectedPeriod);
-                        if (studentsInPeriod.length === 0) {
-                            backToPeriods();
-                            renderPeriodsList(currentSelectedDate);
-                        } else {
-                            showPeriodDetails(currentSelectedDate, currentSelectedPeriod);
-                        }
+                } else if (currentSelectedPeriod) {
+                    let studentsInPeriod = studentsInDay.filter(s => s.time === currentSelectedPeriod);
+                    if (studentsInPeriod.length === 0) {
+                        backToPeriods();
                     } else {
-                        renderPeriodsList(currentSelectedDate);
+                        showPeriodDetails(currentSelectedDate, currentSelectedPeriod);
                     }
+                } else {
+                    renderPeriodsList(currentSelectedDate);
                 }
             } else {
                 renderDatesList();
             }
         });
+
+        // جلب المحظورين
+        database.ref('blocked_phones').on('value', (snapshot) => {
+            blockedPhonesList = [];
+            if (snapshot.exists()) {
+                snapshot.forEach(child => {
+                    blockedPhonesList.push({ id: child.key, phone: child.val().phone, name: child.val().name });
+                });
+            }
+        });
     }
 
-    // دالة للبحث الذكي وظهور الاقتراحات
+    // ----------------- البحث وإدارة التقرير -----------------
     function handleSearch(query) {
         const container = document.getElementById('search-suggestions');
         if (!query.trim()) { 
@@ -538,13 +555,15 @@
         container.style.display = 'block';
     }
 
-    // دالة لاختيار الطالب وعرض التقرير
     function selectStudent(studentName) {
         document.getElementById('search-student').value = '';
         document.getElementById('search-suggestions').style.display = 'none';
         
         let studentRecords = allStudents.filter(s => s.name === studentName);
         if(studentRecords.length === 0) return;
+        
+        studentRecords.sort((a,b) => new Date(b.date) - new Date(a.date));
+        let studentPhone = studentRecords[0].phone; 
         
         let total = studentRecords.length;
         let attendedRecords = studentRecords.filter(s => s.attended);
@@ -557,12 +576,27 @@
         }
         
         document.getElementById('report-name').innerText = 'تقرير الطالب: ' + studentName;
+        document.getElementById('report-phone').innerText = studentPhone;
         document.getElementById('report-total').innerText = total;
         document.getElementById('report-absent').innerText = absent;
         document.getElementById('report-last').innerText = lastAttended;
         
-        studentRecords.sort((a,b) => new Date(a.date) - new Date(b.date));
+        // التحقق من الحظر
+        let normalizedStudentPhone = normalizeText(studentPhone);
+        let isBlocked = blockedPhonesList.some(b => normalizeText(b.phone) === normalizedStudentPhone);
         
+        let blockBtn = document.getElementById('block-btn');
+        if (isBlocked) {
+            blockBtn.innerText = "إلغاء حظر الطالب";
+            blockBtn.style.backgroundColor = "#28a745"; 
+            blockBtn.onclick = () => toggleBlockStudent(studentPhone, studentName, true);
+        } else {
+            blockBtn.innerText = "حظر الطالب من التسجيل 🚫";
+            blockBtn.style.backgroundColor = "#ff4d4d"; 
+            blockBtn.onclick = () => toggleBlockStudent(studentPhone, studentName, false);
+        }
+
+        studentRecords.sort((a,b) => new Date(a.date) - new Date(b.date));
         let tbody = document.getElementById('report-tbody');
         tbody.innerHTML = '';
         studentRecords.forEach(rec => {
@@ -581,37 +615,49 @@
         document.getElementById('report-modal').style.display = 'flex';
     }
 
-    function closeReportModal() {
-        document.getElementById('report-modal').style.display = 'none';
+    async function toggleBlockStudent(phone, name, currentlyBlocked) {
+        const normalizedPhone = normalizeText(phone);
+        
+        if (currentlyBlocked) {
+            let record = blockedPhonesList.find(b => normalizeText(b.phone) === normalizedPhone);
+            if (record) {
+                await database.ref('blocked_phones/' + record.id).remove();
+                alert('تم إلغاء الحظر بنجاح، يمكن للطالب التسجيل الآن.');
+                selectStudent(name); 
+            }
+        } else {
+            if (confirm(`هل أنت متأكد من حظر الطالب (${name}) برقم الهاتف (${phone})؟\nلن يتمكن من حجز أي مواعيد جديدة.`)) {
+                await database.ref('blocked_phones').push({ phone: phone, name: name });
+                alert('تم حظر الطالب بنجاح.');
+                selectStudent(name); 
+            }
+        }
     }
 
-    // لإخفاء قائمة الاقتراحات عند الضغط في أي مكان خارج المربع
+    function closeReportModal() { document.getElementById('report-modal').style.display = 'none'; }
+
     document.addEventListener('click', function(e) {
         if(e.target.id !== 'search-student') {
             document.getElementById('search-suggestions').style.display = 'none';
         }
     });
 
+    // ----------------- باقي وظائف الإدارة -----------------
     function renderDatesList() {
         document.getElementById('dates-list').style.display = 'block';
         document.getElementById('periods-list').style.display = 'none';
         document.getElementById('period-details').style.display = 'none';
-
         const container = document.getElementById('dates-container');
         container.innerHTML = '';
-
         const uniqueDates = [...new Set(allStudents.map(s => s.date))];
         uniqueDates.sort((a, b) => new Date(a) - new Date(b));
-
         if (uniqueDates.length === 0) {
             container.innerHTML = `<p style="text-align: center; color: white;">لا توجد بيانات مسجلة حتى الآن</p>`;
             return;
         }
-
         uniqueDates.forEach(date => {
             const studentsInDay = allStudents.filter(s => s.date === date);
             const periodsCount = new Set(studentsInDay.map(s => s.time)).size;
-            
             const btn = document.createElement('button');
             btn.className = 'nav-btn';
             btn.innerText = `يوم: ${date}  (عدد الفترات: ${periodsCount})`;
@@ -623,28 +669,16 @@
     function renderPeriodsList(date) {
         currentSelectedDate = date;
         currentSelectedPeriod = null;
-        
         document.getElementById('dates-list').style.display = 'none';
         document.getElementById('period-details').style.display = 'none';
         document.getElementById('periods-list').style.display = 'block';
-        
         document.getElementById('selected-date-title').innerText = `إدارة فترات يوم: ${date}`;
-
         const container = document.getElementById('periods-container');
         container.innerHTML = '';
-
         let studentsInDay = allStudents.filter(s => s.date === date);
         const uniquePeriods = [...new Set(studentsInDay.map(s => s.time))];
-
-        const timeOrder = {
-            'من 12 ظهراً إلى 3 عصراً': 1,
-            'من 3 عصراً إلى 6 مساءً': 2,
-            'من 6 مساءً إلى 9 مساءً': 3,
-            'من 8 مساءً إلى 11 مساءً': 4
-        };
-        
+        const timeOrder = { 'من 12 ظهراً إلى 3 عصراً': 1, 'من 3 عصراً إلى 6 مساءً': 2, 'من 6 مساءً إلى 9 مساءً': 3, 'من 8 مساءً إلى 11 مساءً': 4 };
         uniquePeriods.sort((a, b) => (timeOrder[a] || 99) - (timeOrder[b] || 99));
-
         uniquePeriods.forEach(period => {
             const studentsInPeriod = studentsInDay.filter(s => s.time === period).length;
             const btn = document.createElement('button');
@@ -659,17 +693,12 @@
         currentSelectedPeriod = period;
         document.getElementById('periods-list').style.display = 'none';
         document.getElementById('period-details').style.display = 'block';
-        
         document.getElementById('selected-period-title').innerText = `جدول فترة (${period}) ليوم ${date}`;
-
         const tbody = document.querySelector('#dataTable tbody');
         tbody.innerHTML = '';
-
         let filteredStudents = allStudents.filter(s => s.date === date && s.time === period);
-
         const courseOrder = { 'Classic Control': 1, 'PLC': 2, 'Motor Drive': 3 };
         filteredStudents.sort((a, b) => (courseOrder[a.course] || 99) - (courseOrder[b.course] || 99));
-
         filteredStudents.forEach(row => {
             const isChecked = row.attended ? 'checked' : '';
             tbody.innerHTML += `<tr>
@@ -679,36 +708,16 @@
                 <td style="font-weight: bold; color: #3b1e5a;">${row.course || ''}</td>
                 <td>${row.date || ''}</td>
                 <td>${row.time || ''}</td>
-                <td>
-                    <input type="checkbox" class="attendance-check" title="تحديد كحاضر" 
-                           onchange="updateAttendance('${row.id}', this.checked)" ${isChecked}>
-                </td>
+                <td><input type="checkbox" class="attendance-check" title="تحديد كحاضر" onchange="updateAttendance('${row.id}', this.checked)" ${isChecked}></td>
                 <td><button class="delete-btn" onclick="deleteStudent('${row.id}')">حذف</button></td>
             </tr>`;
         });
     }
 
-    function updateAttendance(id, status) {
-        database.ref('students/' + id).update({ attended: status }).catch(error => alert('خطأ في التحديث: ' + error.message));
-    }
-
-    function backToDates() {
-        currentSelectedDate = null;
-        currentSelectedPeriod = null;
-        renderDatesList();
-    }
-
-    function backToPeriods() {
-        currentSelectedPeriod = null;
-        renderPeriodsList(currentSelectedDate);
-    }
-
-    function deleteStudent(id) {
-        if (confirm('هل أنت متأكد من حذف هذا الموعد؟')) {
-            database.ref('students/' + id).remove().catch(error => alert('خطأ: ' + error.message));
-        }
-    }
-
+    function updateAttendance(id, status) { database.ref('students/' + id).update({ attended: status }).catch(error => alert('خطأ في التحديث: ' + error.message)); }
+    function backToDates() { currentSelectedDate = null; currentSelectedPeriod = null; renderDatesList(); }
+    function backToPeriods() { currentSelectedPeriod = null; renderPeriodsList(currentSelectedDate); }
+    function deleteStudent(id) { if (confirm('هل أنت متأكد من حذف هذا الموعد؟')) database.ref('students/' + id).remove().catch(error => alert('خطأ: ' + error.message)); }
     function deleteAllInPeriod() {
         if (!currentSelectedDate || !currentSelectedPeriod) return;
         if (confirm(`تحذير: هل أنت متأكد من حذف جميع تسجيلات فترة (${currentSelectedPeriod})؟\nلا يمكن التراجع.`)) {
@@ -718,7 +727,6 @@
             database.ref('students').update(updates).then(() => alert('تم حذف الفترة بنجاح.')).catch(error => alert('خطأ: ' + error.message));
         }
     }
-
     function deleteAllInDay() {
         if (!currentSelectedDate) return;
         if (confirm(`تحذير: هل أنت متأكد من حذف جميع تسجيلات يوم ${currentSelectedDate} بالكامل؟\nلا يمكن التراجع.`)) {
@@ -728,7 +736,6 @@
             database.ref('students').update(updates).then(() => alert('تم حذف اليوم بنجاح.')).catch(error => alert('خطأ: ' + error.message));
         }
     }
-
     function deleteAllData() {
         if (confirm('تحذير نهائي: هل أنت متأكد من حذف جميع تسجيلات الطلاب في كل الأيام بالكامل؟')) {
             database.ref('students').remove().then(() => alert('تم تفريغ البيانات.')).catch(error => alert('خطأ: ' + error.message));
