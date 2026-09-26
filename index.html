@@ -26,7 +26,7 @@
         
         .attendance-check { width: 22px; height: 22px; cursor: pointer; accent-color: #3b1e5a; }
 
-        /* ستايل النافذة المنبثقة (Modal) */
+        /* ستايل النوافذ المنبثقة (Modal) */
         .modal-overlay {
             display: none;
             position: fixed;
@@ -109,16 +109,26 @@
     </form>
 </div>
 
-<!-- نافذة التأكيد المنبثقة (Modal) -->
+<!-- نافذة التأكيد المنبثقة (النجاح) -->
 <div class="modal-overlay" id="success-modal">
     <div class="modal-content">
         <strong style="color: black; display: block; margin-bottom: 10px; font-size: 16px;">تم تأكيد التسجيل بنجاح. بيان المواعيد:</strong>
         <ul id="modal-appointments-list" style="margin: 0; padding-right: 20px; color: black; line-height: 1.8; font-size: 14px;">
         </ul>
-        <button class="modal-close-btn" onclick="closeModal()">موافق</button>
+        <button class="modal-close-btn" onclick="closeSuccessModal()">موافق</button>
     </div>
 </div>
 
+<!-- نافذة التنبيه المنبثقة (الخطأ / الموعد ممتلئ) -->
+<div class="modal-overlay" id="error-modal">
+    <div class="modal-content" style="border-color: #ff4d4d;">
+        <strong style="color: #ff4d4d; display: block; margin-bottom: 10px; font-size: 16px;">تنبيه هام</strong>
+        <p id="error-modal-msg" style="margin: 0; color: black; line-height: 1.8; font-size: 14px; font-weight: bold;"></p>
+        <button class="modal-close-btn" style="background-color: #ff4d4d;" onclick="closeErrorModal()">رجوع لتعديل الموعد</button>
+    </div>
+</div>
+
+<!-- واجهة تسجيل الدخول للإدارة -->
 <div class="container" id="login-view">
     <h2 style="text-align: center; color: #fcc01a;">تسجيل الدخول للإدارة</h2>
     <form id="loginForm">
@@ -134,6 +144,7 @@
     <p id="login-msg" style="text-align:center; color:#ff4d4d; font-weight:bold; margin-top: 15px;"></p>
 </div>
 
+<!-- واجهة الإدارة -->
 <div class="container" id="admin-view" style="max-width: 950px;">
     <h2 style="text-align: center; color: #fcc01a;">لوحة تحكم م. يوسف شريف</h2>
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
@@ -244,9 +255,18 @@
         container.appendChild(row);
     }
 
-    // إغلاق النافذة المنبثقة
-    function closeModal() {
+    // دوال النوافذ المنبثقة
+    function closeSuccessModal() {
         document.getElementById('success-modal').style.display = 'none';
+    }
+    
+    function showErrorModal(message) {
+        document.getElementById('error-modal-msg').innerText = message;
+        document.getElementById('error-modal').style.display = 'flex';
+    }
+    
+    function closeErrorModal() {
+        document.getElementById('error-modal').style.display = 'none';
     }
 
     document.getElementById('regForm').addEventListener('submit', function(e) {
@@ -288,7 +308,7 @@
         });
 
         if (hasDuplicate) {
-            alert('عفواً، لقد قمت باختيار نفس الموعد (تاريخ ووقت) أكثر من مرة. يرجى التعديل.');
+            showErrorModal('لقد قمت باختيار نفس الموعد (تاريخ ووقت) أكثر من مرة. يرجى التعديل.');
             resetBtn();
             return;
         }
@@ -303,7 +323,7 @@
                 const app = appointments[i];
                 let currentCount = dbData.filter(d => d.date === app.date && d.time === app.time && d.course === course).length;
                 if (currentCount >= maxLimit) {
-                    alert(`عفواً، الموعد يوم (${app.date}) في الفترة (${app.time}) ممتلئ لكورس (${course}). يرجى اختيار موعد آخر أو حذفه.`);
+                    showErrorModal(`عفواً، الموعد يوم (${app.date}) في الفترة (${app.time}) ممتلئ لكورس (${course}). يرجى اختيار موعد آخر أو حذفه.`);
                     resetBtn();
                     return; 
                 }
@@ -316,7 +336,6 @@
             });
 
             Promise.all(promises).then(() => {
-                // تعبئة النافذة المنبثقة بالمواعيد وإظهارها
                 const list = document.getElementById('modal-appointments-list');
                 list.innerHTML = '';
                 appointments.forEach(app => {
@@ -325,7 +344,6 @@
                 
                 document.getElementById('success-modal').style.display = 'flex';
 
-                // تصفير الفورم
                 document.getElementById('regForm').reset();
                 document.getElementById('appointments-container').innerHTML = `
                     <div class="appointment-row" style="display: flex; gap: 10px; margin-bottom: 10px; align-items: center;">
@@ -338,7 +356,7 @@
                 
                 resetBtn();
             }).catch(error => {
-                alert('حدث خطأ أثناء التسجيل: ' + error.message);
+                showErrorModal('حدث خطأ أثناء التسجيل: ' + error.message);
                 resetBtn();
             });
         });
