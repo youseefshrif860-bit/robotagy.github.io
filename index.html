@@ -74,7 +74,8 @@
 
         <button type="submit" class="submit-btn">تأكيد التسجيل</button>
     </form>
-    <div id="msg" style="text-align:center; font-weight:bold; margin-top: 15px;"></div>
+    <!-- تم إزالة margin-top من هنا ليكون التنسيق داخل المربع الأخضر -->
+    <div id="msg"></div>
 </div>
 
 <!-- واجهة تسجيل الدخول للإدارة -->
@@ -258,12 +259,20 @@
             });
 
             Promise.all(promises).then(() => {
-                let successText = '<span style="color: #4CAF50; font-size: 18px;">✅ تم تأكيد حجز المواعيد التالية بنجاح:</span><br><br>';
+                // التصميم الرسمي والاحترافي لرسالة التأكيد
+                let successText = `
+                <div style="border: 2px solid #28a745; background-color: rgba(40, 167, 69, 0.1); padding: 15px; border-radius: 5px; text-align: right; margin-top: 20px;">
+                    <strong style="color: #28a745; display: block; margin-bottom: 10px; font-size: 16px;">تم تأكيد التسجيل بنجاح. بيان المواعيد:</strong>
+                    <ul style="margin: 0; padding-right: 20px; color: white; line-height: 1.8; font-size: 14px;">
+                `;
+                
                 appointments.forEach(app => {
-                    successText += `<span style="display: block; background-color: #3b1e5a; color: white; padding: 8px; border-radius: 5px; margin-bottom: 5px; border: 1px solid #fcc01a;">
-                                      📅 يوم <b>${app.date}</b> - ⏰ فترة <b>${app.time}</b>
-                                    </span>`;
+                    successText += `<li>تاريخ الحضور: <b>${app.date}</b> &nbsp;|&nbsp; الفترة الزمنية: <b>${app.time}</b></li>`;
                 });
+                
+                successText += `
+                    </ul>
+                </div>`;
                 
                 const msgDiv = document.getElementById('msg');
                 msgDiv.innerHTML = successText;
