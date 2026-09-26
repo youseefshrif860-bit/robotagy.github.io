@@ -9,9 +9,9 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <script>
-        // التحديث التلقائي للنسخة (v=6)
-        if (window.location.href.indexOf('?v=6') === -1) {
-            window.location.replace(window.location.href.split('?')[0] + '?v=6');
+        // التحديث التلقائي للنسخة (v=7)
+        if (window.location.href.indexOf('?v=7') === -1) {
+            window.location.replace(window.location.href.split('?')[0] + '?v=7');
         }
     </script>
 
@@ -356,7 +356,7 @@
                 ).length;
                 
                 if (currentCountInDB >= maxLimit) {
-                    showErrorModal(`عفواً، الموعد يوم <b>(${app.date})</b> في الفترة <b>(${app.time})</b> ممتلئ لكورس <b>(${course})</b>.<br><br>الحد الأقصى المسموح هو (${maxLimit}) طلاب وقد اكتمل.<br>يرجى اختيار موعد آخر أو حذفه.`);
+                    showErrorModal(`عفواً، الموعد يوم <b>(${app.date})</b> في الفترة <b>(${app.time})</b> ممتلئ لكورس <b>(${course})</b>.<br><br>المقاعد محجوزة بالكامل في هذا الموعد.<br>يرجى اختيار موعد آخر أو حذفه.`);
                     resetBtn();
                     return; 
                 }
