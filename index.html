@@ -255,13 +255,12 @@
         container.appendChild(row);
     }
 
-    // دوال النوافذ المنبثقة
     function closeSuccessModal() {
         document.getElementById('success-modal').style.display = 'none';
     }
     
     function showErrorModal(message) {
-        document.getElementById('error-modal-msg').innerText = message;
+        document.getElementById('error-modal-msg').innerHTML = message;
         document.getElementById('error-modal').style.display = 'flex';
     }
     
@@ -274,7 +273,7 @@
         
         const submitBtn = document.getElementById('main-submit-btn');
         submitBtn.disabled = true;
-        submitBtn.innerText = 'جاري التسجيل...';
+        submitBtn.innerText = 'جاري التحقق والتسجيل...';
         submitBtn.style.opacity = '0.7';
         submitBtn.style.cursor = 'not-allowed';
 
@@ -308,57 +307,81 @@
         });
 
         if (hasDuplicate) {
-            showErrorModal('لقد قمت باختيار نفس الموعد (تاريخ ووقت) أكثر من مرة. يرجى التعديل.');
+            showErrorModal('لقد قمت باختيار نفس الموعد (تاريخ ووقت) أكثر من مرة.<br><br>يرجى تعديل المواعيد.');
             resetBtn();
             return;
         }
 
-        database.ref('students').once('value', (snapshot) => {
+        // الطريقة الصارمة للتحقق والمنع
+        database.ref('students').once('value').then((snapshot) => {
             let dbData = [];
             if (snapshot.exists()) {
                 snapshot.forEach(child => dbData.push(child.val()));
             }
 
+            let isFull = false;
+            let fullMessage = "";
+
             for (let i = 0; i < appointments.length; i++) {
                 const app = appointments[i];
-                let currentCount = dbData.filter(d => d.date === app.date && d.time === app.time && d.course === course).length;
+                
+                // التأكد من تطابق التاريخ والوقت والكورس بدقة
+                let currentCount = dbData.filter(d => 
+                    d.date === app.date && 
+                    d.time && app.time && d.time.trim() === app.time.trim() && 
+                    d.course === course
+                ).length;
+                
                 if (currentCount >= maxLimit) {
-                    showErrorModal(`عفواً، الموعد يوم (${app.date}) في الفترة (${app.time}) ممتلئ لكورس (${course}). يرجى اختيار موعد آخر أو حذفه.`);
-                    resetBtn();
-                    return; 
+                    isFull = true;
+                    fullMessage = `عفواً، الموعد يوم <b>(${app.date})</b> في الفترة <b>(${app.time})</b> ممتلئ لكورس <b>(${course})</b>.<br><br>الحد الأقصى المسموح هو (${maxLimit}) طلاب وقد اكتمل.<br>يرجى اختيار موعد آخر أو حذفه.`;
+                    break;
                 }
             }
 
+            // لو الموعد ممتلئ، نرفض العملية نهائياً ونوقف الكود هنا
+            if (isFull) {
+                showErrorModal(fullMessage);
+                resetBtn();
+                return Promise.reject(new Error("FULL_SLOT"));
+            }
+
+            // لو الموعد متاح، نكمل التسجيل
             let promises = [];
             appointments.forEach(app => {
                 const record = { name, phone, group, course, date: app.date, time: app.time, attended: false, timestamp: new Date().toLocaleString() };
                 promises.push(database.ref('students').push(record));
             });
 
-            Promise.all(promises).then(() => {
-                const list = document.getElementById('modal-appointments-list');
-                list.innerHTML = '';
-                appointments.forEach(app => {
-                    list.innerHTML += `<li>تاريخ الحضور: <b>${app.date}</b> &nbsp;|&nbsp; الفترة: <b>${app.time}</b></li>`;
-                });
-                
-                document.getElementById('success-modal').style.display = 'flex';
+            return Promise.all(promises);
+            
+        }).then(() => {
+            // تنفيذ كود النجاح فقط إذا لم يتم رفض العملية
+            const list = document.getElementById('modal-appointments-list');
+            list.innerHTML = '';
+            appointments.forEach(app => {
+                list.innerHTML += `<li>تاريخ الحضور: <b>${app.date}</b> &nbsp;|&nbsp; الفترة: <b>${app.time}</b></li>`;
+            });
+            
+            document.getElementById('success-modal').style.display = 'flex';
 
-                document.getElementById('regForm').reset();
-                document.getElementById('appointments-container').innerHTML = `
-                    <div class="appointment-row" style="display: flex; gap: 10px; margin-bottom: 10px; align-items: center;">
-                        <input type="date" class="date-input" min="${today}" required onchange="updateTimeOptions(this)" style="margin:0; width: 50%;">
-                        <select class="time-input" required style="margin:0; width: 50%;">
-                            <option value="" disabled selected>اختر التاريخ أولاً</option>
-                        </select>
-                    </div>
-                `;
-                
-                resetBtn();
-            }).catch(error => {
+            document.getElementById('regForm').reset();
+            document.getElementById('appointments-container').innerHTML = `
+                <div class="appointment-row" style="display: flex; gap: 10px; margin-bottom: 10px; align-items: center;">
+                    <input type="date" class="date-input" min="${today}" required onchange="updateTimeOptions(this)" style="margin:0; width: 50%;">
+                    <select class="time-input" required style="margin:0; width: 50%;">
+                        <option value="" disabled selected>اختر التاريخ أولاً</option>
+                    </select>
+                </div>
+            `;
+            
+            resetBtn();
+        }).catch(error => {
+            // نظهر رسالة خطأ فقط إذا كان الخطأ خارج عن الرفض المبرمج (مشكلة انترنت مثلاً)
+            if(error.message !== "FULL_SLOT") {
                 showErrorModal('حدث خطأ أثناء التسجيل: ' + error.message);
                 resetBtn();
-            });
+            }
         });
     });
 
