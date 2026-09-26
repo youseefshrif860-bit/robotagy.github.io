@@ -4,14 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     
-    <!-- كود إجبار المتصفح على مسح الكاش وتحديث الموقع تلقائياً للنسخة الجديدة -->
+    <!-- كود إجبار المتصفح على مسح الكاش وتحديث الموقع للنسخة النهائية -->
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <script>
-        // التحديث التلقائي للنسخة الصارمة جداً (v=5)
-        if (window.location.href.indexOf('?v=5') === -1) {
-            window.location.replace(window.location.href.split('?')[0] + '?v=5');
+        // التحديث التلقائي للنسخة (v=6)
+        if (window.location.href.indexOf('?v=6') === -1) {
+            window.location.replace(window.location.href.split('?')[0] + '?v=6');
         }
     </script>
 
@@ -280,13 +280,12 @@
         document.getElementById('error-modal').style.display = 'none';
     }
 
-    // القفل البرمجي الشامل لمنع تداخل الطلبات السريعة (Race Condition)
     let isSubmitting = false;
 
     document.getElementById('regForm').addEventListener('submit', async function(e) {
         e.preventDefault();
         
-        if (isSubmitting) return; // رفض قاطع لأي ضغطة إضافية أثناء المعالجة
+        if (isSubmitting) return; 
         isSubmitting = true;
         
         const submitBtn = document.getElementById('main-submit-btn');
@@ -300,7 +299,7 @@
             submitBtn.innerText = 'تأكيد التسجيل';
             submitBtn.style.opacity = '1';
             submitBtn.style.cursor = 'pointer';
-            isSubmitting = false; // فك القفل بعد انتهاء كل شيء
+            isSubmitting = false;
         }
 
         const name = document.getElementById('name').value;
@@ -332,20 +331,24 @@
         }
 
         try {
-            // استخدام once لقراءة البيانات من السيرفر مباشرة لتجنب أخطاء الـ Cache
-            const snapshot = await database.ref('students').once('value');
+            // جلب كامل السجلات بطريقة قاطعة من السيرفر باستخدام get()
+            const snapshot = await database.ref('students').get();
             let dbData = [];
+            
             if (snapshot.exists()) {
-                snapshot.forEach(child => dbData.push(child.val()));
+                const data = snapshot.val();
+                // استخراج البيانات وتجنب ثغرة Firebase forEach نهائياً
+                Object.keys(data).forEach(key => {
+                    dbData.push(data[key]);
+                });
             }
 
-            // دالة صارمة جداً للمقارنة تتجاهل المسافات وأي فواصل مخفية
-            const normalize = (str) => String(str || '').replace(/\s+/g, '').trim();
+            // التخلص من أي مسافات نهائياً لضمان المقارنة الصارمة
+            const normalize = (str) => String(str || '').replace(/[\s\u200B-\u200D\uFEFF]/g, '').trim();
 
             for (let i = 0; i < appointments.length; i++) {
                 const app = appointments[i];
                 
-                // حساب دقيق من السيرفر
                 let currentCountInDB = dbData.filter(d => 
                     normalize(d.date) === normalize(app.date) && 
                     normalize(d.time) === normalize(app.time) && 
@@ -355,7 +358,7 @@
                 if (currentCountInDB >= maxLimit) {
                     showErrorModal(`عفواً، الموعد يوم <b>(${app.date})</b> في الفترة <b>(${app.time})</b> ممتلئ لكورس <b>(${course})</b>.<br><br>الحد الأقصى المسموح هو (${maxLimit}) طلاب وقد اكتمل.<br>يرجى اختيار موعد آخر أو حذفه.`);
                     resetBtn();
-                    return; // إيقاف فوري للعملية
+                    return; 
                 }
             }
 
@@ -365,7 +368,7 @@
                 promises.push(database.ref('students').push(record));
             });
 
-            await Promise.all(promises); // انتظار التأكيد من السيرفر
+            await Promise.all(promises);
 
             const list = document.getElementById('modal-appointments-list');
             list.innerHTML = '';
