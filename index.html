@@ -25,6 +25,41 @@
         .add-btn { background-color: #28a745; color: white; border: none; padding: 10px; font-weight: bold; cursor: pointer; border-radius: 5px; width: 100%; margin-bottom: 15px; }
         
         .attendance-check { width: 22px; height: 22px; cursor: pointer; accent-color: #3b1e5a; }
+
+        /* ستايل النافذة المنبثقة (Modal) */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        .modal-content {
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            border: 3px solid #fcc01a;
+            width: 90%;
+            max-width: 400px;
+            text-align: right;
+            color: black;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }
+        .modal-close-btn {
+            background-color: #28a745;
+            color: white;
+            border: none;
+            padding: 10px;
+            width: 100%;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+        .modal-close-btn:hover { background-color: #218838; }
     </style>
 
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
@@ -38,6 +73,7 @@
     <button class="admin-btn" onclick="showLogin()">الإدارة</button>
 </div>
 
+<!-- واجهة الطلاب -->
 <div class="container" id="student-view">
     <form id="regForm">
         <label>الاسم:</label>
@@ -71,7 +107,16 @@
 
         <button type="submit" class="submit-btn" id="main-submit-btn">تأكيد التسجيل</button>
     </form>
-    <div id="msg"></div>
+</div>
+
+<!-- نافذة التأكيد المنبثقة (Modal) -->
+<div class="modal-overlay" id="success-modal">
+    <div class="modal-content">
+        <strong style="color: black; display: block; margin-bottom: 10px; font-size: 16px;">تم تأكيد التسجيل بنجاح. بيان المواعيد:</strong>
+        <ul id="modal-appointments-list" style="margin: 0; padding-right: 20px; color: black; line-height: 1.8; font-size: 14px;">
+        </ul>
+        <button class="modal-close-btn" onclick="closeModal()">موافق</button>
+    </div>
 </div>
 
 <div class="container" id="login-view">
@@ -199,10 +244,14 @@
         container.appendChild(row);
     }
 
+    // إغلاق النافذة المنبثقة
+    function closeModal() {
+        document.getElementById('success-modal').style.display = 'none';
+    }
+
     document.getElementById('regForm').addEventListener('submit', function(e) {
         e.preventDefault();
         
-        // قفل الزر وتغيير حالته لمنع الضغط المتكرر
         const submitBtn = document.getElementById('main-submit-btn');
         submitBtn.disabled = true;
         submitBtn.innerText = 'جاري التسجيل...';
@@ -267,23 +316,16 @@
             });
 
             Promise.all(promises).then(() => {
-                let successText = `
-                <div style="border: 2px solid #fcc01a; background-color: white; padding: 15px; border-radius: 5px; text-align: right; margin-top: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
-                    <strong style="color: black; display: block; margin-bottom: 10px; font-size: 16px;">تم تأكيد التسجيل بنجاح. بيان المواعيد:</strong>
-                    <ul style="margin: 0; padding-right: 20px; color: black; line-height: 1.8; font-size: 14px;">
-                `;
-                
+                // تعبئة النافذة المنبثقة بالمواعيد وإظهارها
+                const list = document.getElementById('modal-appointments-list');
+                list.innerHTML = '';
                 appointments.forEach(app => {
-                    successText += `<li>تاريخ الحضور: <b>${app.date}</b> &nbsp;|&nbsp; الفترة الزمنية: <b>${app.time}</b></li>`;
+                    list.innerHTML += `<li>تاريخ الحضور: <b>${app.date}</b> &nbsp;|&nbsp; الفترة: <b>${app.time}</b></li>`;
                 });
                 
-                successText += `
-                    </ul>
-                </div>`;
-                
-                const msgDiv = document.getElementById('msg');
-                msgDiv.innerHTML = successText;
+                document.getElementById('success-modal').style.display = 'flex';
 
+                // تصفير الفورم
                 document.getElementById('regForm').reset();
                 document.getElementById('appointments-container').innerHTML = `
                     <div class="appointment-row" style="display: flex; gap: 10px; margin-bottom: 10px; align-items: center;">
@@ -294,8 +336,7 @@
                     </div>
                 `;
                 
-                resetBtn(); // إعادة تشغيل الزر بعد النجاح
-                setTimeout(() => msgDiv.innerHTML = '', 10000);
+                resetBtn();
             }).catch(error => {
                 alert('حدث خطأ أثناء التسجيل: ' + error.message);
                 resetBtn();
