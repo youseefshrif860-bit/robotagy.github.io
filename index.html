@@ -3,6 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <!-- كود إجبار المتصفح على مسح الكاش وتحديث الموقع تلقائياً -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
+    <script>
+        // التحديث التلقائي للنسخة الجديدة الصارمة (v=4)
+        if (window.location.href.indexOf('?v=4') === -1) {
+            window.location.replace(window.location.href.split('?')[0] + '?v=4');
+        }
+    </script>
+
     <title>معمل روبوتاجي</title>
     <style>
         body { font-family: Tahoma, Arial, sans-serif; background-color: #3b1e5a; color: white; margin: 0; padding: 20px; }
@@ -268,7 +280,8 @@
         document.getElementById('error-modal').style.display = 'none';
     }
 
-    document.getElementById('regForm').addEventListener('submit', function(e) {
+    // الاعتماد على async/await لضمان عدم تخطي أوامر المنع
+    document.getElementById('regForm').addEventListener('submit', async function(e) {
         e.preventDefault();
         
         const submitBtn = document.getElementById('main-submit-btn');
@@ -312,51 +325,49 @@
             return;
         }
 
-        // الطريقة الصارمة للتحقق والمنع
-        database.ref('students').once('value').then((snapshot) => {
+        try {
+            // جلب قاعدة البيانات بنظام await لضمان القراءة الكاملة قبل أي قرار
+            const snapshot = await database.ref('students').get();
             let dbData = [];
             if (snapshot.exists()) {
                 snapshot.forEach(child => dbData.push(child.val()));
             }
 
-            let isFull = false;
-            let fullMessage = "";
+            // دالة صارمة لمسح أي مسافات زائدة وضمان تطابق النصوص 100%
+            const safeMatch = (val1, val2) => {
+                if (!val1 || !val2) return false;
+                return String(val1).replace(/\s+/g, '') === String(val2).replace(/\s+/g, '');
+            };
 
+            // التحقق من كل المواعيد المختارة
             for (let i = 0; i < appointments.length; i++) {
                 const app = appointments[i];
                 
-                // التأكد من تطابق التاريخ والوقت والكورس بدقة
-                let currentCount = dbData.filter(d => 
-                    d.date === app.date && 
-                    d.time && app.time && d.time.trim() === app.time.trim() && 
-                    d.course === course
+                // حساب عدد الطلاب المسجلين لنفس الكورس ونفس اليوم والوقت بدقة متناهية
+                let currentCountInDB = dbData.filter(d => 
+                    safeMatch(d.date, app.date) && 
+                    safeMatch(d.time, app.time) && 
+                    safeMatch(d.course, course)
                 ).length;
                 
-                if (currentCount >= maxLimit) {
-                    isFull = true;
-                    fullMessage = `عفواً، الموعد يوم <b>(${app.date})</b> في الفترة <b>(${app.time})</b> ممتلئ لكورس <b>(${course})</b>.<br><br>الحد الأقصى المسموح هو (${maxLimit}) طلاب وقد اكتمل.<br>يرجى اختيار موعد آخر أو حذفه.`;
-                    break;
+                // لو العدد وصل للحد الأقصى أو تخطاه
+                if (currentCountInDB >= maxLimit) {
+                    showErrorModal(`عفواً، الموعد يوم <b>(${app.date})</b> في الفترة <b>(${app.time})</b> ممتلئ لكورس <b>(${course})</b>.<br><br>الحد الأقصى المسموح هو (${maxLimit}) طلاب وقد اكتمل.<br>يرجى اختيار موعد آخر أو حذفه.`);
+                    resetBtn();
+                    return; // إيقاف تام لدالة التسجيل بأكملها ومنع الحفظ نهائياً
                 }
             }
 
-            // لو الموعد ممتلئ، نرفض العملية نهائياً ونوقف الكود هنا
-            if (isFull) {
-                showErrorModal(fullMessage);
-                resetBtn();
-                return Promise.reject(new Error("FULL_SLOT"));
-            }
-
-            // لو الموعد متاح، نكمل التسجيل
+            // إذا نجح التحقق ولم تعمل دالة return، نقوم بحفظ البيانات
             let promises = [];
             appointments.forEach(app => {
                 const record = { name, phone, group, course, date: app.date, time: app.time, attended: false, timestamp: new Date().toLocaleString() };
                 promises.push(database.ref('students').push(record));
             });
 
-            return Promise.all(promises);
-            
-        }).then(() => {
-            // تنفيذ كود النجاح فقط إذا لم يتم رفض العملية
+            await Promise.all(promises);
+
+            // تفعيل نافذة النجاح
             const list = document.getElementById('modal-appointments-list');
             list.innerHTML = '';
             appointments.forEach(app => {
@@ -376,13 +387,16 @@
             `;
             
             resetBtn();
-        }).catch(error => {
-            // نظهر رسالة خطأ فقط إذا كان الخطأ خارج عن الرفض المبرمج (مشكلة انترنت مثلاً)
-            if(error.message !== "FULL_SLOT") {
-                showErrorModal('حدث خطأ أثناء التسجيل: ' + error.message);
-                resetBtn();
-            }
-        });
+            
+            // إخفاء نافذة النجاح تلقائياً بعد 5 ثواني
+            setTimeout(() => {
+                closeSuccessModal();
+            }, 5000);
+
+        } catch (error) {
+            showErrorModal('حدث خطأ أثناء الاتصال بقاعدة البيانات: ' + error.message);
+            resetBtn();
+        }
     });
 
     // ----------------- نظام تسجيل الدخول -----------------
