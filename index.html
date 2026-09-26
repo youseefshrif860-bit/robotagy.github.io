@@ -9,9 +9,9 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <script>
-        // التحديث التلقائي للنسخة (v=9) لضمان تفعيل الحظر الذكي
-        if (window.location.href.indexOf('?v=9') === -1) {
-            window.location.replace(window.location.href.split('?')[0] + '?v=9');
+        // التحديث التلقائي للنسخة (v=10) لتفعيل التحديث اللحظي للحضور
+        if (window.location.href.indexOf('?v=10') === -1) {
+            window.location.replace(window.location.href.split('?')[0] + '?v=10');
         }
     </script>
 
@@ -326,7 +326,6 @@
 
     let isSubmitting = false;
 
-    // دالة التسجيل الأساسية للطالب (مع فحص الحظر)
     document.getElementById('regForm').addEventListener('submit', async function(e) {
         e.preventDefault();
         
@@ -376,7 +375,6 @@
         }
 
         try {
-            // 1. فحص الحظر برقم الهاتف أولاً
             const blockedSnap = await database.ref('blocked_phones').get();
             let isBlocked = false;
             const normalizedInputPhone = normalizeText(phone);
@@ -396,7 +394,6 @@
                 return;
             }
 
-            // 2. فحص السعة الاستيعابية للمواعيد
             const snapshot = await database.ref('students').get();
             let dbData = [];
             if (snapshot.exists()) {
@@ -419,7 +416,6 @@
                 }
             }
 
-            // 3. إتمام التسجيل
             let promises = [];
             appointments.forEach(app => {
                 const record = { name, phone, group, course, date: app.date, time: app.time, attended: false, timestamp: new Date().toLocaleString() };
@@ -498,7 +494,6 @@
     let currentSelectedPeriod = null;
 
     function loadData() {
-        // جلب الطلاب
         database.ref('students').on('value', (snapshot) => {
             allStudents = [];
             if (snapshot.exists()) {
@@ -506,6 +501,17 @@
                     allStudents.push({ id: childSnapshot.key, ...childSnapshot.val() });
                 });
             }
+            
+            // تحديث نافذة التقرير لحظياً لو كانت مفتوحة
+            let reportModal = document.getElementById('report-modal');
+            if (reportModal && reportModal.style.display === 'flex') {
+                let titleText = document.getElementById('report-name').innerText;
+                if (titleText.startsWith('تقرير الطالب: ')) {
+                    let currentName = titleText.replace('تقرير الطالب: ', '');
+                    if (currentName) selectStudent(currentName);
+                }
+            }
+
             if (currentSelectedDate) {
                 let studentsInDay = allStudents.filter(s => s.date === currentSelectedDate);
                 if (studentsInDay.length === 0) {
@@ -525,7 +531,6 @@
             }
         });
 
-        // جلب المحظورين
         database.ref('blocked_phones').on('value', (snapshot) => {
             blockedPhonesList = [];
             if (snapshot.exists()) {
@@ -536,7 +541,6 @@
         });
     }
 
-    // ----------------- البحث وإدارة التقرير -----------------
     function handleSearch(query) {
         const container = document.getElementById('search-suggestions');
         if (!query.trim()) { 
@@ -560,7 +564,10 @@
         document.getElementById('search-suggestions').style.display = 'none';
         
         let studentRecords = allStudents.filter(s => s.name === studentName);
-        if(studentRecords.length === 0) return;
+        if(studentRecords.length === 0) {
+            closeReportModal();
+            return;
+        }
         
         studentRecords.sort((a,b) => new Date(b.date) - new Date(a.date));
         let studentPhone = studentRecords[0].phone; 
@@ -581,7 +588,6 @@
         document.getElementById('report-absent').innerText = absent;
         document.getElementById('report-last').innerText = lastAttended;
         
-        // التحقق من الحظر
         let normalizedStudentPhone = normalizeText(studentPhone);
         let isBlocked = blockedPhonesList.some(b => normalizeText(b.phone) === normalizedStudentPhone);
         
@@ -600,9 +606,10 @@
         let tbody = document.getElementById('report-tbody');
         tbody.innerHTML = '';
         studentRecords.forEach(rec => {
+            // التعديل الخاص بظهور المربع أو النص الثابت
             let statusHTML = rec.attended 
                 ? '<span style="color:green; font-weight:bold;">حاضر ✔</span>' 
-                : '<span style="color:red; font-weight:bold;">غائب ✘</span>';
+                : `<input type="checkbox" class="attendance-check" title="تحديد كحاضر" onchange="updateAttendance('${rec.id}', this.checked)">`;
                 
             tbody.innerHTML += `<tr>
                 <td style="padding: 8px;">${rec.course || ''}</td>
@@ -642,7 +649,6 @@
         }
     });
 
-    // ----------------- باقي وظائف الإدارة -----------------
     function renderDatesList() {
         document.getElementById('dates-list').style.display = 'block';
         document.getElementById('periods-list').style.display = 'none';
