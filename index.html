@@ -11,7 +11,7 @@
         .admin-btn { background-color: #fcc01a; color: #3b1e5a; border: none; padding: 10px 15px; font-weight: bold; cursor: pointer; border-radius: 5px; }
         .container { background-color: #4c2673; padding: 20px; border-radius: 10px; max-width: 500px; margin: auto; box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
         input, select { width: 100%; padding: 10px; margin-top: 8px; margin-bottom: 15px; border-radius: 5px; border: none; box-sizing: border-box; font-family: Tahoma; }
-        .submit-btn { background-color: #fcc01a; color: #3b1e5a; border: none; padding: 12px; width: 100%; font-size: 16px; font-weight: bold; border-radius: 5px; cursor: pointer; }
+        .submit-btn { background-color: #fcc01a; color: #3b1e5a; border: none; padding: 12px; width: 100%; font-size: 16px; font-weight: bold; border-radius: 5px; cursor: pointer; transition: 0.3s; }
         #admin-view, #login-view { display: none; }
         table { width: 100%; border-collapse: collapse; margin-top: 15px; background-color: white; color: black; border-radius: 5px; overflow: hidden; }
         th, td { border: 1px solid #ddd; padding: 10px; text-align: center; }
@@ -19,7 +19,6 @@
         .delete-btn { background-color: #ff4d4d; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer; font-weight: bold; }
         .delete-all-btn { background-color: #cc0000; color: white; border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer; font-weight: bold; margin-bottom: 15px; }
         
-        /* أزرار التنقل */
         .nav-btn { background-color: #fcc01a; color: #3b1e5a; border: none; padding: 15px; font-size: 18px; font-weight: bold; cursor: pointer; border-radius: 5px; text-align: center; width: 100%; margin-bottom: 10px; transition: 0.3s; }
         .nav-btn:hover { background-color: #e5ad17; }
         .back-btn { background-color: white; color: #3b1e5a; border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer; font-weight: bold; margin-bottom: 0; }
@@ -28,7 +27,6 @@
         .attendance-check { width: 22px; height: 22px; cursor: pointer; accent-color: #3b1e5a; }
     </style>
 
-    <!-- مكتبات Firebase -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
@@ -40,7 +38,6 @@
     <button class="admin-btn" onclick="showLogin()">الإدارة</button>
 </div>
 
-<!-- واجهة الطلاب -->
 <div class="container" id="student-view">
     <form id="regForm">
         <label>الاسم:</label>
@@ -72,12 +69,11 @@
         
         <button type="button" class="add-btn" onclick="addAppointment()">+ إضافة موعد آخر</button>
 
-        <button type="submit" class="submit-btn">تأكيد التسجيل</button>
+        <button type="submit" class="submit-btn" id="main-submit-btn">تأكيد التسجيل</button>
     </form>
     <div id="msg"></div>
 </div>
 
-<!-- واجهة تسجيل الدخول للإدارة -->
 <div class="container" id="login-view">
     <h2 style="text-align: center; color: #fcc01a;">تسجيل الدخول للإدارة</h2>
     <form id="loginForm">
@@ -93,7 +89,6 @@
     <p id="login-msg" style="text-align:center; color:#ff4d4d; font-weight:bold; margin-top: 15px;"></p>
 </div>
 
-<!-- واجهة الإدارة -->
 <div class="container" id="admin-view" style="max-width: 950px;">
     <h2 style="text-align: center; color: #fcc01a;">لوحة تحكم م. يوسف شريف</h2>
     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
@@ -101,13 +96,11 @@
         <button class="delete-all-btn" style="margin-bottom: 0;" onclick="deleteAllData()">حذف كل التسجيلات بالكامل</button>
     </div>
 
-    <!-- المستوى الأول: قائمة الأيام -->
     <div id="dates-list">
         <h3 style="text-align: center; color: white;">أيام الحجز المسجلة</h3>
         <div id="dates-container"></div>
     </div>
 
-    <!-- المستوى الثاني: قائمة الفترات لليوم المختار -->
     <div id="periods-list" style="display: none;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
             <button class="back-btn" onclick="backToDates()">الرجوع لقائمة الأيام ↲</button>
@@ -117,7 +110,6 @@
         <div id="periods-container"></div>
     </div>
 
-    <!-- المستوى الثالث: تفاصيل جدول الطلاب للفترة المختارة -->
     <div id="period-details" style="display: none;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
             <button class="back-btn" onclick="backToPeriods()">الرجوع للفترات ↲</button>
@@ -145,7 +137,6 @@
 </div>
 
 <script>
-    // إعدادات مشروع Firebase الخاص بك
     const firebaseConfig = {
       apiKey: "AIzaSyDEl0FbR_gjtOwRxOBS8_YWN_4HfyzyddU",
       authDomain: "robotagy-1f557.firebaseapp.com",
@@ -210,12 +201,26 @@
 
     document.getElementById('regForm').addEventListener('submit', function(e) {
         e.preventDefault();
+        
+        // قفل الزر وتغيير حالته لمنع الضغط المتكرر
+        const submitBtn = document.getElementById('main-submit-btn');
+        submitBtn.disabled = true;
+        submitBtn.innerText = 'جاري التسجيل...';
+        submitBtn.style.opacity = '0.7';
+        submitBtn.style.cursor = 'not-allowed';
+
+        function resetBtn() {
+            submitBtn.disabled = false;
+            submitBtn.innerText = 'تأكيد التسجيل';
+            submitBtn.style.opacity = '1';
+            submitBtn.style.cursor = 'pointer';
+        }
+
         const name = document.getElementById('name').value;
         const phone = document.getElementById('phone').value;
         const group = document.getElementById('group').value;
         const course = document.getElementById('course').value;
         
-        // تحديد الحد الأقصى بناءً على الكورس المختار
         const maxLimit = (course === 'Motor Drive') ? 2 : 8;
 
         const appointmentRows = document.querySelectorAll('.appointment-row');
@@ -235,6 +240,7 @@
 
         if (hasDuplicate) {
             alert('عفواً، لقد قمت باختيار نفس الموعد (تاريخ ووقت) أكثر من مرة. يرجى التعديل.');
+            resetBtn();
             return;
         }
 
@@ -244,12 +250,12 @@
                 snapshot.forEach(child => dbData.push(child.val()));
             }
 
-            // التحقق من السعة لكل موعد تم اختياره
             for (let i = 0; i < appointments.length; i++) {
                 const app = appointments[i];
                 let currentCount = dbData.filter(d => d.date === app.date && d.time === app.time && d.course === course).length;
                 if (currentCount >= maxLimit) {
                     alert(`عفواً، الموعد يوم (${app.date}) في الفترة (${app.time}) ممتلئ لكورس (${course}). يرجى اختيار موعد آخر أو حذفه.`);
+                    resetBtn();
                     return; 
                 }
             }
@@ -261,7 +267,6 @@
             });
 
             Promise.all(promises).then(() => {
-                // التصميم الرسمي: إطار بلون روبوتاجي، خلفية بيضاء، وكتابة سوداء
                 let successText = `
                 <div style="border: 2px solid #fcc01a; background-color: white; padding: 15px; border-radius: 5px; text-align: right; margin-top: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
                     <strong style="color: black; display: block; margin-bottom: 10px; font-size: 16px;">تم تأكيد التسجيل بنجاح. بيان المواعيد:</strong>
@@ -289,13 +294,16 @@
                     </div>
                 `;
                 
-                // إخفاء الرسالة بعد 10 ثواني
+                resetBtn(); // إعادة تشغيل الزر بعد النجاح
                 setTimeout(() => msgDiv.innerHTML = '', 10000);
-            }).catch(error => alert('حدث خطأ أثناء التسجيل: ' + error.message));
+            }).catch(error => {
+                alert('حدث خطأ أثناء التسجيل: ' + error.message);
+                resetBtn();
+            });
         });
     });
 
-    // ----------------- نظام تسجيل الدخول (Authentication) -----------------
+    // ----------------- نظام تسجيل الدخول -----------------
     
     function showLogin() {
         document.getElementById('student-view').style.display = 'none';
@@ -333,7 +341,7 @@
         });
     }
 
-    // ----------------- نهاية نظام تسجيل الدخول -----------------
+    // ----------------- عرض الإدارة -----------------
 
     let allStudents = [];
     let currentSelectedDate = null;
