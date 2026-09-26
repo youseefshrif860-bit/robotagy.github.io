@@ -9,9 +9,9 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <script>
-        // التحديث التلقائي للنسخة (v=10) لتفعيل التحديث اللحظي للحضور
-        if (window.location.href.indexOf('?v=10') === -1) {
-            window.location.replace(window.location.href.split('?')[0] + '?v=10');
+        // التحديث التلقائي للنسخة (v=11) لحل مشكلة اختفاء التقرير
+        if (window.location.href.indexOf('?v=11') === -1) {
+            window.location.replace(window.location.href.split('?')[0] + '?v=11');
         }
     </script>
 
@@ -492,6 +492,7 @@
     let blockedPhonesList = [];
     let currentSelectedDate = null;
     let currentSelectedPeriod = null;
+    let currentSelectedStudent = null; // المتغير الجديد لحفظ حالة التقرير المفتوح
 
     function loadData() {
         database.ref('students').on('value', (snapshot) => {
@@ -502,14 +503,9 @@
                 });
             }
             
-            // تحديث نافذة التقرير لحظياً لو كانت مفتوحة
-            let reportModal = document.getElementById('report-modal');
-            if (reportModal && reportModal.style.display === 'flex') {
-                let titleText = document.getElementById('report-name').innerText;
-                if (titleText.startsWith('تقرير الطالب: ')) {
-                    let currentName = titleText.replace('تقرير الطالب: ', '');
-                    if (currentName) selectStudent(currentName);
-                }
+            // تحديث نافذة التقرير لحظياً لو كانت مفتوحة بفضل المتغير الثابت
+            if (currentSelectedStudent) {
+                selectStudent(currentSelectedStudent);
             }
 
             if (currentSelectedDate) {
@@ -560,6 +556,7 @@
     }
 
     function selectStudent(studentName) {
+        currentSelectedStudent = studentName; // حفظ الاسم في الذاكرة لمنع اختفاء النافذة
         document.getElementById('search-student').value = '';
         document.getElementById('search-suggestions').style.display = 'none';
         
@@ -606,7 +603,6 @@
         let tbody = document.getElementById('report-tbody');
         tbody.innerHTML = '';
         studentRecords.forEach(rec => {
-            // التعديل الخاص بظهور المربع أو النص الثابت
             let statusHTML = rec.attended 
                 ? '<span style="color:green; font-weight:bold;">حاضر ✔</span>' 
                 : `<input type="checkbox" class="attendance-check" title="تحديد كحاضر" onchange="updateAttendance('${rec.id}', this.checked)">`;
@@ -641,7 +637,10 @@
         }
     }
 
-    function closeReportModal() { document.getElementById('report-modal').style.display = 'none'; }
+    function closeReportModal() { 
+        currentSelectedStudent = null; // مسح الاسم من الذاكرة عند الإغلاق
+        document.getElementById('report-modal').style.display = 'none'; 
+    }
 
     document.addEventListener('click', function(e) {
         if(e.target.id !== 'search-student') {
