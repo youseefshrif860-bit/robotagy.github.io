@@ -9,9 +9,9 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <script>
-        // التحديث التلقائي للنسخة (v=16) - استخلاص أرقام المجموعات بصرامة
-        if (window.location.href.indexOf('?v=16') === -1) {
-            window.location.replace(window.location.href.split('?')[0] + '?v=16');
+        // التحديث التلقائي للنسخة (v=17) - فلترة المجموعات بالصرامة التامة (أرقام فقط)
+        if (window.location.href.indexOf('?v=17') === -1) {
+            window.location.replace(window.location.href.split('?')[0] + '?v=17');
         }
     </script>
 
@@ -302,13 +302,18 @@
 
     const normalizeText = (str) => String(str || '').replace(/[\s\u200B-\u200D\uFEFF]/g, '').trim();
     
-    // دالة لاستخراج الأرقام الصافية فقط (تجاهل أي حروف أو مسافات)
     const extractPureNumber = (str) => {
         let safeStr = String(str || '');
-        // تحويل الأرقام العربية (١٢٣) إلى إنجليزية (123)
         let englishNumbers = safeStr.replace(/[٠-٩]/g, d => "٠١٢٣٤٥٦٧٨٩".indexOf(d));
-        // مسح أي شيء ليس رقماً
         return englishNumbers.replace(/\D/g, '');
+    };
+
+    // الدالة المسؤولة عن الصرامة التامة: بترجع true لو كانت الخانة أرقام فقط بدون أي حروف أو مسافات
+    const isStrictlyNumber = (str) => {
+        let safeStr = String(str || '').trim();
+        if (!safeStr) return false;
+        let englishNumbers = safeStr.replace(/[٠-٩]/g, d => "٠١٢٣٤٥٦٧٨٩".indexOf(d));
+        return /^\d+$/.test(englishNumbers); 
     };
 
     const today = new Date().toISOString().split('T')[0];
@@ -527,9 +532,9 @@
     function updateGroupsDropdown() {
         let uniqueGroups = new Set(); 
         allStudents.forEach(s => {
-            let pureNumber = extractPureNumber(s.group);
-            // إظهار المجموعة فقط إذا كان هناك أرقام (تجاهل الكلمات بالكامل)
-            if (pureNumber !== '') {
+            // الشرط الصارم: يسمح فقط بالخانات اللي عبارة عن أرقام صافية تماماً
+            if (isStrictlyNumber(s.group)) {
+                let pureNumber = extractPureNumber(s.group);
                 uniqueGroups.add(pureNumber);
             }
         });
@@ -538,11 +543,10 @@
         let currentVal = select.value;
         select.innerHTML = '<option value="" disabled selected>اختر رقم المجموعة</option>';
         
-        // ترتيب الأرقام تصاعدياً
         let sortedGroups = Array.from(uniqueGroups).sort((a, b) => parseInt(a) - parseInt(b));
         sortedGroups.forEach(num => {
             let o = document.createElement('option');
-            o.value = num; o.text = num; // عرض الرقم الصافي فقط
+            o.value = num; o.text = num;
             select.appendChild(o);
         });
         
@@ -553,8 +557,10 @@
     }
 
     function renderGroupStudents(selectedGroupNumber) {
-        // فلترة بناءً على الرقم الصافي فقط
-        let studentsInGroup = allStudents.filter(s => extractPureNumber(s.group) === selectedGroupNumber);
+        // الشرط الصارم للمطابقة هنا أيضاً
+        let studentsInGroup = allStudents.filter(s => {
+            return isStrictlyNumber(s.group) && extractPureNumber(s.group) === selectedGroupNumber;
+        });
         
         let uniqueStudents = [];
         let seen = new Set();
@@ -736,9 +742,9 @@
         filteredStudents.sort((a, b) => (courseOrder[a.course] || 99) - (courseOrder[b.course] || 99));
         filteredStudents.forEach(row => {
             const isChecked = row.attended ? 'checked' : '';
-            // عرض الرقم الصافي فقط في جدول المواعيد اليومية أيضاً
-            let pureGrp = extractPureNumber(row.group);
-            tbody.innerHTML += `<tr><td>${row.name || ''}</td><td>${row.phone || ''}</td><td style="font-weight:bold;">${pureGrp}</td><td style="font-weight: bold; color: #3b1e5a;">${row.course || ''}</td><td>${row.date || ''}</td><td>${row.time || ''}</td><td><input type="checkbox" class="attendance-check" title="تحديد كحاضر" onchange="updateAttendance('${row.id}', this.checked)" ${isChecked}></td><td><button class="delete-btn" onclick="deleteStudent('${row.id}')">حذف</button></td></tr>`;
+            // عرض الرقم الصافي لو كان أرقام فقط، ولو كان الطالب كاتب نصوص هتظهر عشان الإدارة تشوف الإدخال الخاطئ
+            let displayGroup = isStrictlyNumber(row.group) ? extractPureNumber(row.group) : (row.group || '');
+            tbody.innerHTML += `<tr><td>${row.name || ''}</td><td>${row.phone || ''}</td><td style="font-weight:bold;">${displayGroup}</td><td style="font-weight: bold; color: #3b1e5a;">${row.course || ''}</td><td>${row.date || ''}</td><td>${row.time || ''}</td><td><input type="checkbox" class="attendance-check" title="تحديد كحاضر" onchange="updateAttendance('${row.id}', this.checked)" ${isChecked}></td><td><button class="delete-btn" onclick="deleteStudent('${row.id}')">حذف</button></td></tr>`;
         });
     }
 
