@@ -9,9 +9,9 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <script>
-        // التحديث التلقائي للنسخة (v=22) - تعديل نص الاستعلام عن المواعيد
-        if (window.location.href.indexOf('?v=22') === -1) {
-            window.location.replace(window.location.href.split('?')[0] + '?v=22');
+        // التحديث التلقائي للنسخة (v=23) - لوحة إحصائيات الطالب (Dashboard)
+        if (window.location.href.indexOf('?v=23') === -1) {
+            window.location.replace(window.location.href.split('?')[0] + '?v=23');
         }
     </script>
 
@@ -351,33 +351,63 @@
             let resultsHTML = '';
             if (snap.exists()) {
                 let data = snap.val();
-                let myApps = [];
+                let studentAllRecords = [];
                 Object.keys(data).forEach(key => {
                     let s = data[key];
                     if (normalizePhone(s.phone) === mPhone && extractPureNumber(s.group) === mGroup) {
-                        if (!s.canceled && s.date >= today) {
-                            myApps.push({id: key, ...s});
-                        }
+                        studentAllRecords.push({id: key, ...s});
                     }
                 });
 
-                if (myApps.length > 0) {
-                    myApps.sort((a,b) => new Date(a.date) - new Date(b.date));
-                    myApps.forEach(app => {
-                        resultsHTML += `
-                        <div style="background: rgba(255,255,255,0.1); padding: 15px; border-radius: 5px; margin-bottom: 10px; display:flex; justify-content:space-between; align-items:center;">
-                            <div>
-                                <div style="color:#fcc01a; font-weight:bold; font-size:16px;">${app.course}</div>
-                                <div style="font-size:14px; margin-top:5px;">${app.date} <br> ${app.time}</div>
+                if (studentAllRecords.length > 0) {
+                    // ترتيب المواعيد زمنياً للحصول على أحدث اسم سجله الطالب
+                    studentAllRecords.sort((a,b) => new Date(a.date || 0) - new Date(b.date || 0));
+                    let latestName = studentAllRecords[studentAllRecords.length - 1].name;
+                    
+                    // حساب الإحصائيات مع استبعاد المواعيد الملغية
+                    let validRecords = studentAllRecords.filter(s => !s.canceled);
+                    let totalAppointments = validRecords.length;
+                    let attended = validRecords.filter(s => s.attended).length;
+                    let pastRecords = validRecords.filter(s => s.date < today);
+                    let absent = pastRecords.length - pastRecords.filter(s => s.attended).length;
+                    
+                    let upcomingRecords = validRecords.filter(s => s.date >= today);
+
+                    // 1. بناء لوحة بيانات الطالب (Dashboard)
+                    resultsHTML += `
+                        <div style="background-color: white; color: #3b1e5a; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 3px solid #fcc01a;">
+                            <h3 style="margin-top: 0; margin-bottom: 10px; border-bottom: 2px solid #ddd; padding-bottom: 5px;">أهلاً بك، ${latestName}</h3>
+                            <div style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px; font-weight: bold; font-size: 14px;">
+                                <div style="flex: 1; min-width: 45%; background: #f9f9f9; padding: 10px; border-radius: 5px; text-align: center;">إجمالي المواعيد<br><span style="color:#3b1e5a; font-size:18px;">${totalAppointments}</span></div>
+                                <div style="flex: 1; min-width: 45%; background: #e6ffe6; padding: 10px; border-radius: 5px; text-align: center;">الحضور<br><span style="color:green; font-size:18px;">${attended}</span></div>
+                                <div style="flex: 1; min-width: 45%; background: #ffe6e6; padding: 10px; border-radius: 5px; text-align: center;">الغياب<br><span style="color:red; font-size:18px;">${absent}</span></div>
                             </div>
-                            <button class="delete-btn" style="padding:10px 15px; background-color:#ff4d4d;" onclick="cancelMyApp('${app.id}')">إلغاء</button>
-                        </div>`;
-                    });
+                        </div>
+                    `;
+
+                    // 2. بناء قائمة المواعيد القادمة
+                    resultsHTML += `<h4 style="color:#fcc01a; border-bottom: 1px solid #fcc01a; padding-bottom: 5px; margin-bottom:15px;">مواعيدك القادمة</h4>`;
+                    
+                    if (upcomingRecords.length > 0) {
+                        upcomingRecords.forEach(app => {
+                            resultsHTML += `
+                            <div style="background: rgba(255,255,255,0.1); padding: 15px; border-radius: 5px; margin-bottom: 10px; display:flex; justify-content:space-between; align-items:center;">
+                                <div>
+                                    <div style="color:#fcc01a; font-weight:bold; font-size:16px;">${app.course}</div>
+                                    <div style="font-size:14px; margin-top:5px;">${app.date} <br> ${app.time}</div>
+                                </div>
+                                <button class="delete-btn" style="padding:10px 15px; background-color:#ff4d4d;" onclick="cancelMyApp('${app.id}')">إلغاء</button>
+                            </div>`;
+                        });
+                    } else {
+                        resultsHTML += '<p style="text-align:center; color:#ddd; font-weight:bold;">لا توجد مواعيد قادمة (جميع مواعيدك إما سابقة أو ملغية).</p>';
+                    }
+                    
                 } else {
-                    resultsHTML = '<p style="text-align:center; color:#fcc01a; font-weight:bold;">لا توجد مواعيد قادمة متاحة.</p>';
+                    resultsHTML = '<p style="text-align:center; color:#ff4d4d; background:white; padding:10px; border-radius:5px; font-weight:bold;">لا توجد أي بيانات متطابقة مع هذا الهاتف والمجموعة.</p>';
                 }
             } else {
-                resultsHTML = '<p style="text-align:center; color:#ff4d4d;">لا توجد بيانات مسجلة.</p>';
+                resultsHTML = '<p style="text-align:center; color:#ff4d4d;">لا توجد بيانات مسجلة في النظام.</p>';
             }
             document.getElementById('manage-results').innerHTML = resultsHTML;
         } catch(e) {
