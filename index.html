@@ -9,9 +9,9 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <script>
-        // التحديث التلقائي للنسخة (v=13) - لوحة الإدارة المتكاملة
-        if (window.location.href.indexOf('?v=13') === -1) {
-            window.location.replace(window.location.href.split('?')[0] + '?v=13');
+        // التحديث التلقائي للنسخة (v=14) - إصلاح قراءة البيانات ومعالجة الأخطاء
+        if (window.location.href.indexOf('?v=14') === -1) {
+            window.location.replace(window.location.href.split('?')[0] + '?v=14');
         }
     </script>
 
@@ -71,7 +71,6 @@
         .btn-enable { background-color: #28a745; color: white; }
         .btn-disable { background-color: #ff4d4d; color: white; }
         .btn-inactive { background-color: #666; color: white; opacity: 0.5; }
-        .day-header { color: #fcc01a; border-bottom: 2px solid #fcc01a; padding-bottom: 5px; margin-top: 20px; margin-bottom: 15px; }
 
         @media (max-width: 768px) {
             .sidebar { max-width: 100%; }
@@ -185,6 +184,10 @@
                         <h3 style="color: white; margin: 0;">الأيام المسجلة</h3>
                         <button class="delete-all-btn" style="margin-bottom: 0;" onclick="deleteAllData()">حذف كل التسجيلات بالكامل</button>
                     </div>
+                    
+                    <!-- عداد التسجيلات للتأكد من وصول الداتا -->
+                    <div id="records-counter" style="text-align: center; color: #fcc01a; font-weight: bold; margin-bottom: 15px; font-size: 15px; background: rgba(255,255,255,0.1); padding: 5px; border-radius: 5px;"></div>
+                    
                     <div id="dates-container"></div>
                 </div>
 
@@ -263,12 +266,12 @@
         <strong style="color: #3b1e5a; display: block; margin-bottom: 15px; font-size: 18px; border-bottom: 2px solid #fcc01a; padding-bottom: 5px;" id="report-name"></strong>
         <div style="margin-bottom: 15px; font-size: 15px; color: black; line-height: 1.8;">
             <div>رقم الهاتف: <b id="report-phone" style="color: #3b1e5a; font-family: Tahoma;"></b></div>
-            <div>إجمالي المواعيد المسجلة (حتى اليوم): <b id="report-total" style="color: #3b1e5a;"></b></div>
+            <div>إجمالي المواعيد المسجلة: <b id="report-total" style="color: #3b1e5a;"></b></div>
             <div>مرات الغياب (لم يحضر): <b id="report-absent" style="color: red;"></b></div>
             <div>تاريخ آخر حضور: <b id="report-last" style="color: green;"></b></div>
         </div>
         
-        <strong style="color: #000; display: block; margin-bottom: 10px; font-size: 14px;">التفاصيل (للمواعيد السابقة والحالية فقط):</strong>
+        <strong style="color: #000; display: block; margin-bottom: 10px; font-size: 14px;">التفاصيل:</strong>
         <div style="overflow-x: auto; max-height: 200px; border: 1px solid #ddd; border-radius: 5px; margin-bottom: 15px;">
             <table style="width: 100%; font-size: 13px; margin-top: 0; border-radius: 0;">
                 <thead>
@@ -300,9 +303,10 @@
 
     const normalizeText = (str) => String(str || '').replace(/[\s\u200B-\u200D\uFEFF]/g, '').trim();
     
-    // دالة تحويل الأرقام العربية إلى إنجليزية لتوحيد المجموعات
+    // التحديث الآمن لمعالجة الأخطاء في أرقام المجاميع (تحويل إجباري لنص)
     const normalizeNumbers = (str) => {
-        let normalized = str.replace(/[٠-٩]/g, d => "٠١٢٣٤٥٦٧٨٩".indexOf(d));
+        let safeStr = String(str || '');
+        let normalized = safeStr.replace(/[٠-٩]/g, d => "٠١٢٣٤٥٦٧٨٩".indexOf(d));
         return normalizeText(normalized);
     };
 
@@ -312,29 +316,25 @@
     // ----------------- نظام إدارة المواعيد (الإعدادات المركزية) -----------------
     const ALL_PERIODS = ['من 12 ظهراً إلى 3 عصراً', 'من 3 عصراً إلى 6 مساءً', 'من 6 مساءً إلى 9 مساءً', 'من 8 مساءً إلى 11 مساءً'];
     
-    // القيم الافتراضية القديمة (تُستخدم لو مفيش بيانات في القاعدة لسه)
     const defaultSchedule = {
-        0: {'من 12 ظهراً إلى 3 عصراً': true, 'من 3 عصراً إلى 6 مساءً': true, 'من 6 مساءً إلى 9 مساءً': true, 'من 8 مساءً إلى 11 مساءً': false}, // الأحد
-        1: {'من 12 ظهراً إلى 3 عصراً': false, 'من 3 عصراً إلى 6 مساءً': false, 'من 6 مساءً إلى 9 مساءً': false, 'من 8 مساءً إلى 11 مساءً': true}, // الإثنين
-        2: {'من 12 ظهراً إلى 3 عصراً': false, 'من 3 عصراً إلى 6 مساءً': false, 'من 6 مساءً إلى 9 مساءً': false, 'من 8 مساءً إلى 11 مساءً': true}, // الثلاثاء
-        3: {'من 12 ظهراً إلى 3 عصراً': false, 'من 3 عصراً إلى 6 مساءً': false, 'من 6 مساءً إلى 9 مساءً': false, 'من 8 مساءً إلى 11 مساءً': true}, // الأربعاء
-        4: {'من 12 ظهراً إلى 3 عصراً': true, 'من 3 عصراً إلى 6 مساءً': true, 'من 6 مساءً إلى 9 مساءً': true, 'من 8 مساءً إلى 11 مساءً': false}, // الخميس
-        6: {'من 12 ظهراً إلى 3 عصراً': true, 'من 3 عصراً إلى 6 مساءً': true, 'من 6 مساءً إلى 9 مساءً': true, 'من 8 مساءً إلى 11 مساءً': false}  // السبت
+        0: {'من 12 ظهراً إلى 3 عصراً': true, 'من 3 عصراً إلى 6 مساءً': true, 'من 6 مساءً إلى 9 مساءً': true, 'من 8 مساءً إلى 11 مساءً': false},
+        1: {'من 12 ظهراً إلى 3 عصراً': false, 'من 3 عصراً إلى 6 مساءً': false, 'من 6 مساءً إلى 9 مساءً': false, 'من 8 مساءً إلى 11 مساءً': true},
+        2: {'من 12 ظهراً إلى 3 عصراً': false, 'من 3 عصراً إلى 6 مساءً': false, 'من 6 مساءً إلى 9 مساءً': false, 'من 8 مساءً إلى 11 مساءً': true},
+        3: {'من 12 ظهراً إلى 3 عصراً': false, 'من 3 عصراً إلى 6 مساءً': false, 'من 6 مساءً إلى 9 مساءً': false, 'من 8 مساءً إلى 11 مساءً': true},
+        4: {'من 12 ظهراً إلى 3 عصراً': true, 'من 3 عصراً إلى 6 مساءً': true, 'من 6 مساءً إلى 9 مساءً': true, 'من 8 مساءً إلى 11 مساءً': false},
+        6: {'من 12 ظهراً إلى 3 عصراً': true, 'من 3 عصراً إلى 6 مساءً': true, 'من 6 مساءً إلى 9 مساءً': true, 'من 8 مساءً إلى 11 مساءً': false}
     };
     
     let globalSchedule = JSON.parse(JSON.stringify(defaultSchedule));
 
-    // جلب إعدادات المواعيد الحية من القاعدة للطلاب والإدارة
     database.ref('settings/schedule').on('value', (snapshot) => {
         if (snapshot.exists()) {
             globalSchedule = snapshot.val();
         } else {
-            // لو أول مرة تشتغل، نرفع القيم الافتراضية
             database.ref('settings/schedule').set(defaultSchedule);
         }
     });
 
-    // تحديث أوقات الطالب بناءً على اللوحة
     function updateTimeOptions(element) {
         const dateVal = element.value;
         const timeSelect = element.parentElement.querySelector('.time-input');
@@ -343,33 +343,23 @@
         if (!dateVal) return;
         const day = new Date(dateVal).getDay(); 
 
-        if (day === 5) { // الجمعة مغلق دائماً
-            let o = document.createElement('option');
-            o.value = ''; o.text = 'المعمل مغلق يوم الجمعة'; o.disabled = true; o.selected = true;
-            timeSelect.appendChild(o);
+        if (day === 5) { 
+            let o = document.createElement('option'); o.value = ''; o.text = 'المعمل مغلق يوم الجمعة'; o.disabled = true; o.selected = true; timeSelect.appendChild(o);
         } else {
-            let defaultOpt = document.createElement('option');
-            defaultOpt.value = ''; defaultOpt.text = 'اختر الوقت'; defaultOpt.disabled = true; defaultOpt.selected = true;
-            timeSelect.appendChild(defaultOpt);
+            let defaultOpt = document.createElement('option'); defaultOpt.value = ''; defaultOpt.text = 'اختر الوقت'; defaultOpt.disabled = true; defaultOpt.selected = true; timeSelect.appendChild(defaultOpt);
             
             let daySettings = globalSchedule[day] || defaultSchedule[day] || {};
             let hasAvailable = false;
             
             ALL_PERIODS.forEach(opt => {
                 if(daySettings[opt] === true) {
-                    let o = document.createElement('option'); 
-                    o.value = opt; 
-                    o.text = opt; 
-                    timeSelect.appendChild(o);
-                    hasAvailable = true;
+                    let o = document.createElement('option'); o.value = opt; o.text = opt; timeSelect.appendChild(o); hasAvailable = true;
                 }
             });
             
             if(!hasAvailable) {
                 timeSelect.innerHTML = '';
-                let o = document.createElement('option');
-                o.value = ''; o.text = 'لا توجد مواعيد متاحة في هذا اليوم'; o.disabled = true; o.selected = true;
-                timeSelect.appendChild(o);
+                let o = document.createElement('option'); o.value = ''; o.text = 'لا توجد مواعيد متاحة في هذا اليوم'; o.disabled = true; o.selected = true; timeSelect.appendChild(o);
             }
         }
     }
@@ -390,15 +380,11 @@
     }
 
     function closeSuccessModal() { document.getElementById('success-modal').style.display = 'none'; }
-    function showErrorModal(message) {
-        document.getElementById('error-modal-msg').innerHTML = message;
-        document.getElementById('error-modal').style.display = 'flex';
-    }
+    function showErrorModal(message) { document.getElementById('error-modal-msg').innerHTML = message; document.getElementById('error-modal').style.display = 'flex'; }
     function closeErrorModal() { document.getElementById('error-modal').style.display = 'none'; }
 
     let isSubmitting = false;
 
-    // تسجيل الطالب
     document.getElementById('regForm').addEventListener('submit', async function(e) {
         e.preventDefault();
         if (isSubmitting) return; 
@@ -407,9 +393,7 @@
         const submitBtn = document.getElementById('main-submit-btn');
         submitBtn.disabled = true; submitBtn.innerText = 'جاري التحقق والتسجيل...'; submitBtn.style.opacity = '0.7'; submitBtn.style.cursor = 'not-allowed';
 
-        function resetBtn() {
-            submitBtn.disabled = false; submitBtn.innerText = 'تأكيد التسجيل'; submitBtn.style.opacity = '1'; submitBtn.style.cursor = 'pointer'; isSubmitting = false;
-        }
+        function resetBtn() { submitBtn.disabled = false; submitBtn.innerText = 'تأكيد التسجيل'; submitBtn.style.opacity = '1'; submitBtn.style.cursor = 'pointer'; isSubmitting = false; }
 
         const name = document.getElementById('name').value;
         const phone = document.getElementById('phone').value;
@@ -492,7 +476,6 @@
         auth.signOut().then(() => { document.getElementById('admin-view').style.display = 'none'; document.getElementById('student-view').style.display = 'block'; switchDashboardView('dates'); backToDates(); });
     }
 
-    // التنقل بين الأقسام
     function switchDashboardView(viewId) {
         document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
         document.querySelectorAll('.sidebar-btn').forEach(el => el.classList.remove('active'));
@@ -506,23 +489,33 @@
     function loadData() {
         database.ref('students').on('value', (snapshot) => {
             allStudents = [];
-            if (snapshot.exists()) { snapshot.forEach(child => allStudents.push({ id: child.key, ...child.val() })); }
+            if (snapshot.exists()) { 
+                snapshot.forEach(child => {
+                    let val = child.val();
+                    if(val) allStudents.push({ id: child.key, ...val });
+                }); 
+            }
             
-            if (currentSelectedStudent) selectStudent(currentSelectedStudent);
+            // تحديث العداد
+            document.getElementById('records-counter').innerText = `إجمالي التسجيلات المحملة من السيرفر: ${allStudents.length}`;
             
-            // تحديث الأيام
-            if (currentSelectedDate) {
-                let studentsInDay = allStudents.filter(s => s.date === currentSelectedDate);
-                if (studentsInDay.length === 0) backToDates();
-                else if (currentSelectedPeriod) {
-                    let studentsInPeriod = studentsInDay.filter(s => s.time === currentSelectedPeriod);
-                    if (studentsInPeriod.length === 0) backToPeriods();
-                    else showPeriodDetails(currentSelectedDate, currentSelectedPeriod);
-                } else renderPeriodsList(currentSelectedDate);
-            } else renderDatesList();
+            try {
+                if (currentSelectedStudent) selectStudent(currentSelectedStudent);
+                
+                if (currentSelectedDate) {
+                    let studentsInDay = allStudents.filter(s => s.date === currentSelectedDate);
+                    if (studentsInDay.length === 0) backToDates();
+                    else if (currentSelectedPeriod) {
+                        let studentsInPeriod = studentsInDay.filter(s => s.time === currentSelectedPeriod);
+                        if (studentsInPeriod.length === 0) backToPeriods();
+                        else showPeriodDetails(currentSelectedDate, currentSelectedPeriod);
+                    } else renderPeriodsList(currentSelectedDate);
+                } else renderDatesList();
 
-            // تحديث قائمة المجموعات
-            updateGroupsDropdown();
+                updateGroupsDropdown();
+            } catch (err) {
+                console.error("خطأ في معالجة البيانات:", err);
+            }
         });
 
         database.ref('blocked_phones').on('value', (snapshot) => {
@@ -531,7 +524,6 @@
         });
     }
 
-    // ----------------- المجموعات -----------------
     function updateGroupsDropdown() {
         let groupsMap = {}; 
         allStudents.forEach(s => {
@@ -559,7 +551,6 @@
     function renderGroupStudents(normalizedGroupKey) {
         let studentsInGroup = allStudents.filter(s => normalizeNumbers(s.group || 'بدون مجموعة') === normalizedGroupKey);
         
-        // استخراج الطلاب بدون تكرار الاسم
         let uniqueStudents = [];
         let seen = new Set();
         studentsInGroup.forEach(s => {
@@ -576,16 +567,11 @@
         let tbody = document.querySelector('#groupDataTable tbody');
         tbody.innerHTML = '';
         uniqueStudents.forEach(st => {
-            tbody.innerHTML += `<tr>
-                <td>${st.name}</td>
-                <td>${st.phone}</td>
-                <td>${st.group}</td>
-            </tr>`;
+            tbody.innerHTML += `<tr><td>${st.name || ''}</td><td>${st.phone || ''}</td><td>${st.group || ''}</td></tr>`;
         });
         document.getElementById('groupDataTable').style.display = 'table';
     }
 
-    // ----------------- إدارة المواعيد (Admin) -----------------
     function renderScheduleDay(dayVal) {
         const container = document.getElementById('schedule-slots-container');
         if (!dayVal) { container.innerHTML = ''; return; }
@@ -597,8 +583,6 @@
             let isActive = daySettings[period] === true;
             let btnClass = isActive ? 'btn-enable' : 'btn-inactive';
             let btnText = isActive ? 'مفعل ✔' : 'موقوف ✘';
-            
-            // إضافة ستايل مختلف لزر الإيقاف للوضوح
             let actionBtnClass = isActive ? 'btn-disable' : 'btn-enable';
             let actionBtnText = isActive ? 'إيقاف' : 'تفعيل';
 
@@ -622,7 +606,6 @@
         }
     }
 
-    // ----------------- البحث والتقارير والحظر -----------------
     function handleSearch(query) {
         const container = document.getElementById('search-suggestions');
         if (!query.trim()) { container.style.display = 'none'; return; }
@@ -641,15 +624,20 @@
         let allStudentRecords = allStudents.filter(s => s.name === studentName);
         if(allStudentRecords.length === 0) { closeReportModal(); return; }
         
-        allStudentRecords.sort((a,b) => new Date(b.date) - new Date(a.date));
+        allStudentRecords.sort((a,b) => new Date(b.date || 0) - new Date(a.date || 0));
         let studentPhone = allStudentRecords[0].phone; 
         
-        let studentRecords = allStudentRecords.filter(s => s.date <= today);
+        // تعديل فلتر التواريخ ليكون آمن بدون مسح بيانات بالخطأ
+        let studentRecords = allStudentRecords.filter(s => {
+            if (!s.date) return true;
+            return s.date <= today;
+        });
+        
         let total = studentRecords.length;
         let attendedRecords = studentRecords.filter(s => s.attended);
         let absent = total - attendedRecords.length;
         let lastAttended = 'لم يحضر أي موعد بعد';
-        if(attendedRecords.length > 0) { attendedRecords.sort((a,b) => new Date(b.date) - new Date(a.date)); lastAttended = attendedRecords[0].date; }
+        if(attendedRecords.length > 0) { attendedRecords.sort((a,b) => new Date(b.date || 0) - new Date(a.date || 0)); lastAttended = attendedRecords[0].date; }
         
         document.getElementById('report-name').innerText = 'تقرير الطالب: ' + studentName;
         document.getElementById('report-phone').innerText = studentPhone;
@@ -675,7 +663,7 @@
         if (studentRecords.length === 0) {
             tbody.innerHTML = `<tr><td colspan="4" style="padding: 10px; color: red; text-align: center; font-weight: bold;">لا توجد مواعيد سابقة أو حالية (تسجيلات الطالب في تواريخ قادمة)</td></tr>`;
         } else {
-            studentRecords.sort((a,b) => new Date(a.date) - new Date(b.date));
+            studentRecords.sort((a,b) => new Date(a.date || 0) - new Date(b.date || 0));
             studentRecords.forEach(rec => {
                 let statusHTML = rec.attended ? '<span style="color:green; font-weight:bold;">حاضر ✔</span>' : `<input type="checkbox" class="attendance-check" title="تحديد كحاضر" onchange="updateAttendance('${rec.id}', this.checked)">`;
                 tbody.innerHTML += `<tr><td style="padding: 8px;">${rec.course || ''}</td><td style="padding: 8px;">${rec.date || ''}</td><td style="padding: 8px;">${rec.time || ''}</td><td style="padding: 8px;">${statusHTML}</td></tr>`;
@@ -699,12 +687,17 @@
     function closeReportModal() { currentSelectedStudent = null; document.getElementById('report-modal').style.display = 'none'; }
     document.addEventListener('click', function(e) { if(e.target.id !== 'search-student') document.getElementById('search-suggestions').style.display = 'none'; });
 
-    // ----------------- الأيام والفترات والتحكم القديم -----------------
     function renderDatesList() {
         document.getElementById('dates-list').style.display = 'block'; document.getElementById('periods-list').style.display = 'none'; document.getElementById('period-details').style.display = 'none';
         const container = document.getElementById('dates-container'); container.innerHTML = '';
-        const uniqueDates = [...new Set(allStudents.map(s => s.date))]; uniqueDates.sort((a, b) => new Date(a) - new Date(b));
+        
+        // جلب الأيام بطريقة آمنة
+        let rawDates = allStudents.map(s => s.date).filter(Boolean);
+        const uniqueDates = [...new Set(rawDates)]; 
+        uniqueDates.sort((a, b) => new Date(a) - new Date(b));
+        
         if (uniqueDates.length === 0) { container.innerHTML = `<p style="text-align: center; color: white;">لا توجد بيانات مسجلة حتى الآن</p>`; return; }
+        
         uniqueDates.forEach(date => {
             const studentsInDay = allStudents.filter(s => s.date === date);
             const periodsCount = new Set(studentsInDay.map(s => s.time)).size;
