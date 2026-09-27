@@ -9,9 +9,9 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <script>
-        // التحديث التلقائي للنسخة (v=14) - إصلاح قراءة البيانات ومعالجة الأخطاء
-        if (window.location.href.indexOf('?v=14') === -1) {
-            window.location.replace(window.location.href.split('?')[0] + '?v=14');
+        // التحديث التلقائي للنسخة (v=16) - استخلاص أرقام المجموعات بصرامة
+        if (window.location.href.indexOf('?v=16') === -1) {
+            window.location.replace(window.location.href.split('?')[0] + '?v=16');
         }
     </script>
 
@@ -219,7 +219,7 @@
 
             <!-- قسم: المجموعات -->
             <div id="view-groups" class="view-section">
-                <h3 style="color: white; margin-top: 0; border-bottom: 2px solid #fcc01a; padding-bottom: 10px;">إدارة المجموعات (الطلاب بدون تكرار)</h3>
+                <h3 style="color: white; margin-top: 0; border-bottom: 2px solid #fcc01a; padding-bottom: 10px;">إدارة المجموعات</h3>
                 <label>اختر المجموعة:</label>
                 <select id="group-select" onchange="renderGroupStudents(this.value)">
                     <option value="" disabled selected>اختر رقم المجموعة</option>
@@ -230,7 +230,7 @@
                 <div style="overflow-x: auto;">
                     <table id="groupDataTable" style="display: none;">
                         <thead>
-                            <tr><th>الاسم</th><th>الهاتف</th><th>اسم المجموعة (كما كُتب)</th></tr>
+                            <tr><th>الاسم</th><th>الهاتف</th><th>رقم المجموعة</th></tr>
                         </thead>
                         <tbody></tbody>
                     </table>
@@ -239,8 +239,7 @@
 
             <!-- قسم: إدارة المواعيد -->
             <div id="view-schedule" class="view-section">
-                <h3 style="color: white; margin-top: 0; border-bottom: 2px solid #fcc01a; padding-bottom: 10px;">إدارة المواعيد (تفعيل وإيقاف الفترات)</h3>
-                <p style="font-size: 14px; color: #ddd; margin-bottom: 20px;">أي فترة تقوم بإيقافها هنا، ستختفي فوراً من اختيارات الطلاب في الصفحة الرئيسية.</p>
+                <h3 style="color: white; margin-top: 0; border-bottom: 2px solid #fcc01a; padding-bottom: 10px;">إدارة المواعيد</h3>
                 
                 <label>اختر يوم الأسبوع:</label>
                 <select id="schedule-day-select" onchange="renderScheduleDay(this.value)">
@@ -303,11 +302,13 @@
 
     const normalizeText = (str) => String(str || '').replace(/[\s\u200B-\u200D\uFEFF]/g, '').trim();
     
-    // التحديث الآمن لمعالجة الأخطاء في أرقام المجاميع (تحويل إجباري لنص)
-    const normalizeNumbers = (str) => {
+    // دالة لاستخراج الأرقام الصافية فقط (تجاهل أي حروف أو مسافات)
+    const extractPureNumber = (str) => {
         let safeStr = String(str || '');
-        let normalized = safeStr.replace(/[٠-٩]/g, d => "٠١٢٣٤٥٦٧٨٩".indexOf(d));
-        return normalizeText(normalized);
+        // تحويل الأرقام العربية (١٢٣) إلى إنجليزية (123)
+        let englishNumbers = safeStr.replace(/[٠-٩]/g, d => "٠١٢٣٤٥٦٧٨٩".indexOf(d));
+        // مسح أي شيء ليس رقماً
+        return englishNumbers.replace(/\D/g, '');
     };
 
     const today = new Date().toISOString().split('T')[0];
@@ -496,7 +497,6 @@
                 }); 
             }
             
-            // تحديث العداد
             document.getElementById('records-counter').innerText = `إجمالي التسجيلات المحملة من السيرفر: ${allStudents.length}`;
             
             try {
@@ -525,31 +525,36 @@
     }
 
     function updateGroupsDropdown() {
-        let groupsMap = {}; 
+        let uniqueGroups = new Set(); 
         allStudents.forEach(s => {
-            let original = s.group || 'بدون مجموعة';
-            let norm = normalizeNumbers(original);
-            if(!groupsMap[norm]) groupsMap[norm] = original; 
+            let pureNumber = extractPureNumber(s.group);
+            // إظهار المجموعة فقط إذا كان هناك أرقام (تجاهل الكلمات بالكامل)
+            if (pureNumber !== '') {
+                uniqueGroups.add(pureNumber);
+            }
         });
         
         let select = document.getElementById('group-select');
         let currentVal = select.value;
         select.innerHTML = '<option value="" disabled selected>اختر رقم المجموعة</option>';
         
-        Object.keys(groupsMap).sort().forEach(normKey => {
+        // ترتيب الأرقام تصاعدياً
+        let sortedGroups = Array.from(uniqueGroups).sort((a, b) => parseInt(a) - parseInt(b));
+        sortedGroups.forEach(num => {
             let o = document.createElement('option');
-            o.value = normKey; o.text = groupsMap[normKey];
+            o.value = num; o.text = num; // عرض الرقم الصافي فقط
             select.appendChild(o);
         });
         
-        if (currentVal && groupsMap[currentVal]) {
+        if (currentVal && uniqueGroups.has(currentVal)) {
             select.value = currentVal;
             renderGroupStudents(currentVal);
         }
     }
 
-    function renderGroupStudents(normalizedGroupKey) {
-        let studentsInGroup = allStudents.filter(s => normalizeNumbers(s.group || 'بدون مجموعة') === normalizedGroupKey);
+    function renderGroupStudents(selectedGroupNumber) {
+        // فلترة بناءً على الرقم الصافي فقط
+        let studentsInGroup = allStudents.filter(s => extractPureNumber(s.group) === selectedGroupNumber);
         
         let uniqueStudents = [];
         let seen = new Set();
@@ -567,7 +572,8 @@
         let tbody = document.querySelector('#groupDataTable tbody');
         tbody.innerHTML = '';
         uniqueStudents.forEach(st => {
-            tbody.innerHTML += `<tr><td>${st.name || ''}</td><td>${st.phone || ''}</td><td>${st.group || ''}</td></tr>`;
+            let pureGrp = extractPureNumber(st.group);
+            tbody.innerHTML += `<tr><td>${st.name || ''}</td><td>${st.phone || ''}</td><td style="font-weight: bold; color: #3b1e5a;">${pureGrp}</td></tr>`;
         });
         document.getElementById('groupDataTable').style.display = 'table';
     }
@@ -627,7 +633,6 @@
         allStudentRecords.sort((a,b) => new Date(b.date || 0) - new Date(a.date || 0));
         let studentPhone = allStudentRecords[0].phone; 
         
-        // تعديل فلتر التواريخ ليكون آمن بدون مسح بيانات بالخطأ
         let studentRecords = allStudentRecords.filter(s => {
             if (!s.date) return true;
             return s.date <= today;
@@ -691,7 +696,6 @@
         document.getElementById('dates-list').style.display = 'block'; document.getElementById('periods-list').style.display = 'none'; document.getElementById('period-details').style.display = 'none';
         const container = document.getElementById('dates-container'); container.innerHTML = '';
         
-        // جلب الأيام بطريقة آمنة
         let rawDates = allStudents.map(s => s.date).filter(Boolean);
         const uniqueDates = [...new Set(rawDates)]; 
         uniqueDates.sort((a, b) => new Date(a) - new Date(b));
@@ -732,7 +736,9 @@
         filteredStudents.sort((a, b) => (courseOrder[a.course] || 99) - (courseOrder[b.course] || 99));
         filteredStudents.forEach(row => {
             const isChecked = row.attended ? 'checked' : '';
-            tbody.innerHTML += `<tr><td>${row.name || ''}</td><td>${row.phone || ''}</td><td>${row.group || ''}</td><td style="font-weight: bold; color: #3b1e5a;">${row.course || ''}</td><td>${row.date || ''}</td><td>${row.time || ''}</td><td><input type="checkbox" class="attendance-check" title="تحديد كحاضر" onchange="updateAttendance('${row.id}', this.checked)" ${isChecked}></td><td><button class="delete-btn" onclick="deleteStudent('${row.id}')">حذف</button></td></tr>`;
+            // عرض الرقم الصافي فقط في جدول المواعيد اليومية أيضاً
+            let pureGrp = extractPureNumber(row.group);
+            tbody.innerHTML += `<tr><td>${row.name || ''}</td><td>${row.phone || ''}</td><td style="font-weight:bold;">${pureGrp}</td><td style="font-weight: bold; color: #3b1e5a;">${row.course || ''}</td><td>${row.date || ''}</td><td>${row.time || ''}</td><td><input type="checkbox" class="attendance-check" title="تحديد كحاضر" onchange="updateAttendance('${row.id}', this.checked)" ${isChecked}></td><td><button class="delete-btn" onclick="deleteStudent('${row.id}')">حذف</button></td></tr>`;
         });
     }
 
