@@ -9,9 +9,9 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <script>
-        // التحديث التلقائي للنسخة (v=19) - تسجيل الغياب التلقائي في التقرير
-        if (window.location.href.indexOf('?v=19') === -1) {
-            window.location.replace(window.location.href.split('?')[0] + '?v=19');
+        // التحديث التلقائي للنسخة (v=20) - نظام إدارة المواعيد والإلغاء الآمن للطلاب
+        if (window.location.href.indexOf('?v=20') === -1) {
+            window.location.replace(window.location.href.split('?')[0] + '?v=20');
         }
     </script>
 
@@ -26,7 +26,7 @@
         input, select { width: 100%; padding: 10px; margin-top: 8px; margin-bottom: 15px; border-radius: 5px; border: none; box-sizing: border-box; font-family: Tahoma; }
         .submit-btn { background-color: #fcc01a; color: #3b1e5a; border: none; padding: 12px; width: 100%; font-size: 16px; font-weight: bold; border-radius: 5px; cursor: pointer; transition: 0.3s; }
         
-        #admin-view, #login-view { display: none; }
+        #admin-view, #login-view, #manage-view { display: none; }
         table { width: 100%; border-collapse: collapse; margin-top: 15px; background-color: white; color: black; border-radius: 5px; overflow: hidden; }
         th, td { border: 1px solid #ddd; padding: 10px; text-align: center; }
         th { background-color: #fcc01a; color: #3b1e5a; }
@@ -52,20 +52,14 @@
 
         /* ----------- تصميم لوحة الإدارة (Dashboard) ----------- */
         .dashboard-layout { display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start; }
-        
-        /* القائمة الجانبية */
         .sidebar { background-color: #2a1540; padding: 20px; border-radius: 10px; width: 100%; max-width: 250px; box-sizing: border-box; display: flex; flex-direction: column; gap: 10px; }
         .sidebar-title { color: #fcc01a; text-align: center; margin-top: 0; margin-bottom: 20px; font-size: 22px; }
         .sidebar-btn { background-color: #4c2673; color: white; border: 1px solid #fcc01a; padding: 12px; border-radius: 5px; font-weight: bold; cursor: pointer; text-align: right; transition: 0.3s; }
         .sidebar-btn:hover, .sidebar-btn.active { background-color: #fcc01a; color: #3b1e5a; }
         .sidebar-logout { background-color: #ff4d4d; color: white; border: none; padding: 12px; border-radius: 5px; font-weight: bold; cursor: pointer; margin-top: 20px; text-align: center; }
-
-        /* منطقة المحتوى الرئيسية */
         .main-content { flex: 1; background-color: #4c2673; padding: 20px; border-radius: 10px; box-sizing: border-box; min-width: 300px; }
         .view-section { display: none; }
         .view-section.active { display: block; }
-
-        /* ستايل أزرار التحكم في المواعيد */
         .toggle-row { display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.1); padding: 10px; border-radius: 5px; margin-bottom: 10px; }
         .toggle-btn { padding: 8px 15px; border-radius: 5px; border: none; font-weight: bold; cursor: pointer; width: 80px; }
         .btn-enable { background-color: #28a745; color: white; }
@@ -88,7 +82,7 @@
     <button class="admin-btn" onclick="showLogin()">الإدارة</button>
 </div>
 
-<!-- واجهة الطلاب -->
+<!-- واجهة التسجيل الرئيسية للطلاب -->
 <div class="container" id="student-view">
     <form id="regForm">
         <label>الاسم:</label>
@@ -121,9 +115,32 @@
         <button type="button" class="add-btn" onclick="addAppointment()">+ إضافة موعد آخر</button>
         <button type="submit" class="submit-btn" id="main-submit-btn">تأكيد التسجيل</button>
     </form>
+    
+    <!-- زر الانتقال لإدارة المواعيد والإلغاء -->
+    <button type="button" class="nav-btn" style="background-color: white; color: #3b1e5a; border: 2px solid #fcc01a; margin-top: 15px;" onclick="showManageView()">إدارة مواعيدي</button>
 </div>
 
-<!-- النوافذ المنبثقة للطلاب (النجاح / الخطأ) -->
+<!-- واجهة إدارة مواعيد الطالب (الإلغاء الذاتي) -->
+<div class="container" id="manage-view">
+    <h2 style="text-align: center; color: #fcc01a;">إدارة مواعيدي</h2>
+    <p style="text-align:center; font-size:14px; color:#ddd;">أدخل بياناتك كما سجلتها للبحث عن مواعيدك القادمة.</p>
+    
+    <label>الاسم:</label>
+    <input type="text" id="manage-name" required>
+
+    <label>رقم الهاتف:</label>
+    <input type="tel" id="manage-phone" required>
+
+    <label>رقم المجموعة:</label>
+    <input type="text" id="manage-group" required>
+
+    <button type="button" class="submit-btn" onclick="searchMyVisits()">بحث</button>
+    <button type="button" class="back-btn" style="width: 100%; margin-top: 10px;" onclick="hideManageView()">إلغاء والعودة للتسجيل</button>
+
+    <div id="manage-results" style="margin-top: 20px;"></div>
+</div>
+
+<!-- النوافذ المنبثقة (النجاح / الخطأ) -->
 <div class="modal-overlay" id="success-modal">
     <div class="modal-content">
         <strong style="color: black; display: block; margin-bottom: 10px; font-size: 16px;">تم تأكيد التسجيل بنجاح. بيان المواعيد:</strong>
@@ -158,36 +175,27 @@
 <div id="admin-view" style="max-width: 1100px; margin: auto;">
     <div class="dashboard-layout">
         
-        <!-- القائمة الجانبية (Sidebar) -->
         <div class="sidebar">
             <h3 class="sidebar-title">الإدارة</h3>
-            
             <div style="position: relative; margin-bottom: 15px;">
                 <input type="text" id="search-student" placeholder="بحث عن طالب..." oninput="handleSearch(this.value)" autocomplete="off" style="margin: 0; border: 2px solid #fcc01a; background: #fff; color: #000; font-weight: bold; padding: 8px;">
                 <div id="search-suggestions"></div>
             </div>
-
             <button class="sidebar-btn active" id="btn-nav-dates" onclick="switchDashboardView('dates')">الأيام المسجلة</button>
             <button class="sidebar-btn" id="btn-nav-groups" onclick="switchDashboardView('groups')">إدارة المجموعات</button>
             <button class="sidebar-btn" id="btn-nav-schedule" onclick="switchDashboardView('schedule')">إدارة المواعيد</button>
-            
             <button class="sidebar-logout" onclick="logoutAdmin()">تسجيل الخروج</button>
         </div>
 
-        <!-- منطقة المحتوى الرئيسية -->
         <div class="main-content">
-            
-            <!-- قسم: الأيام المسجلة -->
+            <!-- الأيام المسجلة -->
             <div id="view-dates" class="view-section active">
                 <div id="dates-list">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                         <h3 style="color: white; margin: 0;">الأيام المسجلة</h3>
                         <button class="delete-all-btn" style="margin-bottom: 0;" onclick="deleteAllData()">حذف كل التسجيلات بالكامل</button>
                     </div>
-                    
-                    <!-- عداد التسجيلات -->
                     <div id="records-counter" style="text-align: center; color: #fcc01a; font-weight: bold; margin-bottom: 15px; font-size: 15px; background: rgba(255,255,255,0.1); padding: 5px; border-radius: 5px;"></div>
-                    
                     <div id="dates-container"></div>
                 </div>
 
@@ -217,16 +225,14 @@
                 </div>
             </div>
 
-            <!-- قسم: المجموعات -->
+            <!-- المجموعات -->
             <div id="view-groups" class="view-section">
                 <h3 style="color: white; margin-top: 0; border-bottom: 2px solid #fcc01a; padding-bottom: 10px;">إدارة المجموعات</h3>
                 <label>اختر المجموعة:</label>
                 <select id="group-select" onchange="renderGroupStudents(this.value)">
                     <option value="" disabled selected>اختر رقم المجموعة</option>
                 </select>
-                
                 <h4 id="group-total-count" style="color: #fcc01a; display: none;"></h4>
-                
                 <div style="overflow-x: auto;">
                     <table id="groupDataTable" style="display: none;">
                         <thead>
@@ -237,10 +243,9 @@
                 </div>
             </div>
 
-            <!-- قسم: إدارة المواعيد -->
+            <!-- إدارة المواعيد -->
             <div id="view-schedule" class="view-section">
                 <h3 style="color: white; margin-top: 0; border-bottom: 2px solid #fcc01a; padding-bottom: 10px;">إدارة المواعيد</h3>
-                
                 <label>اختر يوم الأسبوع:</label>
                 <select id="schedule-day-select" onchange="renderScheduleDay(this.value)">
                     <option value="" disabled selected>اختر اليوم</option>
@@ -251,7 +256,6 @@
                     <option value="3">الأربعاء</option>
                     <option value="4">الخميس</option>
                 </select>
-
                 <div id="schedule-slots-container" style="margin-top: 20px;"></div>
             </div>
 
@@ -265,7 +269,7 @@
         <strong style="color: #3b1e5a; display: block; margin-bottom: 15px; font-size: 18px; border-bottom: 2px solid #fcc01a; padding-bottom: 5px;" id="report-name"></strong>
         <div style="margin-bottom: 15px; font-size: 15px; color: black; line-height: 1.8;">
             <div>رقم الهاتف: <b id="report-phone" style="color: #3b1e5a; font-family: Tahoma;"></b></div>
-            <div>إجمالي المواعيد المسجلة: <b id="report-total" style="color: #3b1e5a;"></b></div>
+            <div>إجمالي المواعيد المسجلة (الصحيحة): <b id="report-total" style="color: #3b1e5a;"></b></div>
             <div>مرات الغياب (لم يحضر): <b id="report-absent" style="color: red;"></b></div>
             <div>تاريخ آخر حضور: <b id="report-last" style="color: green;"></b></div>
         </div>
@@ -318,9 +322,82 @@
     const today = new Date().toISOString().split('T')[0];
     document.querySelector('.date-input').setAttribute('min', today);
 
+    // ----------------- إدارة واجهات الطالب -----------------
+    function showManageView() {
+        document.getElementById('student-view').style.display = 'none';
+        document.getElementById('manage-view').style.display = 'block';
+    }
+    function hideManageView() {
+        document.getElementById('manage-view').style.display = 'none';
+        document.getElementById('student-view').style.display = 'block';
+        document.getElementById('manage-results').innerHTML = '';
+    }
+
+    async function searchMyVisits() {
+        const mName = normalizeText(document.getElementById('manage-name').value);
+        const mPhone = normalizeText(document.getElementById('manage-phone').value);
+        const mGroup = extractPureNumber(document.getElementById('manage-group').value);
+        
+        if (!mName || !mPhone || !mGroup) {
+            alert('يرجى ملء الاسم ورقم الهاتف والمجموعة للبحث'); return;
+        }
+
+        const btn = document.querySelector('#manage-view .submit-btn');
+        btn.innerText = 'جاري البحث...';
+        
+        try {
+            const snap = await database.ref('students').get();
+            let resultsHTML = '';
+            if (snap.exists()) {
+                let data = snap.val();
+                let myApps = [];
+                Object.keys(data).forEach(key => {
+                    let s = data[key];
+                    if (normalizeText(s.name) === mName && normalizeText(s.phone) === mPhone && extractPureNumber(s.group) === mGroup) {
+                        // إظهار المواعيد القادمة فقط اللي مش ملغية
+                        if (!s.canceled && s.date >= today) {
+                            myApps.push({id: key, ...s});
+                        }
+                    }
+                });
+
+                if (myApps.length > 0) {
+                    myApps.sort((a,b) => new Date(a.date) - new Date(b.date));
+                    myApps.forEach(app => {
+                        resultsHTML += `
+                        <div style="background: rgba(255,255,255,0.1); padding: 15px; border-radius: 5px; margin-bottom: 10px; display:flex; justify-content:space-between; align-items:center;">
+                            <div>
+                                <div style="color:#fcc01a; font-weight:bold; font-size:16px;">${app.course}</div>
+                                <div style="font-size:14px; margin-top:5px;">${app.date} <br> ${app.time}</div>
+                            </div>
+                            <button class="delete-btn" style="padding:10px 15px; background-color:#ff4d4d;" onclick="cancelMyApp('${app.id}')">إلغاء</button>
+                        </div>`;
+                    });
+                } else {
+                    resultsHTML = '<p style="text-align:center; color:#fcc01a; font-weight:bold;">لا توجد مواعيد قادمة متاحة.</p>';
+                }
+            } else {
+                resultsHTML = '<p style="text-align:center; color:#ff4d4d;">لا توجد بيانات مسجلة.</p>';
+            }
+            document.getElementById('manage-results').innerHTML = resultsHTML;
+        } catch(e) {
+            alert('خطأ: ' + e);
+        }
+        btn.innerText = 'بحث';
+    }
+
+    function cancelMyApp(id) {
+        if(confirm('هل أنت متأكد من إلغاء الموعد؟\nالمكان سيفضى لطالب آخر ولن تتمكن من التراجع.')) {
+            database.ref('students/' + id).update({ canceled: true }).then(() => {
+                alert('تم إلغاء الموعد بنجاح.');
+                searchMyVisits();
+            });
+        }
+    }
+
+
     // ----------------- نظام إدارة المواعيد (الإعدادات المركزية) -----------------
     const ALL_PERIODS = ['من 12 ظهراً إلى 3 عصراً', 'من 3 عصراً إلى 6 مساءً', 'من 6 مساءً إلى 9 مساءً', 'من 8 مساءً إلى 11 مساءً'];
-    
     const defaultSchedule = {
         0: {'من 12 ظهراً إلى 3 عصراً': true, 'من 3 عصراً إلى 6 مساءً': true, 'من 6 مساءً إلى 9 مساءً': true, 'من 8 مساءً إلى 11 مساءً': false},
         1: {'من 12 ظهراً إلى 3 عصراً': false, 'من 3 عصراً إلى 6 مساءً': false, 'من 6 مساءً إلى 9 مساءً': false, 'من 8 مساءً إلى 11 مساءً': true},
@@ -431,7 +508,14 @@
 
             for (let i = 0; i < appointments.length; i++) {
                 const app = appointments[i];
-                let currentCountInDB = dbData.filter(d => normalizeText(d.date) === normalizeText(app.date) && normalizeText(d.time) === normalizeText(app.time) && normalizeText(d.course) === normalizeText(course)).length;
+                // المواعيد الملغية لا تحسب في العدد عشان المكان يفضى
+                let currentCountInDB = dbData.filter(d => 
+                    normalizeText(d.date) === normalizeText(app.date) && 
+                    normalizeText(d.time) === normalizeText(app.time) && 
+                    normalizeText(d.course) === normalizeText(course) && 
+                    d.canceled !== true
+                ).length;
+                
                 if (currentCountInDB >= maxLimit) {
                     showErrorModal(`عفواً، الموعد يوم <b>(${app.date})</b> في الفترة <b>(${app.time})</b> ممتلئ لكورس <b>(${course})</b>.<br><br>المقاعد محجوزة بالكامل في هذا الموعد.<br>يرجى اختيار موعد آخر أو حذفه.`);
                     resetBtn(); return; 
@@ -440,7 +524,7 @@
 
             let promises = [];
             appointments.forEach(app => {
-                const record = { name, phone, group, course, date: app.date, time: app.time, attended: false, timestamp: new Date().toLocaleString() };
+                const record = { name, phone, group, course, date: app.date, time: app.time, attended: false, canceled: false, timestamp: new Date().toLocaleString() };
                 promises.push(database.ref('students').push(record));
             });
             await Promise.all(promises);
@@ -531,7 +615,7 @@
     function updateGroupsDropdown() {
         let uniqueGroups = new Set(); 
         allStudents.forEach(s => {
-            if (isStrictlyNumber(s.group)) {
+            if (isStrictlyNumber(s.group) && !s.canceled) {
                 let pureNumber = extractPureNumber(s.group);
                 uniqueGroups.add(pureNumber);
             }
@@ -543,37 +627,27 @@
         
         let sortedGroups = Array.from(uniqueGroups).sort((a, b) => parseInt(a) - parseInt(b));
         sortedGroups.forEach(num => {
-            let o = document.createElement('option');
-            o.value = num; o.text = num;
-            select.appendChild(o);
+            let o = document.createElement('option'); o.value = num; o.text = num; select.appendChild(o);
         });
         
-        if (currentVal && uniqueGroups.has(currentVal)) {
-            select.value = currentVal;
-            renderGroupStudents(currentVal);
-        }
+        if (currentVal && uniqueGroups.has(currentVal)) { select.value = currentVal; renderGroupStudents(currentVal); }
     }
 
     function renderGroupStudents(selectedGroupNumber) {
         let studentsInGroup = allStudents.filter(s => {
-            return isStrictlyNumber(s.group) && extractPureNumber(s.group) === selectedGroupNumber;
+            return isStrictlyNumber(s.group) && extractPureNumber(s.group) === selectedGroupNumber && !s.canceled;
         });
         
-        let uniqueStudents = [];
-        let seen = new Set();
+        let uniqueStudents = []; let seen = new Set();
         studentsInGroup.forEach(s => {
             let normName = normalizeText(s.name);
-            if(!seen.has(normName)) {
-                seen.add(normName);
-                uniqueStudents.push(s);
-            }
+            if(!seen.has(normName)) { seen.add(normName); uniqueStudents.push(s); }
         });
 
         document.getElementById('group-total-count').style.display = 'block';
         document.getElementById('group-total-count').innerText = `العدد الإجمالي لطلاب المجموعة: ${uniqueStudents.length} طالب/طالبة`;
         
-        let tbody = document.querySelector('#groupDataTable tbody');
-        tbody.innerHTML = '';
+        let tbody = document.querySelector('#groupDataTable tbody'); tbody.innerHTML = '';
         uniqueStudents.forEach(st => {
             let pureGrp = extractPureNumber(st.group);
             tbody.innerHTML += `<tr><td>${st.name || ''}</td><td>${st.phone || ''}</td><td style="font-weight: bold; color: #3b1e5a;">${pureGrp}</td></tr>`;
@@ -585,9 +659,7 @@
         const container = document.getElementById('schedule-slots-container');
         if (!dayVal) { container.innerHTML = ''; return; }
         
-        let daySettings = globalSchedule[dayVal] || defaultSchedule[dayVal] || {};
-        container.innerHTML = '';
-
+        let daySettings = globalSchedule[dayVal] || defaultSchedule[dayVal] || {}; container.innerHTML = '';
         ALL_PERIODS.forEach(period => {
             let isActive = daySettings[period] === true;
             let btnClass = isActive ? 'btn-enable' : 'btn-inactive';
@@ -609,9 +681,7 @@
 
     function toggleSchedulePeriod(day, period, newState) {
         if(confirm(`هل أنت متأكد من ${newState ? 'تفعيل' : 'إيقاف'} فترة (${period})؟`)) {
-            database.ref(`settings/schedule/${day}/${period}`).set(newState)
-                .then(() => { renderScheduleDay(day); })
-                .catch(err => alert("خطأ: " + err));
+            database.ref(`settings/schedule/${day}/${period}`).set(newState).then(() => { renderScheduleDay(day); }).catch(err => alert("خطأ: " + err));
         }
     }
 
@@ -636,13 +706,15 @@
         allStudentRecords.sort((a,b) => new Date(b.date || 0) - new Date(a.date || 0));
         let studentPhone = allStudentRecords[0].phone; 
         
+        // جلب المواعيد القديمة واللي لسه مجاتش (لعرض التقرير بشكل منطقي)
         let studentRecords = allStudentRecords.filter(s => {
             if (!s.date) return true;
             return s.date <= today;
         });
         
-        let total = studentRecords.length;
-        let attendedRecords = studentRecords.filter(s => s.attended);
+        let validRecords = studentRecords.filter(s => !s.canceled);
+        let total = validRecords.length;
+        let attendedRecords = validRecords.filter(s => s.attended);
         let absent = total - attendedRecords.length;
         let lastAttended = 'لم يحضر أي موعد بعد';
         if(attendedRecords.length > 0) { attendedRecords.sort((a,b) => new Date(b.date || 0) - new Date(a.date || 0)); lastAttended = attendedRecords[0].date; }
@@ -669,12 +741,14 @@
         tbody.innerHTML = '';
         
         if (studentRecords.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="4" style="padding: 10px; color: red; text-align: center; font-weight: bold;">لا توجد مواعيد سابقة أو حالية (تسجيلات الطالب في تواريخ قادمة)</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="4" style="padding: 10px; color: red; text-align: center; font-weight: bold;">لا توجد مواعيد سابقة أو حالية غير ملغية</td></tr>`;
         } else {
             studentRecords.sort((a,b) => new Date(a.date || 0) - new Date(b.date || 0));
             studentRecords.forEach(rec => {
                 let statusHTML = '';
-                if (rec.attended) {
+                if (rec.canceled) {
+                    statusHTML = '<span style="color:red; font-weight:bold;">ملغي</span>';
+                } else if (rec.attended) {
                     statusHTML = '<span style="color:green; font-weight:bold;">حاضر ✔</span>';
                 } else {
                     if (rec.date < today) {
@@ -683,7 +757,8 @@
                         statusHTML = `<input type="checkbox" class="attendance-check" title="تحديد كحاضر" onchange="updateAttendance('${rec.id}', this.checked)">`;
                     }
                 }
-                tbody.innerHTML += `<tr><td style="padding: 8px;">${rec.course || ''}</td><td style="padding: 8px;">${rec.date || ''}</td><td style="padding: 8px;">${rec.time || ''}</td><td style="padding: 8px;">${statusHTML}</td></tr>`;
+                let bgStyle = rec.canceled ? "background-color: #f9f9f9; color:#999;" : "";
+                tbody.innerHTML += `<tr style="${bgStyle}"><td style="padding: 8px;">${rec.course || ''}</td><td style="padding: 8px;">${rec.date || ''}</td><td style="padding: 8px;">${rec.time || ''}</td><td style="padding: 8px;">${statusHTML}</td></tr>`;
             });
         }
         document.getElementById('report-modal').style.display = 'flex';
@@ -746,17 +821,36 @@
         let filteredStudents = allStudents.filter(s => s.date === date && s.time === period);
         const courseOrder = { 'Classic Control': 1, 'PLC': 2, 'Motor Drive': 3 };
         filteredStudents.sort((a, b) => (courseOrder[a.course] || 99) - (courseOrder[b.course] || 99));
+        
         filteredStudents.forEach(row => {
-            const isChecked = row.attended ? 'checked' : '';
+            let isCanceled = row.canceled === true;
+            let bgStyle = isCanceled ? 'background-color: #f1f1f1; color: #a9a9a9;' : '';
+            let statusHTML = '';
+            
+            if (isCanceled) {
+                statusHTML = '<span style="color:red; font-weight:bold;">ملغي</span>';
+            } else if (row.attended) {
+                statusHTML = '<span style="color:green; font-weight:bold;">حاضر ✔</span>';
+            } else {
+                statusHTML = `<input type="checkbox" class="attendance-check" title="تحديد كحاضر" onchange="updateAttendance('${row.id}', this.checked)">`;
+            }
+            
+            let controlsHTML = `<button class="delete-btn" onclick="deleteStudent('${row.id}')">حذف</button>`;
+            if (isCanceled) {
+                controlsHTML = `<button class="add-btn" style="padding:5px 10px; margin-bottom:5px; font-size:12px; display:block; width:100%;" onclick="restoreStudent('${row.id}')">استرجاع</button>` + controlsHTML;
+            }
+
             let displayGroup = isStrictlyNumber(row.group) ? extractPureNumber(row.group) : (row.group || '');
-            tbody.innerHTML += `<tr><td>${row.name || ''}</td><td>${row.phone || ''}</td><td style="font-weight:bold;">${displayGroup}</td><td style="font-weight: bold; color: #3b1e5a;">${row.course || ''}</td><td>${row.date || ''}</td><td>${row.time || ''}</td><td><input type="checkbox" class="attendance-check" title="تحديد كحاضر" onchange="updateAttendance('${row.id}', this.checked)" ${isChecked}></td><td><button class="delete-btn" onclick="deleteStudent('${row.id}')">حذف</button></td></tr>`;
+            
+            tbody.innerHTML += `<tr style="${bgStyle}"><td>${row.name || ''}</td><td>${row.phone || ''}</td><td style="font-weight:bold;">${displayGroup}</td><td style="font-weight: bold; color: #3b1e5a;">${row.course || ''}</td><td>${row.date || ''}</td><td>${row.time || ''}</td><td>${statusHTML}</td><td>${controlsHTML}</td></tr>`;
         });
     }
 
     function updateAttendance(id, status) { database.ref('students/' + id).update({ attended: status }).catch(error => alert('خطأ في التحديث: ' + error.message)); }
+    function restoreStudent(id) { if(confirm('هل تريد استرجاع هذا الموعد وتفعيله مرة أخرى للطالب؟')) database.ref('students/' + id).update({ canceled: null }).catch(error => alert('خطأ: ' + error.message)); }
     function backToDates() { currentSelectedDate = null; currentSelectedPeriod = null; renderDatesList(); }
     function backToPeriods() { currentSelectedPeriod = null; renderPeriodsList(currentSelectedDate); }
-    function deleteStudent(id) { if (confirm('هل أنت متأكد من حذف هذا الموعد؟')) database.ref('students/' + id).remove().catch(error => alert('خطأ: ' + error.message)); }
+    function deleteStudent(id) { if (confirm('هل أنت متأكد من حذف هذا الموعد نهائياً؟')) database.ref('students/' + id).remove().catch(error => alert('خطأ: ' + error.message)); }
     function deleteAllInPeriod() {
         if (!currentSelectedDate || !currentSelectedPeriod) return;
         if (confirm(`تحذير: هل أنت متأكد من حذف جميع تسجيلات فترة (${currentSelectedPeriod})؟\nلا يمكن التراجع.`)) {
