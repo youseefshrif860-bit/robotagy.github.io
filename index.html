@@ -9,9 +9,9 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <script>
-        // التحديث التلقائي للنسخة (v=23) - لوحة إحصائيات الطالب (Dashboard)
-        if (window.location.href.indexOf('?v=23') === -1) {
-            window.location.replace(window.location.href.split('?')[0] + '?v=23');
+        // التحديث التلقائي للنسخة (v=24) - إحصائيات تفصيلية للطالب وإصلاح تداخل الشاشات
+        if (window.location.href.indexOf('?v=24') === -1) {
+            window.location.replace(window.location.href.split('?')[0] + '?v=24');
         }
     </script>
 
@@ -19,7 +19,8 @@
     <style>
         body { font-family: Tahoma, Arial, sans-serif; background-color: #3b1e5a; color: white; margin: 0; padding: 20px; }
         .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-        .logo { font-size: 28px; font-weight: bold; color: #fcc01a; }
+        .logo { font-size: 28px; font-weight: bold; color: #fcc01a; cursor: pointer; transition: 0.3s; }
+        .logo:hover { opacity: 0.8; }
         .admin-btn { background-color: #fcc01a; color: #3b1e5a; border: none; padding: 10px 15px; font-weight: bold; cursor: pointer; border-radius: 5px; }
         .container { background-color: #4c2673; padding: 20px; border-radius: 10px; max-width: 500px; margin: auto; box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
         
@@ -78,7 +79,7 @@
 <body>
 
 <div class="header">
-    <div class="logo">روبوتاجي</div>
+    <div class="logo" onclick="goHome()" title="العودة للرئيسية">روبوتاجي</div>
     <button class="admin-btn" onclick="showLogin()">الإدارة</button>
 </div>
 
@@ -120,7 +121,7 @@
     <button type="button" class="nav-btn" style="background-color: white; color: #3b1e5a; border: 2px solid #fcc01a; margin-top: 15px;" onclick="showManageView()">إدارة مواعيدي</button>
 </div>
 
-<!-- واجهة إدارة مواعيد الطالب (الإلغاء الذاتي السلس) -->
+<!-- واجهة إدارة مواعيد الطالب -->
 <div class="container" id="manage-view">
     <h2 style="text-align: center; color: #fcc01a;">إدارة مواعيدي</h2>
     <p style="text-align:center; font-size:14px; color:#ddd;">للاستعلام عن مواعيدك المسجلة أو إلغائها</p>
@@ -132,7 +133,7 @@
     <input type="text" id="manage-group" required>
 
     <button type="button" class="submit-btn" onclick="searchMyVisits()">بحث</button>
-    <button type="button" class="back-btn" style="width: 100%; margin-top: 10px;" onclick="hideManageView()">إلغاء والعودة للتسجيل</button>
+    <button type="button" class="back-btn" style="width: 100%; margin-top: 10px;" onclick="goHome()">إلغاء والعودة للرئيسية</button>
 
     <div id="manage-results" style="margin-top: 20px;"></div>
 </div>
@@ -324,17 +325,46 @@
     const today = new Date().toISOString().split('T')[0];
     document.querySelector('.date-input').setAttribute('min', today);
 
-    // ----------------- إدارة واجهات الطالب للإلغاء الذاتي بسلاسة -----------------
-    function showManageView() {
-        document.getElementById('student-view').style.display = 'none';
-        document.getElementById('manage-view').style.display = 'block';
-    }
-    function hideManageView() {
+    // ----------------- دوال التنقل الذكية وإصلاح التداخل -----------------
+    function goHome() {
+        document.getElementById('admin-view').style.display = 'none';
+        document.getElementById('login-view').style.display = 'none';
         document.getElementById('manage-view').style.display = 'none';
         document.getElementById('student-view').style.display = 'block';
+    }
+
+    function showLogin() {
+        document.getElementById('student-view').style.display = 'none';
+        document.getElementById('manage-view').style.display = 'none';
+        
+        // التحقق الذكي: لو هو مسجل دخول أصلاً، يفتح الإدارة ويقفل اللوجين
+        if (auth.currentUser) {
+            document.getElementById('login-view').style.display = 'none';
+            document.getElementById('admin-view').style.display = 'block';
+        } else {
+            document.getElementById('admin-view').style.display = 'none';
+            document.getElementById('login-view').style.display = 'block';
+        }
+    }
+
+    function closeLogin() {
+        goHome();
+        document.getElementById('login-msg').innerText = '';
+    }
+
+    function showManageView() {
+        document.getElementById('student-view').style.display = 'none';
+        document.getElementById('login-view').style.display = 'none';
+        document.getElementById('admin-view').style.display = 'none';
+        document.getElementById('manage-view').style.display = 'block';
+    }
+
+    function hideManageView() {
+        goHome();
         document.getElementById('manage-results').innerHTML = '';
     }
 
+    // ----------------- إدارة واجهات الطالب للإلغاء الذاتي والإحصائيات -----------------
     async function searchMyVisits() {
         const mPhone = normalizePhone(document.getElementById('manage-phone').value);
         const mGroup = extractPureNumber(document.getElementById('manage-group').value);
@@ -360,32 +390,41 @@
                 });
 
                 if (studentAllRecords.length > 0) {
-                    // ترتيب المواعيد زمنياً للحصول على أحدث اسم سجله الطالب
                     studentAllRecords.sort((a,b) => new Date(a.date || 0) - new Date(b.date || 0));
                     let latestName = studentAllRecords[studentAllRecords.length - 1].name;
                     
-                    // حساب الإحصائيات مع استبعاد المواعيد الملغية
                     let validRecords = studentAllRecords.filter(s => !s.canceled);
                     let totalAppointments = validRecords.length;
-                    let attended = validRecords.filter(s => s.attended).length;
-                    let pastRecords = validRecords.filter(s => s.date < today);
-                    let absent = pastRecords.length - pastRecords.filter(s => s.attended).length;
                     
+                    let pastRecords = validRecords.filter(s => s.date < today);
                     let upcomingRecords = validRecords.filter(s => s.date >= today);
+                    
+                    // حساب الغياب والحضور بيتم على المواعيد الفائتة فقط لمنطقية الإحصائيات
+                    let attended = pastRecords.filter(s => s.attended).length;
+                    let absent = pastRecords.length - attended;
 
-                    // 1. بناء لوحة بيانات الطالب (Dashboard)
+                    // 1. بناء لوحة بيانات الطالب (Dashboard الجديدة)
                     resultsHTML += `
                         <div style="background-color: white; color: #3b1e5a; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 3px solid #fcc01a;">
-                            <h3 style="margin-top: 0; margin-bottom: 10px; border-bottom: 2px solid #ddd; padding-bottom: 5px;">أهلاً بك، ${latestName}</h3>
+                            <h3 style="margin-top: 0; margin-bottom: 15px; border-bottom: 2px solid #ddd; padding-bottom: 5px; text-align: center;">أهلاً بك، ${latestName}</h3>
+                            
+                            <div style="background: #f9f9f9; padding: 12px; border-radius: 5px; margin-bottom: 15px; text-align: center; border: 1px solid #ddd;">
+                                <div style="font-size: 14px; font-weight: bold;">إجمالي مواعيدك المسجلة</div>
+                                <div style="color: #3b1e5a; font-size: 24px; font-weight: bold; margin: 5px 0;">${totalAppointments}</div>
+                                <div style="font-size: 13px; color: #555; font-weight: bold;">
+                                    ( <span style="color: #888;">فائتة: ${pastRecords.length}</span> &nbsp;|&nbsp; <span style="color: #fcc01a; text-shadow: 0 0 1px #000;">قادمة: ${upcomingRecords.length}</span> )
+                                </div>
+                            </div>
+
+                            <h4 style="margin: 0 0 10px 0; font-size: 14px; text-align: center; color: #666;">تفاصيل المواعيد الفائتة (${pastRecords.length}):</h4>
                             <div style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px; font-weight: bold; font-size: 14px;">
-                                <div style="flex: 1; min-width: 45%; background: #f9f9f9; padding: 10px; border-radius: 5px; text-align: center;">إجمالي المواعيد<br><span style="color:#3b1e5a; font-size:18px;">${totalAppointments}</span></div>
-                                <div style="flex: 1; min-width: 45%; background: #e6ffe6; padding: 10px; border-radius: 5px; text-align: center;">الحضور<br><span style="color:green; font-size:18px;">${attended}</span></div>
-                                <div style="flex: 1; min-width: 45%; background: #ffe6e6; padding: 10px; border-radius: 5px; text-align: center;">الغياب<br><span style="color:red; font-size:18px;">${absent}</span></div>
+                                <div style="flex: 1; min-width: 45%; background: #e6ffe6; padding: 10px; border-radius: 5px; text-align: center; border: 1px solid #c3e6c3;">حضرت<br><span style="color:green; font-size:20px;">${attended}</span></div>
+                                <div style="flex: 1; min-width: 45%; background: #ffe6e6; padding: 10px; border-radius: 5px; text-align: center; border: 1px solid #e6c3c3;">غبت<br><span style="color:red; font-size:20px;">${absent}</span></div>
                             </div>
                         </div>
                     `;
 
-                    // 2. بناء قائمة المواعيد القادمة
+                    // 2. بناء قائمة المواعيد القادمة للتحكم والإلغاء
                     resultsHTML += `<h4 style="color:#fcc01a; border-bottom: 1px solid #fcc01a; padding-bottom: 5px; margin-bottom:15px;">مواعيدك القادمة</h4>`;
                     
                     if (upcomingRecords.length > 0) {
@@ -396,11 +435,11 @@
                                     <div style="color:#fcc01a; font-weight:bold; font-size:16px;">${app.course}</div>
                                     <div style="font-size:14px; margin-top:5px;">${app.date} <br> ${app.time}</div>
                                 </div>
-                                <button class="delete-btn" style="padding:10px 15px; background-color:#ff4d4d;" onclick="cancelMyApp('${app.id}')">إلغاء</button>
+                                <button class="delete-btn" style="padding:10px 15px; background-color:#ff4d4d;" onclick="cancelMyApp('${app.id}')">إلغاء الموعد</button>
                             </div>`;
                         });
                     } else {
-                        resultsHTML += '<p style="text-align:center; color:#ddd; font-weight:bold;">لا توجد مواعيد قادمة (جميع مواعيدك إما سابقة أو ملغية).</p>';
+                        resultsHTML += '<p style="text-align:center; color:#ddd; font-weight:bold;">لا توجد مواعيد قادمة (جميع مواعيدك إما سابقة أو تم إلغاؤها).</p>';
                     }
                     
                 } else {
@@ -576,10 +615,7 @@
         } catch (error) { showErrorModal('حدث خطأ أثناء الاتصال بقاعدة البيانات: ' + error.message); resetBtn(); }
     });
 
-    // ----------------- نظام الإدارة والداشبورد -----------------
-    function showLogin() { document.getElementById('student-view').style.display = 'none'; document.getElementById('login-view').style.display = 'block'; }
-    function closeLogin() { document.getElementById('login-view').style.display = 'none'; document.getElementById('student-view').style.display = 'block'; document.getElementById('login-msg').innerText = ''; }
-
+    // ----------------- نظام الإدارة للوحة التحكم -----------------
     document.getElementById('loginForm').addEventListener('submit', function(e) {
         e.preventDefault();
         const email = document.getElementById('admin-email').value; const pass = document.getElementById('admin-password').value;
@@ -590,7 +626,7 @@
     });
 
     function logoutAdmin() {
-        auth.signOut().then(() => { document.getElementById('admin-view').style.display = 'none'; document.getElementById('student-view').style.display = 'block'; switchDashboardView('dates'); backToDates(); });
+        auth.signOut().then(() => { goHome(); switchDashboardView('dates'); backToDates(); });
     }
 
     function switchDashboardView(viewId) {
