@@ -9,9 +9,9 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <script>
-        // التحديث التلقائي للنسخة (v=17) - فلترة المجموعات بالصرامة التامة (أرقام فقط)
-        if (window.location.href.indexOf('?v=17') === -1) {
-            window.location.replace(window.location.href.split('?')[0] + '?v=17');
+        // التحديث التلقائي للنسخة (v=18) - تعديل نص العداد
+        if (window.location.href.indexOf('?v=18') === -1) {
+            window.location.replace(window.location.href.split('?')[0] + '?v=18');
         }
     </script>
 
@@ -185,7 +185,7 @@
                         <button class="delete-all-btn" style="margin-bottom: 0;" onclick="deleteAllData()">حذف كل التسجيلات بالكامل</button>
                     </div>
                     
-                    <!-- عداد التسجيلات للتأكد من وصول الداتا -->
+                    <!-- عداد التسجيلات -->
                     <div id="records-counter" style="text-align: center; color: #fcc01a; font-weight: bold; margin-bottom: 15px; font-size: 15px; background: rgba(255,255,255,0.1); padding: 5px; border-radius: 5px;"></div>
                     
                     <div id="dates-container"></div>
@@ -308,7 +308,6 @@
         return englishNumbers.replace(/\D/g, '');
     };
 
-    // الدالة المسؤولة عن الصرامة التامة: بترجع true لو كانت الخانة أرقام فقط بدون أي حروف أو مسافات
     const isStrictlyNumber = (str) => {
         let safeStr = String(str || '').trim();
         if (!safeStr) return false;
@@ -502,7 +501,7 @@
                 }); 
             }
             
-            document.getElementById('records-counter').innerText = `إجمالي التسجيلات المحملة من السيرفر: ${allStudents.length}`;
+            document.getElementById('records-counter').innerText = `إجمالي التسجيلات: ${allStudents.length}`;
             
             try {
                 if (currentSelectedStudent) selectStudent(currentSelectedStudent);
@@ -532,7 +531,6 @@
     function updateGroupsDropdown() {
         let uniqueGroups = new Set(); 
         allStudents.forEach(s => {
-            // الشرط الصارم: يسمح فقط بالخانات اللي عبارة عن أرقام صافية تماماً
             if (isStrictlyNumber(s.group)) {
                 let pureNumber = extractPureNumber(s.group);
                 uniqueGroups.add(pureNumber);
@@ -557,7 +555,6 @@
     }
 
     function renderGroupStudents(selectedGroupNumber) {
-        // الشرط الصارم للمطابقة هنا أيضاً
         let studentsInGroup = allStudents.filter(s => {
             return isStrictlyNumber(s.group) && extractPureNumber(s.group) === selectedGroupNumber;
         });
@@ -742,7 +739,6 @@
         filteredStudents.sort((a, b) => (courseOrder[a.course] || 99) - (courseOrder[b.course] || 99));
         filteredStudents.forEach(row => {
             const isChecked = row.attended ? 'checked' : '';
-            // عرض الرقم الصافي لو كان أرقام فقط، ولو كان الطالب كاتب نصوص هتظهر عشان الإدارة تشوف الإدخال الخاطئ
             let displayGroup = isStrictlyNumber(row.group) ? extractPureNumber(row.group) : (row.group || '');
             tbody.innerHTML += `<tr><td>${row.name || ''}</td><td>${row.phone || ''}</td><td style="font-weight:bold;">${displayGroup}</td><td style="font-weight: bold; color: #3b1e5a;">${row.course || ''}</td><td>${row.date || ''}</td><td>${row.time || ''}</td><td><input type="checkbox" class="attendance-check" title="تحديد كحاضر" onchange="updateAttendance('${row.id}', this.checked)" ${isChecked}></td><td><button class="delete-btn" onclick="deleteStudent('${row.id}')">حذف</button></td></tr>`;
         });
