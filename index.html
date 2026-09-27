@@ -9,9 +9,9 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <script>
-        // التحديث التلقائي للنسخة (v=20) - نظام إدارة المواعيد والإلغاء الآمن للطلاب
-        if (window.location.href.indexOf('?v=20') === -1) {
-            window.location.replace(window.location.href.split('?')[0] + '?v=20');
+        // التحديث التلقائي للنسخة (v=22) - تعديل نص الاستعلام عن المواعيد
+        if (window.location.href.indexOf('?v=22') === -1) {
+            window.location.replace(window.location.href.split('?')[0] + '?v=22');
         }
     </script>
 
@@ -120,13 +120,10 @@
     <button type="button" class="nav-btn" style="background-color: white; color: #3b1e5a; border: 2px solid #fcc01a; margin-top: 15px;" onclick="showManageView()">إدارة مواعيدي</button>
 </div>
 
-<!-- واجهة إدارة مواعيد الطالب (الإلغاء الذاتي) -->
+<!-- واجهة إدارة مواعيد الطالب (الإلغاء الذاتي السلس) -->
 <div class="container" id="manage-view">
     <h2 style="text-align: center; color: #fcc01a;">إدارة مواعيدي</h2>
-    <p style="text-align:center; font-size:14px; color:#ddd;">أدخل بياناتك كما سجلتها للبحث عن مواعيدك القادمة.</p>
-    
-    <label>الاسم:</label>
-    <input type="text" id="manage-name" required>
+    <p style="text-align:center; font-size:14px; color:#ddd;">للاستعلام عن مواعيدك المسجلة أو إلغائها</p>
 
     <label>رقم الهاتف:</label>
     <input type="tel" id="manage-phone" required>
@@ -306,6 +303,11 @@
 
     const normalizeText = (str) => String(str || '').replace(/[\s\u200B-\u200D\uFEFF]/g, '').trim();
     
+    const normalizePhone = (str) => {
+        let safeStr = String(str || '').replace(/[\s\u200B-\u200D\uFEFF]/g, '').trim();
+        return safeStr.replace(/[٠-٩]/g, d => "٠١٢٣٤٥٦٧٨٩".indexOf(d));
+    };
+
     const extractPureNumber = (str) => {
         let safeStr = String(str || '');
         let englishNumbers = safeStr.replace(/[٠-٩]/g, d => "٠١٢٣٤٥٦٧٨٩".indexOf(d));
@@ -322,7 +324,7 @@
     const today = new Date().toISOString().split('T')[0];
     document.querySelector('.date-input').setAttribute('min', today);
 
-    // ----------------- إدارة واجهات الطالب -----------------
+    // ----------------- إدارة واجهات الطالب للإلغاء الذاتي بسلاسة -----------------
     function showManageView() {
         document.getElementById('student-view').style.display = 'none';
         document.getElementById('manage-view').style.display = 'block';
@@ -334,12 +336,11 @@
     }
 
     async function searchMyVisits() {
-        const mName = normalizeText(document.getElementById('manage-name').value);
-        const mPhone = normalizeText(document.getElementById('manage-phone').value);
+        const mPhone = normalizePhone(document.getElementById('manage-phone').value);
         const mGroup = extractPureNumber(document.getElementById('manage-group').value);
         
-        if (!mName || !mPhone || !mGroup) {
-            alert('يرجى ملء الاسم ورقم الهاتف والمجموعة للبحث'); return;
+        if (!mPhone || !mGroup) {
+            alert('يرجى ملء رقم الهاتف والمجموعة للبحث'); return;
         }
 
         const btn = document.querySelector('#manage-view .submit-btn');
@@ -353,8 +354,7 @@
                 let myApps = [];
                 Object.keys(data).forEach(key => {
                     let s = data[key];
-                    if (normalizeText(s.name) === mName && normalizeText(s.phone) === mPhone && extractPureNumber(s.group) === mGroup) {
-                        // إظهار المواعيد القادمة فقط اللي مش ملغية
+                    if (normalizePhone(s.phone) === mPhone && extractPureNumber(s.group) === mGroup) {
                         if (!s.canceled && s.date >= today) {
                             myApps.push({id: key, ...s});
                         }
@@ -394,7 +394,6 @@
             });
         }
     }
-
 
     // ----------------- نظام إدارة المواعيد (الإعدادات المركزية) -----------------
     const ALL_PERIODS = ['من 12 ظهراً إلى 3 عصراً', 'من 3 عصراً إلى 6 مساءً', 'من 6 مساءً إلى 9 مساءً', 'من 8 مساءً إلى 11 مساءً'];
@@ -495,10 +494,10 @@
 
         try {
             const blockedSnap = await database.ref('blocked_phones').get();
-            let isBlocked = false; const normalizedInputPhone = normalizeText(phone);
+            let isBlocked = false; const normalizedInputPhone = normalizePhone(phone);
             if (blockedSnap.exists()) {
                 const blockedData = blockedSnap.val();
-                Object.keys(blockedData).forEach(key => { if (normalizeText(blockedData[key].phone) === normalizedInputPhone) isBlocked = true; });
+                Object.keys(blockedData).forEach(key => { if (normalizePhone(blockedData[key].phone) === normalizedInputPhone) isBlocked = true; });
             }
             if (isBlocked) { showErrorModal('عفواً، لا يمكنك التسجيل في الوقت الحالي. يرجى مراجعة إدارة المعمل.'); resetBtn(); return; }
 
@@ -508,7 +507,6 @@
 
             for (let i = 0; i < appointments.length; i++) {
                 const app = appointments[i];
-                // المواعيد الملغية لا تحسب في العدد عشان المكان يفضى
                 let currentCountInDB = dbData.filter(d => 
                     normalizeText(d.date) === normalizeText(app.date) && 
                     normalizeText(d.time) === normalizeText(app.time) && 
@@ -706,7 +704,6 @@
         allStudentRecords.sort((a,b) => new Date(b.date || 0) - new Date(a.date || 0));
         let studentPhone = allStudentRecords[0].phone; 
         
-        // جلب المواعيد القديمة واللي لسه مجاتش (لعرض التقرير بشكل منطقي)
         let studentRecords = allStudentRecords.filter(s => {
             if (!s.date) return true;
             return s.date <= today;
@@ -725,8 +722,8 @@
         document.getElementById('report-absent').innerText = absent;
         document.getElementById('report-last').innerText = lastAttended;
         
-        let normalizedStudentPhone = normalizeText(studentPhone);
-        let isBlocked = blockedPhonesList.some(b => normalizeText(b.phone) === normalizedStudentPhone);
+        let normalizedStudentPhone = normalizePhone(studentPhone);
+        let isBlocked = blockedPhonesList.some(b => normalizePhone(b.phone) === normalizedStudentPhone);
         
         let blockBtn = document.getElementById('block-btn');
         if (isBlocked) {
@@ -765,9 +762,9 @@
     }
 
     async function toggleBlockStudent(phone, name, currentlyBlocked) {
-        const normalizedPhone = normalizeText(phone);
+        const normalizedPhone = normalizePhone(phone);
         if (currentlyBlocked) {
-            let record = blockedPhonesList.find(b => normalizeText(b.phone) === normalizedPhone);
+            let record = blockedPhonesList.find(b => normalizePhone(b.phone) === normalizedPhone);
             if (record) { await database.ref('blocked_phones/' + record.id).remove(); alert('تم إلغاء الحظر بنجاح، يمكن للطالب التسجيل الآن.'); selectStudent(name); }
         } else {
             if (confirm(`هل أنت متأكد من حظر الطالب (${name}) برقم الهاتف (${phone})؟\nلن يتمكن من حجز أي مواعيد جديدة.`)) {
