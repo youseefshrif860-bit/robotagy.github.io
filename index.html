@@ -9,9 +9,9 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <script>
-        // التحديث التلقائي للنسخة (v=24) - إحصائيات تفصيلية للطالب وإصلاح تداخل الشاشات
-        if (window.location.href.indexOf('?v=24') === -1) {
-            window.location.replace(window.location.href.split('?')[0] + '?v=24');
+        // التحديث التلقائي للنسخة (v=25) - إزالة خاصية الضغط من اللوجو
+        if (window.location.href.indexOf('?v=25') === -1) {
+            window.location.replace(window.location.href.split('?')[0] + '?v=25');
         }
     </script>
 
@@ -19,8 +19,7 @@
     <style>
         body { font-family: Tahoma, Arial, sans-serif; background-color: #3b1e5a; color: white; margin: 0; padding: 20px; }
         .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-        .logo { font-size: 28px; font-weight: bold; color: #fcc01a; cursor: pointer; transition: 0.3s; }
-        .logo:hover { opacity: 0.8; }
+        .logo { font-size: 28px; font-weight: bold; color: #fcc01a; }
         .admin-btn { background-color: #fcc01a; color: #3b1e5a; border: none; padding: 10px 15px; font-weight: bold; cursor: pointer; border-radius: 5px; }
         .container { background-color: #4c2673; padding: 20px; border-radius: 10px; max-width: 500px; margin: auto; box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
         
@@ -79,7 +78,7 @@
 <body>
 
 <div class="header">
-    <div class="logo" onclick="goHome()" title="العودة للرئيسية">روبوتاجي</div>
+    <div class="logo">روبوتاجي</div>
     <button class="admin-btn" onclick="showLogin()">الإدارة</button>
 </div>
 
@@ -337,7 +336,6 @@
         document.getElementById('student-view').style.display = 'none';
         document.getElementById('manage-view').style.display = 'none';
         
-        // التحقق الذكي: لو هو مسجل دخول أصلاً، يفتح الإدارة ويقفل اللوجين
         if (auth.currentUser) {
             document.getElementById('login-view').style.display = 'none';
             document.getElementById('admin-view').style.display = 'block';
@@ -399,11 +397,10 @@
                     let pastRecords = validRecords.filter(s => s.date < today);
                     let upcomingRecords = validRecords.filter(s => s.date >= today);
                     
-                    // حساب الغياب والحضور بيتم على المواعيد الفائتة فقط لمنطقية الإحصائيات
                     let attended = pastRecords.filter(s => s.attended).length;
                     let absent = pastRecords.length - attended;
 
-                    // 1. بناء لوحة بيانات الطالب (Dashboard الجديدة)
+                    // 1. بناء لوحة بيانات الطالب (Dashboard)
                     resultsHTML += `
                         <div style="background-color: white; color: #3b1e5a; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 3px solid #fcc01a;">
                             <h3 style="margin-top: 0; margin-bottom: 15px; border-bottom: 2px solid #ddd; padding-bottom: 5px; text-align: center;">أهلاً بك، ${latestName}</h3>
