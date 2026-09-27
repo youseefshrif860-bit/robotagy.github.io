@@ -9,9 +9,9 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <script>
-        // التحديث التلقائي للنسخة (v=25) - إزالة خاصية الضغط من اللوجو
-        if (window.location.href.indexOf('?v=25') === -1) {
-            window.location.replace(window.location.href.split('?')[0] + '?v=25');
+        // التحديث التلقائي للنسخة (v=26) - صائد أخطاء الإلغاء لمعرفة السبب
+        if (window.location.href.indexOf('?v=26') === -1) {
+            window.location.replace(window.location.href.split('?')[0] + '?v=26');
         }
     </script>
 
@@ -454,9 +454,14 @@
 
     function cancelMyApp(id) {
         if(confirm('هل أنت متأكد من إلغاء الموعد؟\nالمكان سيفضى لطالب آخر ولن تتمكن من التراجع.')) {
-            database.ref('students/' + id).update({ canceled: true }).then(() => {
+            // إضافة صائد أخطاء لتوضيح سبب رفض فايربيس للتعديل
+            database.ref('students/' + id).update({ canceled: true })
+            .then(() => {
                 alert('تم إلغاء الموعد بنجاح.');
                 searchMyVisits();
+            })
+            .catch((error) => {
+                alert('عفواً، فشل الإلغاء بسبب حماية قاعدة البيانات (Firebase Rules) تمنع التعديل:\n' + error.message);
             });
         }
     }
