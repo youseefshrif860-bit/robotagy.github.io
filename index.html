@@ -9,9 +9,9 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <script>
-        // التحديث التلقائي للنسخة (v=26) - صائد أخطاء الإلغاء لمعرفة السبب
-        if (window.location.href.indexOf('?v=26') === -1) {
-            window.location.replace(window.location.href.split('?')[0] + '?v=26');
+        // التحديث التلقائي للنسخة (v=30) - النسخة الذهبية والنهائية
+        if (window.location.href.indexOf('?v=30') === -1) {
+            window.location.replace(window.location.href.split('?')[0] + '?v=30');
         }
     </script>
 
@@ -19,6 +19,7 @@
     <style>
         body { font-family: Tahoma, Arial, sans-serif; background-color: #3b1e5a; color: white; margin: 0; padding: 20px; }
         .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
+        /* تم إزالة تأثير الضغط من اللوجو ليكون نصاً ثابتاً */
         .logo { font-size: 28px; font-weight: bold; color: #fcc01a; }
         .admin-btn { background-color: #fcc01a; color: #3b1e5a; border: none; padding: 10px 15px; font-weight: bold; cursor: pointer; border-radius: 5px; }
         .container { background-color: #4c2673; padding: 20px; border-radius: 10px; max-width: 500px; margin: auto; box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
@@ -454,14 +455,13 @@
 
     function cancelMyApp(id) {
         if(confirm('هل أنت متأكد من إلغاء الموعد؟\nالمكان سيفضى لطالب آخر ولن تتمكن من التراجع.')) {
-            // إضافة صائد أخطاء لتوضيح سبب رفض فايربيس للتعديل
             database.ref('students/' + id).update({ canceled: true })
             .then(() => {
                 alert('تم إلغاء الموعد بنجاح.');
                 searchMyVisits();
             })
             .catch((error) => {
-                alert('عفواً، فشل الإلغاء بسبب حماية قاعدة البيانات (Firebase Rules) تمنع التعديل:\n' + error.message);
+                alert('عفواً، فشل الإلغاء بسبب حماية قاعدة البيانات تمنع التعديل:\n' + error.message);
             });
         }
     }
