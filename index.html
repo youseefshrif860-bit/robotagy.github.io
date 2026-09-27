@@ -9,9 +9,9 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <script>
-        // التحديث التلقائي للنسخة (v=18) - تعديل نص العداد
-        if (window.location.href.indexOf('?v=18') === -1) {
-            window.location.replace(window.location.href.split('?')[0] + '?v=18');
+        // التحديث التلقائي للنسخة (v=19) - تسجيل الغياب التلقائي في التقرير
+        if (window.location.href.indexOf('?v=19') === -1) {
+            window.location.replace(window.location.href.split('?')[0] + '?v=19');
         }
     </script>
 
@@ -673,7 +673,16 @@
         } else {
             studentRecords.sort((a,b) => new Date(a.date || 0) - new Date(b.date || 0));
             studentRecords.forEach(rec => {
-                let statusHTML = rec.attended ? '<span style="color:green; font-weight:bold;">حاضر ✔</span>' : `<input type="checkbox" class="attendance-check" title="تحديد كحاضر" onchange="updateAttendance('${rec.id}', this.checked)">`;
+                let statusHTML = '';
+                if (rec.attended) {
+                    statusHTML = '<span style="color:green; font-weight:bold;">حاضر ✔</span>';
+                } else {
+                    if (rec.date < today) {
+                        statusHTML = '<span style="color:red; font-weight:bold;">غائب ✘</span>';
+                    } else {
+                        statusHTML = `<input type="checkbox" class="attendance-check" title="تحديد كحاضر" onchange="updateAttendance('${rec.id}', this.checked)">`;
+                    }
+                }
                 tbody.innerHTML += `<tr><td style="padding: 8px;">${rec.course || ''}</td><td style="padding: 8px;">${rec.date || ''}</td><td style="padding: 8px;">${rec.time || ''}</td><td style="padding: 8px;">${statusHTML}</td></tr>`;
             });
         }
