@@ -9,9 +9,9 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <script>
-        // التحديث التلقائي للنسخة (v=33) - إضافة نظام التقييم والمهام (LMS)
-        if (window.location.href.indexOf('?v=33') === -1) {
-            window.location.replace(window.location.href.split('?')[0] + '?v=33');
+        // التحديث التلقائي للنسخة (v=34) - تحديث جدول المجموعات وإزالة LMS
+        if (window.location.href.indexOf('?v=34') === -1) {
+            window.location.replace(window.location.href.split('?')[0] + '?v=34');
         }
     </script>
 
@@ -29,7 +29,7 @@
         #admin-view, #login-view, #manage-view { display: none; }
         table { width: 100%; border-collapse: collapse; margin-top: 15px; background-color: white; color: black; border-radius: 5px; overflow: hidden; }
         th, td { border: 1px solid #ddd; padding: 10px; text-align: center; }
-        th { background-color: #fcc01a; color: #3b1e5a; }
+        th { background-color: #fcc01a; color: #3b1e5a; font-size: 14px; }
         .delete-btn { background-color: #ff4d4d; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer; font-weight: bold; }
         .delete-all-btn { background-color: #cc0000; color: white; border: none; padding: 10px 15px; border-radius: 5px; cursor: pointer; font-weight: bold; margin-bottom: 15px; }
         
@@ -40,7 +40,7 @@
         
         .attendance-check { width: 22px; height: 22px; cursor: pointer; accent-color: #3b1e5a; }
 
-        /* ستايل النوافذ المنبثقة (Modal) */
+        /* ستايل النوافذ المنبثقة */
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.7); z-index: 1000; justify-content: center; align-items: center; }
         .modal-content { background-color: white; padding: 20px; border-radius: 10px; border: 3px solid #fcc01a; width: 90%; max-width: 500px; text-align: right; color: black; box-shadow: 0 4px 15px rgba(0,0,0,0.3); max-height: 90vh; overflow-y: auto; }
         .modal-close-btn { background-color: #28a745; color: white; border: none; padding: 10px; width: 100%; font-size: 16px; font-weight: bold; border-radius: 5px; cursor: pointer; margin-top: 20px; }
@@ -50,14 +50,14 @@
         .suggestion-item { padding: 10px; cursor: pointer; border-bottom: 1px solid #ddd; font-size: 14px; }
         .suggestion-item:hover { background-color: #fcc01a; color: #3b1e5a; font-weight: bold; }
 
-        /* ----------- تصميم لوحة الإدارة (Dashboard) ----------- */
+        /* ----------- تصميم لوحة الإدارة ----------- */
         .dashboard-layout { display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start; }
         .sidebar { background-color: #2a1540; padding: 20px; border-radius: 10px; width: 100%; max-width: 250px; box-sizing: border-box; display: flex; flex-direction: column; gap: 10px; }
         .sidebar-title { color: #fcc01a; text-align: center; margin-top: 0; margin-bottom: 20px; font-size: 22px; }
         .sidebar-btn { background-color: #4c2673; color: white; border: 1px solid #fcc01a; padding: 12px; border-radius: 5px; font-weight: bold; cursor: pointer; text-align: right; transition: 0.3s; }
         .sidebar-btn:hover, .sidebar-btn.active { background-color: #fcc01a; color: #3b1e5a; }
         .sidebar-logout { background-color: #ff4d4d; color: white; border: none; padding: 12px; border-radius: 5px; font-weight: bold; cursor: pointer; margin-top: 20px; text-align: center; }
-        .main-content { flex: 1; background-color: #4c2673; padding: 20px; border-radius: 10px; box-sizing: border-box; min-width: 300px; }
+        .main-content { flex: 1; background-color: #4c2673; padding: 20px; border-radius: 10px; box-sizing: border-box; min-width: 300px; overflow-x: auto; }
         .view-section { display: none; }
         .view-section.active { display: block; }
         .toggle-row { display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.1); padding: 10px; border-radius: 5px; margin-bottom: 10px; }
@@ -66,7 +66,7 @@
         .btn-disable { background-color: #ff4d4d; color: white; }
         .btn-inactive { background-color: #666; color: white; opacity: 0.5; }
 
-        /* ستايل المهام والتقييم (LMS) */
+        /* ستايل المهام والتقييم */
         .course-accordion { background-color: #f4f4f4; color: #3b1e5a; cursor: pointer; padding: 12px; width: 100%; border: 2px solid #ddd; text-align: right; font-weight: bold; font-size: 15px; border-radius: 5px; margin-top: 10px; display: flex; justify-content: space-between; align-items: center; transition: 0.3s; }
         .course-accordion:hover, .course-accordion.active { background-color: #e6e6e6; border-color: #fcc01a; }
         .course-panel { padding: 15px; display: none; background-color: white; border: 1px solid #ddd; border-top: none; border-radius: 0 0 5px 5px; }
@@ -129,7 +129,6 @@
         <button type="submit" class="submit-btn" id="main-submit-btn">تأكيد التسجيل</button>
     </form>
     
-    <!-- زر الانتقال لإدارة المواعيد والإلغاء -->
     <button type="button" class="nav-btn" style="background-color: white; color: #3b1e5a; border: 2px solid #fcc01a; margin-top: 15px;" onclick="showManageView()">إدارة مواعيدي</button>
 </div>
 
@@ -241,9 +240,16 @@
                 </select>
                 <h4 id="group-total-count" style="color: #fcc01a; display: none;"></h4>
                 <div style="overflow-x: auto;">
-                    <table id="groupDataTable" style="display: none;">
+                    <table id="groupDataTable" style="display: none; min-width: 600px;">
                         <thead>
-                            <tr><th>الاسم</th><th>الهاتف</th><th>رقم المجموعة</th></tr>
+                            <tr>
+                                <th>الاسم</th>
+                                <th>الهاتف</th>
+                                <th>المجموعة</th>
+                                <th>Classic</th>
+                                <th>PLC</th>
+                                <th>Drive</th>
+                            </tr>
                         </thead>
                         <tbody></tbody>
                     </table>
@@ -264,7 +270,6 @@
                 </select>
                 <div id="schedule-slots-container" style="margin-top: 20px;"></div>
             </div>
-
         </div>
     </div>
 </div>
@@ -290,11 +295,9 @@
             </table>
         </div>
 
-        <!-- قسم التقييم ومتابعة المهام الجديد -->
-        <strong style="color: #000; display: block; margin-bottom: 10px; font-size: 14px; border-top: 2px solid #ddd; padding-top: 10px;">التقييم ومتابعة المهام (LMS):</strong>
-        <div id="lms-container" style="margin-bottom: 15px;">
-            <!-- سيتم حقن المهام هنا ديناميكياً -->
-        </div>
+        <!-- قسم التقييم ومتابعة المهام -->
+        <strong style="color: #000; display: block; margin-bottom: 10px; font-size: 14px; border-top: 2px solid #ddd; padding-top: 10px;">التقييم ومتابعة المهام:</strong>
+        <div id="lms-container" style="margin-bottom: 15px;"></div>
         
         <button id="block-btn" style="width: 100%; padding: 12px; margin-bottom: 10px; font-size: 15px; color: white; border: none; border-radius: 5px; font-weight: bold; cursor: pointer;"></button>
         <button class="modal-close-btn" style="background-color: #3b1e5a; margin-top: 0;" onclick="closeReportModal()">إغلاق التقرير</button>
@@ -339,7 +342,7 @@
     const today = new Date().toISOString().split('T')[0];
     document.querySelector('.date-input').setAttribute('min', today);
 
-    // ----------------- دوال التنقل -----------------
+    // ----------------- التنقل -----------------
     function goHome() {
         document.getElementById('admin-view').style.display = 'none';
         document.getElementById('login-view').style.display = 'none';
@@ -371,7 +374,7 @@
         document.getElementById('manage-view').style.display = 'block';
     }
 
-    // ----------------- إدارة الطالب (بحث وإلغاء) -----------------
+    // ----------------- واجهة الطالب للإلغاء -----------------
     async function searchMyVisits() {
         const mPhone = normalizePhone(document.getElementById('manage-phone').value);
         const mGroup = extractPureNumber(document.getElementById('manage-group').value);
@@ -388,9 +391,7 @@
                 let studentAllRecords = [];
                 Object.keys(data).forEach(key => {
                     let s = data[key];
-                    if (normalizePhone(s.phone) === mPhone && extractPureNumber(s.group) === mGroup) {
-                        studentAllRecords.push({id: key, ...s});
-                    }
+                    if (normalizePhone(s.phone) === mPhone && extractPureNumber(s.group) === mGroup) { studentAllRecords.push({id: key, ...s}); }
                 });
 
                 if (studentAllRecords.length > 0) {
@@ -527,9 +528,15 @@
         document.getElementById('view-' + viewId).classList.add('active'); document.getElementById('btn-nav-' + viewId).classList.add('active');
     }
 
-    let allStudents = []; let blockedPhonesList = []; let currentSelectedDate = null; let currentSelectedPeriod = null; let currentSelectedStudent = null; 
+    let allStudents = []; 
+    let blockedPhonesList = []; 
+    let allProgress = {}; // الاحتفاظ بتقدم كل الطلاب لتسهيل عرضه في الجروبات
+    let currentSelectedDate = null; 
+    let currentSelectedPeriod = null; 
+    let currentSelectedStudent = null; 
 
     function loadData() {
+        // جلب الطلاب
         database.ref('students').on('value', (snapshot) => {
             allStudents = []; if (snapshot.exists()) { snapshot.forEach(child => { let val = child.val(); if(val) allStudents.push({ id: child.key, ...val }); }); }
             document.getElementById('records-counter').innerText = `إجمالي التسجيلات: ${allStudents.length}`;
@@ -544,7 +551,18 @@
             } else renderDatesList();
             updateGroupsDropdown();
         });
-        database.ref('blocked_phones').on('value', (snapshot) => { blockedPhonesList = []; if (snapshot.exists()) { snapshot.forEach(child => blockedPhonesList.push({ id: child.key, phone: child.val().phone, name: child.val().name })); } });
+
+        // جلب الحظر
+        database.ref('blocked_phones').on('value', (snapshot) => { 
+            blockedPhonesList = []; if (snapshot.exists()) { snapshot.forEach(child => blockedPhonesList.push({ id: child.key, phone: child.val().phone, name: child.val().name })); } 
+        });
+
+        // جلب التقييمات لكل الطلاب لربطها بجدول المجموعات
+        database.ref('student_progress').on('value', (snapshot) => {
+            allProgress = snapshot.exists() ? snapshot.val() : {};
+            let select = document.getElementById('group-select');
+            if (select && select.value) { renderGroupStudents(select.value); }
+        });
     }
 
     function updateGroupsDropdown() {
@@ -557,14 +575,39 @@
     function renderGroupStudents(selectedGroupNumber) {
         let studentsInGroup = allStudents.filter(s => { return isStrictlyNumber(s.group) && extractPureNumber(s.group) === selectedGroupNumber && !s.canceled; });
         let phoneMap = new Map(); studentsInGroup.sort((a,b) => new Date(a.date || 0) - new Date(b.date || 0));
-        studentsInGroup.forEach(s => { phoneMap.set(normalizePhone(s.phone), s); }); let uniqueStudents = Array.from(phoneMap.values());
-        document.getElementById('group-total-count').style.display = 'block'; document.getElementById('group-total-count').innerText = `العدد الإجمالي لطلاب المجموعة: ${uniqueStudents.length} طالب/طالبة`;
+        studentsInGroup.forEach(s => { phoneMap.set(normalizePhone(s.phone), s); }); 
+        let uniqueStudents = Array.from(phoneMap.values());
+        
+        document.getElementById('group-total-count').style.display = 'block'; 
+        document.getElementById('group-total-count').innerText = `العدد الإجمالي لطلاب المجموعة: ${uniqueStudents.length} طالب/طالبة`;
+        
         let tbody = document.querySelector('#groupDataTable tbody'); tbody.innerHTML = '';
-        uniqueStudents.forEach(st => { tbody.innerHTML += `<tr><td>${st.name || ''}</td><td>${st.phone || ''}</td><td style="font-weight: bold; color: #3b1e5a;">${extractPureNumber(st.group)}</td></tr>`; });
+        uniqueStudents.forEach(st => { 
+            let pureGrp = extractPureNumber(st.group);
+            let normPhone = normalizePhone(st.phone);
+            let stProg = allProgress[normPhone] || {};
+
+            let cProg = calculateProgress('classic_control', stProg);
+            let pProg = calculateProgress('plc', stProg);
+            let dProg = calculateProgress('motor_drive', stProg);
+
+            let cText = cProg.percentage === 100 ? '✅' : `${cProg.completed}/${cProg.totalItems}`;
+            let pText = pProg.percentage === 100 ? '✅' : `${pProg.completed}/${pProg.totalItems}`;
+            let dText = dProg.percentage === 100 ? '✅' : `${dProg.completed}/${dProg.totalItems}`;
+
+            tbody.innerHTML += `<tr>
+                <td>${st.name || ''}</td>
+                <td>${st.phone || ''}</td>
+                <td style="font-weight: bold; color: #3b1e5a;">${pureGrp}</td>
+                <td style="font-size: 13px; font-weight: bold; color:#cc0000;">${cText}</td>
+                <td style="font-size: 13px; font-weight: bold; color:#cc0000;">${pText}</td>
+                <td style="font-size: 13px; font-weight: bold; color:#cc0000;">${dText}</td>
+            </tr>`; 
+        });
         document.getElementById('groupDataTable').style.display = 'table';
     }
 
-    // ----------------- نظام التقييم (LMS) -----------------
+    // ----------------- نظام التقييم -----------------
     const LMS_COURSES = {
         'classic_control': { title: 'Classic Control', tasks: 15, exam: true },
         'plc': { title: 'PLC', tasks: 27, exam: true },
@@ -603,7 +646,6 @@
             const isCompleted = progress.percentage === 100;
             const checkMark = isCompleted ? '<span style="color: #28a745; font-size: 18px;">✅</span>' : '';
             
-            // زر الـ Accordion
             let accBtn = document.createElement('div');
             accBtn.className = 'course-accordion';
             accBtn.id = `btn-${courseKey}`;
@@ -618,7 +660,6 @@
                 </div>
             `;
             
-            // اللوحة (Panel) اللي فيها الـ Checkboxes
             let panel = document.createElement('div');
             panel.className = 'course-panel';
             panel.id = `panel-${courseKey}`;
@@ -638,7 +679,6 @@
             }
             panel.appendChild(tasksGrid);
 
-            // امتحان (لو موجود)
             if (courseInfo.exam) {
                 let isExamChecked = (studentData && studentData[courseKey] && studentData[courseKey]['exam']) ? 'checked' : '';
                 let examHtml = `
@@ -655,10 +695,9 @@
         });
     }
 
-    // لما نضغط على أي Checkbox بنحدث الداتا ونعيد حساب شريط التقدم
     window.handleTaskChange = async function(phone, courseKey, taskKey, isChecked) {
         await updateTask(phone, courseKey, taskKey, isChecked);
-        // نعيد جلب البيانات ونحدث الشريط بدون ما نقفل الـ Accordion اللي مفتوح
+        // التحديث اللحظي للواجهة من خلال المتغيرات
         const snap = await database.ref('student_progress/' + phone).get();
         const freshData = snap.exists() ? snap.val() : {};
         
@@ -666,7 +705,6 @@
         document.getElementById(`bar-prog-${courseKey}`).style.width = `${progress.percentage}%`;
         document.getElementById(`text-prog-${courseKey}`).innerText = `${progress.completed} / ${progress.totalItems}`;
         
-        // تحديث الصح الأخضر
         let titleArea = document.querySelector(`#btn-${courseKey} .course-title-area div:first-child span:first-child`);
         if (progress.percentage === 100) { titleArea.innerHTML = `${LMS_COURSES[courseKey].title} <span style="color: #28a745; font-size: 18px;">✅</span>`; }
         else { titleArea.innerHTML = LMS_COURSES[courseKey].title; }
@@ -728,7 +766,6 @@
             });
         }
         
-        // جلب تقدم الطالب من فايربيس ثم بناء واجهة المهام
         const progSnap = await database.ref('student_progress/' + normalizedStudentPhone).get();
         const studentProgressData = progSnap.exists() ? progSnap.val() : {};
         buildLMSUI(normalizedStudentPhone, studentProgressData);
@@ -749,7 +786,7 @@
     function closeReportModal() { currentSelectedStudent = null; document.getElementById('report-modal').style.display = 'none'; }
     document.addEventListener('click', function(e) { if(e.target.id !== 'search-student') document.getElementById('search-suggestions').style.display = 'none'; });
 
-    // ----------------- باقي دوال الإدارة والمسح -----------------
+    // ----------------- الجداول السريعة -----------------
     function renderScheduleDay(dayVal) {
         const container = document.getElementById('schedule-slots-container'); if (!dayVal) { container.innerHTML = ''; return; }
         let daySettings = globalSchedule[dayVal] || defaultSchedule[dayVal] || {}; container.innerHTML = '';
