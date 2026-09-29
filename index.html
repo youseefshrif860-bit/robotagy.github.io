@@ -9,9 +9,9 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <script>
-        // التحديث التلقائي للنسخة (v=34) - تحديث جدول المجموعات وإزالة LMS
-        if (window.location.href.indexOf('?v=34') === -1) {
-            window.location.replace(window.location.href.split('?')[0] + '?v=34');
+        // التحديث التلقائي للنسخة (v=35) - تقييد الهاتف لـ 11 رقم وإضافة زر تصدير إكسيل للمجموعات
+        if (window.location.href.indexOf('?v=35') === -1) {
+            window.location.replace(window.location.href.split('?')[0] + '?v=35');
         }
     </script>
 
@@ -101,8 +101,8 @@
         <label>الاسم:</label>
         <input type="text" id="name" required>
 
-        <label>رقم الهاتف:</label>
-        <input type="tel" id="phone" required>
+        <label>رقم الهاتف (11 رقم):</label>
+        <input type="tel" id="phone" required placeholder="مثال: 01012345678">
 
         <label>رقم المجموعة:</label>
         <input type="text" id="group" required>
@@ -137,8 +137,8 @@
     <h2 style="text-align: center; color: #fcc01a;">إدارة مواعيدي</h2>
     <p style="text-align:center; font-size:14px; color:#ddd;">للاستعلام عن مواعيدك المسجلة أو إلغائها</p>
 
-    <label>رقم الهاتف:</label>
-    <input type="tel" id="manage-phone" required>
+    <label>رقم الهاتف (11 رقم):</label>
+    <input type="tel" id="manage-phone" required placeholder="مثال: 01012345678">
 
     <label>رقم المجموعة:</label>
     <input type="text" id="manage-group" required>
@@ -232,8 +232,14 @@
                 </div>
             </div>
 
+            <!-- إدارة المجموعات وإضافة زر الإكسيل -->
             <div id="view-groups" class="view-section">
-                <h3 style="color: white; margin-top: 0; border-bottom: 2px solid #fcc01a; padding-bottom: 10px;">إدارة المجموعات</h3>
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #fcc01a; padding-bottom: 10px; margin-bottom: 15px;">
+                    <h3 style="color: white; margin: 0;">إدارة المجموعات</h3>
+                    <!-- زر التصدير للإكسيل -->
+                    <button id="export-excel-btn" class="add-btn" style="width: auto; background-color: #28a745; margin: 0; display: none;" onclick="exportGroupToExcel()">تصدير للإكسيل 📊</button>
+                </div>
+                
                 <label>اختر المجموعة:</label>
                 <select id="group-select" onchange="renderGroupStudents(this.value)">
                     <option value="" disabled selected>اختر رقم المجموعة</option>
@@ -374,11 +380,19 @@
         document.getElementById('manage-view').style.display = 'block';
     }
 
-    // ----------------- واجهة الطالب للإلغاء -----------------
+    // ----------------- واجهة الطالب للإلغاء والبحث -----------------
     async function searchMyVisits() {
-        const mPhone = normalizePhone(document.getElementById('manage-phone').value);
+        // التحقق من رقم الهاتف ليكون 11 رقم بالضبط
+        const rawPhone = document.getElementById('manage-phone').value;
+        const mPhone = extractPureNumber(rawPhone);
+        
+        if (mPhone.length !== 11) { 
+            alert('عفواً، يجب أن يتكون رقم الهاتف من 11 رقم.'); 
+            return; 
+        }
+
         const mGroup = extractPureNumber(document.getElementById('manage-group').value);
-        if (!mPhone || !mGroup) { alert('يرجى ملء رقم الهاتف والمجموعة للبحث'); return; }
+        if (!mGroup) { alert('يرجى ملء رقم المجموعة للبحث'); return; }
 
         const btn = document.querySelector('#manage-view .submit-btn');
         btn.innerText = 'جاري البحث...';
@@ -442,7 +456,7 @@
         }
     }
 
-    // ----------------- التسجيل -----------------
+    // ----------------- التسجيل (مع تقييد رقم الهاتف) -----------------
     const ALL_PERIODS = ['من 12 ظهراً إلى 3 عصراً', 'من 3 عصراً إلى 6 مساءً', 'من 6 مساءً إلى 9 مساءً', 'من 8 مساءً إلى 11 مساءً'];
     const defaultSchedule = {
         0: {'من 12 ظهراً إلى 3 عصراً': true, 'من 3 عصراً إلى 6 مساءً': true, 'من 6 مساءً إلى 9 مساءً': true, 'من 8 مساءً إلى 11 مساءً': false},
@@ -479,10 +493,23 @@
     let isSubmitting = false;
     document.getElementById('regForm').addEventListener('submit', async function(e) {
         e.preventDefault(); if (isSubmitting) return; isSubmitting = true;
-        const submitBtn = document.getElementById('main-submit-btn'); submitBtn.disabled = true; submitBtn.innerText = 'جاري التسجيل...'; submitBtn.style.opacity = '0.7';
+        const submitBtn = document.getElementById('main-submit-btn'); submitBtn.disabled = true; submitBtn.innerText = 'جاري التحقق...'; submitBtn.style.opacity = '0.7';
         function resetBtn() { submitBtn.disabled = false; submitBtn.innerText = 'تأكيد التسجيل'; submitBtn.style.opacity = '1'; isSubmitting = false; }
 
-        const name = document.getElementById('name').value; const phone = document.getElementById('phone').value; const group = document.getElementById('group').value; const course = document.getElementById('course').value;
+        const name = document.getElementById('name').value; 
+        const phoneInput = document.getElementById('phone').value;
+        const group = document.getElementById('group').value; 
+        const course = document.getElementById('course').value;
+        
+        // تقييد رقم الهاتف لـ 11 رقم بالضبط
+        const purePhoneCheck = extractPureNumber(phoneInput);
+        if (purePhoneCheck.length !== 11) {
+            showErrorModal('عفواً، يجب أن يتكون رقم الهاتف من 11 رقم بشكل صحيح<br>(مثال: 01012345678).'); 
+            resetBtn(); 
+            return;
+        }
+        
+        const phone = purePhoneCheck; // نعتمد الرقم الصافي بعد التأكد
         const maxLimit = (course === 'Motor Drive') ? 2 : 8;
         const appointmentRows = document.querySelectorAll('.appointment-row'); let appointments = []; let hasDuplicate = false; let tempSet = new Set();
         appointmentRows.forEach(row => { const d = row.querySelector('.date-input').value; const t = row.querySelector('.time-input').value; const key = d + '|' + t; if(tempSet.has(key)) hasDuplicate = true; tempSet.add(key); appointments.push({ date: d, time: t }); });
@@ -530,13 +557,12 @@
 
     let allStudents = []; 
     let blockedPhonesList = []; 
-    let allProgress = {}; // الاحتفاظ بتقدم كل الطلاب لتسهيل عرضه في الجروبات
+    let allProgress = {}; 
     let currentSelectedDate = null; 
     let currentSelectedPeriod = null; 
     let currentSelectedStudent = null; 
 
     function loadData() {
-        // جلب الطلاب
         database.ref('students').on('value', (snapshot) => {
             allStudents = []; if (snapshot.exists()) { snapshot.forEach(child => { let val = child.val(); if(val) allStudents.push({ id: child.key, ...val }); }); }
             document.getElementById('records-counter').innerText = `إجمالي التسجيلات: ${allStudents.length}`;
@@ -552,12 +578,10 @@
             updateGroupsDropdown();
         });
 
-        // جلب الحظر
         database.ref('blocked_phones').on('value', (snapshot) => { 
             blockedPhonesList = []; if (snapshot.exists()) { snapshot.forEach(child => blockedPhonesList.push({ id: child.key, phone: child.val().phone, name: child.val().name })); } 
         });
 
-        // جلب التقييمات لكل الطلاب لربطها بجدول المجموعات
         database.ref('student_progress').on('value', (snapshot) => {
             allProgress = snapshot.exists() ? snapshot.val() : {};
             let select = document.getElementById('group-select');
@@ -578,8 +602,15 @@
         studentsInGroup.forEach(s => { phoneMap.set(normalizePhone(s.phone), s); }); 
         let uniqueStudents = Array.from(phoneMap.values());
         
-        document.getElementById('group-total-count').style.display = 'block'; 
-        document.getElementById('group-total-count').innerText = `العدد الإجمالي لطلاب المجموعة: ${uniqueStudents.length} طالب/طالبة`;
+        let excelBtn = document.getElementById('export-excel-btn');
+        if (uniqueStudents.length > 0) {
+            excelBtn.style.display = 'block';
+            document.getElementById('group-total-count').style.display = 'block'; 
+            document.getElementById('group-total-count').innerText = `العدد الإجمالي لطلاب المجموعة: ${uniqueStudents.length} طالب/طالبة`;
+        } else {
+            excelBtn.style.display = 'none';
+            document.getElementById('group-total-count').style.display = 'none'; 
+        }
         
         let tbody = document.querySelector('#groupDataTable tbody'); tbody.innerHTML = '';
         uniqueStudents.forEach(st => { 
@@ -605,6 +636,53 @@
             </tr>`; 
         });
         document.getElementById('groupDataTable').style.display = 'table';
+    }
+
+    // ----------------- دالة التصدير للإكسيل -----------------
+    function exportGroupToExcel() {
+        let groupSelect = document.getElementById('group-select').value;
+        if (!groupSelect) { alert('اختر المجموعة أولاً'); return; }
+        
+        let table = document.getElementById("groupDataTable");
+        // استنساخ الجدول لعمل تنسيقات مناسبة للإكسيل
+        let cloneTable = table.cloneNode(true);
+        cloneTable.setAttribute('border', '1');
+        cloneTable.style.borderCollapse = 'collapse';
+        cloneTable.style.textAlign = 'center';
+        cloneTable.style.direction = 'rtl';
+        cloneTable.style.fontFamily = 'Tahoma, Arial, sans-serif';
+        
+        // تلوين العناوين لملف الإكسيل
+        let ths = cloneTable.querySelectorAll('th');
+        ths.forEach(th => {
+            th.style.backgroundColor = '#fcc01a';
+            th.style.color = '#3b1e5a';
+            th.style.padding = '10px';
+        });
+
+        let tds = cloneTable.querySelectorAll('td');
+        tds.forEach(td => { td.style.padding = '8px'; });
+
+        let html = cloneTable.outerHTML;
+        
+        // تجهيز كود الـ HTML اللي بيقراه الإكسيل بترميز UTF-8
+        let blob = new Blob(['\ufeff', `
+            <html dir="rtl" lang="ar">
+            <head><meta charset="UTF-8"></head>
+            <body>
+                <h2 style="text-align: center; color: #3b1e5a; font-family: Tahoma;">بيانات مجموعة: ${groupSelect} - معمل روبوتاجي</h2>
+                ${html}
+            </body>
+            </html>
+        `], { type: 'application/vnd.ms-excel' });
+        
+        let url = URL.createObjectURL(blob);
+        let a = document.createElement('a');
+        a.href = url;
+        a.download = `مجموعة_${groupSelect}_روبوتاجي.xls`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
     }
 
     // ----------------- نظام التقييم -----------------
@@ -697,7 +775,6 @@
 
     window.handleTaskChange = async function(phone, courseKey, taskKey, isChecked) {
         await updateTask(phone, courseKey, taskKey, isChecked);
-        // التحديث اللحظي للواجهة من خلال المتغيرات
         const snap = await database.ref('student_progress/' + phone).get();
         const freshData = snap.exists() ? snap.val() : {};
         
