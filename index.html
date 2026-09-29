@@ -9,9 +9,9 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <script>
-        // التحديث التلقائي للنسخة (v=30) - النسخة الذهبية والنهائية
-        if (window.location.href.indexOf('?v=30') === -1) {
-            window.location.replace(window.location.href.split('?')[0] + '?v=30');
+        // التحديث التلقائي للنسخة (v=32) - زيادة الأمان وإلغاء حفظ تسجيل الدخول عند إغلاق الصفحة
+        if (window.location.href.indexOf('?v=32') === -1) {
+            window.location.replace(window.location.href.split('?')[0] + '?v=32');
         }
     </script>
 
@@ -19,7 +19,6 @@
     <style>
         body { font-family: Tahoma, Arial, sans-serif; background-color: #3b1e5a; color: white; margin: 0; padding: 20px; }
         .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-        /* تم إزالة تأثير الضغط من اللوجو ليكون نصاً ثابتاً */
         .logo { font-size: 28px; font-weight: bold; color: #fcc01a; }
         .admin-btn { background-color: #fcc01a; color: #3b1e5a; border: none; padding: 10px 15px; font-weight: bold; cursor: pointer; border-radius: 5px; }
         .container { background-color: #4c2673; padding: 20px; border-radius: 10px; max-width: 500px; margin: auto; box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
@@ -47,7 +46,7 @@
         .modal-close-btn { background-color: #28a745; color: white; border: none; padding: 10px; width: 100%; font-size: 16px; font-weight: bold; border-radius: 5px; cursor: pointer; margin-top: 20px; }
         .modal-close-btn:hover { background-color: #218838; }
 
-        #search-suggestions { position: absolute; width: 100%; background: white; color: black; z-index: 1001; max-height: 150px; overflow-y: auto; border-radius: 5px; box-shadow: 0 4px 8px rgba(0,0,0,0.2); display: none; top: 100%; left: 0; }
+        #search-suggestions { position: absolute; width: 100%; background: white; color: black; z-index: 1001; max-height: 200px; overflow-y: auto; border-radius: 5px; box-shadow: 0 4px 8px rgba(0,0,0,0.2); display: none; top: 100%; left: 0; }
         .suggestion-item { padding: 10px; cursor: pointer; border-bottom: 1px solid #ddd; font-size: 14px; }
         .suggestion-item:hover { background-color: #fcc01a; color: #3b1e5a; font-weight: bold; }
 
@@ -176,7 +175,7 @@
         <div class="sidebar">
             <h3 class="sidebar-title">الإدارة</h3>
             <div style="position: relative; margin-bottom: 15px;">
-                <input type="text" id="search-student" placeholder="بحث عن طالب..." oninput="handleSearch(this.value)" autocomplete="off" style="margin: 0; border: 2px solid #fcc01a; background: #fff; color: #000; font-weight: bold; padding: 8px;">
+                <input type="text" id="search-student" placeholder="بحث باسم الطالب أو رقمه..." oninput="handleSearch(this.value)" autocomplete="off" style="margin: 0; border: 2px solid #fcc01a; background: #fff; color: #000; font-weight: bold; padding: 8px;">
                 <div id="search-suggestions"></div>
             </div>
             <button class="sidebar-btn active" id="btn-nav-dates" onclick="switchDashboardView('dates')">الأيام المسجلة</button>
@@ -401,7 +400,6 @@
                     let attended = pastRecords.filter(s => s.attended).length;
                     let absent = pastRecords.length - attended;
 
-                    // 1. بناء لوحة بيانات الطالب (Dashboard)
                     resultsHTML += `
                         <div style="background-color: white; color: #3b1e5a; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 3px solid #fcc01a;">
                             <h3 style="margin-top: 0; margin-bottom: 15px; border-bottom: 2px solid #ddd; padding-bottom: 5px; text-align: center;">أهلاً بك، ${latestName}</h3>
@@ -422,7 +420,6 @@
                         </div>
                     `;
 
-                    // 2. بناء قائمة المواعيد القادمة للتحكم والإلغاء
                     resultsHTML += `<h4 style="color:#fcc01a; border-bottom: 1px solid #fcc01a; padding-bottom: 5px; margin-bottom:15px;">مواعيدك القادمة</h4>`;
                     
                     if (upcomingRecords.length > 0) {
@@ -620,11 +617,23 @@
     // ----------------- نظام الإدارة للوحة التحكم -----------------
     document.getElementById('loginForm').addEventListener('submit', function(e) {
         e.preventDefault();
-        const email = document.getElementById('admin-email').value; const pass = document.getElementById('admin-password').value;
-        auth.signInWithEmailAndPassword(email, pass).then((userCredential) => {
-            document.getElementById('login-view').style.display = 'none'; document.getElementById('admin-view').style.display = 'block';
-            document.getElementById('loginForm').reset(); loadData();
-        }).catch((error) => { document.getElementById('login-msg').innerText = 'بيانات الدخول غير صحيحة!'; });
+        const email = document.getElementById('admin-email').value; 
+        const pass = document.getElementById('admin-password').value;
+        
+        // تعيين الجلسة لتنتهي بمجرد إغلاق الصفحة (Session Persistence)
+        auth.setPersistence(firebase.auth.Auth.Persistence.SESSION)
+            .then(() => {
+                return auth.signInWithEmailAndPassword(email, pass);
+            })
+            .then((userCredential) => {
+                document.getElementById('login-view').style.display = 'none'; 
+                document.getElementById('admin-view').style.display = 'block';
+                document.getElementById('loginForm').reset(); 
+                loadData();
+            })
+            .catch((error) => { 
+                document.getElementById('login-msg').innerText = 'بيانات الدخول غير صحيحة!'; 
+            });
     });
 
     function logoutAdmin() {
@@ -678,6 +687,7 @@
         });
     }
 
+    // تجميع الطلاب في الجروبات بناءً على رقم التليفون كمعرف وحيد
     function updateGroupsDropdown() {
         let uniqueGroups = new Set(); 
         allStudents.forEach(s => {
@@ -704,11 +714,17 @@
             return isStrictlyNumber(s.group) && extractPureNumber(s.group) === selectedGroupNumber && !s.canceled;
         });
         
-        let uniqueStudents = []; let seen = new Set();
+        // استخدام خريطة لضمان عدم تكرار نفس الطالب (بناءً على التليفون)
+        let phoneMap = new Map();
+        // ترتيبهم بالأقدمية عشان الخريطة تحتفظ بآخر/أحدث اسم سجله
+        studentsInGroup.sort((a,b) => new Date(a.date || 0) - new Date(b.date || 0));
+        
         studentsInGroup.forEach(s => {
-            let normName = normalizeText(s.name);
-            if(!seen.has(normName)) { seen.add(normName); uniqueStudents.push(s); }
+            let normPhone = normalizePhone(s.phone);
+            phoneMap.set(normPhone, s);
         });
+
+        let uniqueStudents = Array.from(phoneMap.values());
 
         document.getElementById('group-total-count').style.display = 'block';
         document.getElementById('group-total-count').innerText = `العدد الإجمالي لطلاب المجموعة: ${uniqueStudents.length} طالب/طالبة`;
@@ -751,26 +767,49 @@
         }
     }
 
+    // بحث متقدم يوحد البيانات بناءً على رقم التليفون
     function handleSearch(query) {
         const container = document.getElementById('search-suggestions');
         if (!query.trim()) { container.style.display = 'none'; return; }
-        let uniqueNames = [...new Set(allStudents.map(s => s.name))];
-        let matches = uniqueNames.filter(n => n && n.toLowerCase().includes(query.toLowerCase()));
-        if (matches.length === 0) container.innerHTML = '<div class="suggestion-item" style="color:red;">لا يوجد طالب بهذا الاسم</div>';
-        else container.innerHTML = matches.map(n => `<div class="suggestion-item" onclick="selectStudent('${n}')">${n}</div>`).join('');
+        
+        let phoneMap = new Map();
+        let sortedAll = [...allStudents].sort((a,b) => new Date(a.date || 0) - new Date(b.date || 0));
+        sortedAll.forEach(s => {
+            let normPhone = normalizePhone(s.phone);
+            phoneMap.set(normPhone, s);
+        });
+        
+        let uniqueLatestRecords = Array.from(phoneMap.values());
+        
+        let matches = uniqueLatestRecords.filter(s => 
+            (s.name && s.name.toLowerCase().includes(query.toLowerCase())) || 
+            (s.phone && normalizePhone(s.phone).includes(normalizePhone(query)))
+        );
+
+        if (matches.length === 0) {
+            container.innerHTML = '<div class="suggestion-item" style="color:red;">لا يوجد طالب بهذا الاسم أو الرقم</div>';
+        } else {
+            // نمرر رقم التليفون للدالة عشان يجمع كل مواعيد الشخص ده
+            container.innerHTML = matches.map(s => 
+                `<div class="suggestion-item" onclick="selectStudent('${s.phone}')">${s.name} - <span style="color:#666; font-size:12px;">${s.phone}</span></div>`
+            ).join('');
+        }
         container.style.display = 'block';
     }
 
-    function selectStudent(studentName) {
-        currentSelectedStudent = studentName;
+    // استخراج تقرير الطالب بناءً على رقم الهاتف لجمع كل مواعيده
+    function selectStudent(studentPhoneParam) {
+        let targetPhone = normalizePhone(studentPhoneParam);
+        currentSelectedStudent = targetPhone;
         document.getElementById('search-student').value = '';
         document.getElementById('search-suggestions').style.display = 'none';
         
-        let allStudentRecords = allStudents.filter(s => s.name === studentName);
+        let allStudentRecords = allStudents.filter(s => normalizePhone(s.phone) === targetPhone);
         if(allStudentRecords.length === 0) { closeReportModal(); return; }
         
         allStudentRecords.sort((a,b) => new Date(b.date || 0) - new Date(a.date || 0));
-        let studentPhone = allStudentRecords[0].phone; 
+        let latestName = allStudentRecords[allStudentRecords.length - 1].name;
+        let studentPhone = allStudentRecords[allStudentRecords.length - 1].phone; 
         
         let studentRecords = allStudentRecords.filter(s => {
             if (!s.date) return true;
@@ -784,7 +823,7 @@
         let lastAttended = 'لم يحضر أي موعد بعد';
         if(attendedRecords.length > 0) { attendedRecords.sort((a,b) => new Date(b.date || 0) - new Date(a.date || 0)); lastAttended = attendedRecords[0].date; }
         
-        document.getElementById('report-name').innerText = 'تقرير الطالب: ' + studentName;
+        document.getElementById('report-name').innerText = 'تقرير الطالب: ' + latestName;
         document.getElementById('report-phone').innerText = studentPhone;
         document.getElementById('report-total').innerText = total;
         document.getElementById('report-absent').innerText = absent;
@@ -796,10 +835,10 @@
         let blockBtn = document.getElementById('block-btn');
         if (isBlocked) {
             blockBtn.innerText = "إلغاء حظر الطالب"; blockBtn.style.backgroundColor = "#28a745"; 
-            blockBtn.onclick = () => toggleBlockStudent(studentPhone, studentName, true);
+            blockBtn.onclick = () => toggleBlockStudent(studentPhone, latestName, true);
         } else {
             blockBtn.innerText = "حظر الطالب من التسجيل 🚫"; blockBtn.style.backgroundColor = "#ff4d4d"; 
-            blockBtn.onclick = () => toggleBlockStudent(studentPhone, studentName, false);
+            blockBtn.onclick = () => toggleBlockStudent(studentPhone, latestName, false);
         }
 
         let tbody = document.getElementById('report-tbody');
@@ -833,10 +872,10 @@
         const normalizedPhone = normalizePhone(phone);
         if (currentlyBlocked) {
             let record = blockedPhonesList.find(b => normalizePhone(b.phone) === normalizedPhone);
-            if (record) { await database.ref('blocked_phones/' + record.id).remove(); alert('تم إلغاء الحظر بنجاح، يمكن للطالب التسجيل الآن.'); selectStudent(name); }
+            if (record) { await database.ref('blocked_phones/' + record.id).remove(); alert('تم إلغاء الحظر بنجاح، يمكن للطالب التسجيل الآن.'); selectStudent(phone); }
         } else {
             if (confirm(`هل أنت متأكد من حظر الطالب (${name}) برقم الهاتف (${phone})؟\nلن يتمكن من حجز أي مواعيد جديدة.`)) {
-                await database.ref('blocked_phones').push({ phone: phone, name: name }); alert('تم حظر الطالب بنجاح.'); selectStudent(name); 
+                await database.ref('blocked_phones').push({ phone: phone, name: name }); alert('تم حظر الطالب بنجاح.'); selectStudent(phone); 
             }
         }
     }
