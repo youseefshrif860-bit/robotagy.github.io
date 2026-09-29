@@ -9,9 +9,9 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <script>
-        // التحديث التلقائي للنسخة (v=35) - تقييد الهاتف لـ 11 رقم وإضافة زر تصدير إكسيل للمجموعات
-        if (window.location.href.indexOf('?v=35') === -1) {
-            window.location.replace(window.location.href.split('?')[0] + '?v=35');
+        // التحديث التلقائي للنسخة (v=36) - تنظيف واجهة رقم الهاتف مع بقاء حماية الـ 11 رقم
+        if (window.location.href.indexOf('?v=36') === -1) {
+            window.location.replace(window.location.href.split('?')[0] + '?v=36');
         }
     </script>
 
@@ -101,8 +101,8 @@
         <label>الاسم:</label>
         <input type="text" id="name" required>
 
-        <label>رقم الهاتف (11 رقم):</label>
-        <input type="tel" id="phone" required placeholder="مثال: 01012345678">
+        <label>رقم الهاتف:</label>
+        <input type="tel" id="phone" required>
 
         <label>رقم المجموعة:</label>
         <input type="text" id="group" required>
@@ -137,8 +137,8 @@
     <h2 style="text-align: center; color: #fcc01a;">إدارة مواعيدي</h2>
     <p style="text-align:center; font-size:14px; color:#ddd;">للاستعلام عن مواعيدك المسجلة أو إلغائها</p>
 
-    <label>رقم الهاتف (11 رقم):</label>
-    <input type="tel" id="manage-phone" required placeholder="مثال: 01012345678">
+    <label>رقم الهاتف:</label>
+    <input type="tel" id="manage-phone" required>
 
     <label>رقم المجموعة:</label>
     <input type="text" id="manage-group" required>
@@ -382,7 +382,6 @@
 
     // ----------------- واجهة الطالب للإلغاء والبحث -----------------
     async function searchMyVisits() {
-        // التحقق من رقم الهاتف ليكون 11 رقم بالضبط
         const rawPhone = document.getElementById('manage-phone').value;
         const mPhone = extractPureNumber(rawPhone);
         
@@ -501,7 +500,6 @@
         const group = document.getElementById('group').value; 
         const course = document.getElementById('course').value;
         
-        // تقييد رقم الهاتف لـ 11 رقم بالضبط
         const purePhoneCheck = extractPureNumber(phoneInput);
         if (purePhoneCheck.length !== 11) {
             showErrorModal('عفواً، يجب أن يتكون رقم الهاتف من 11 رقم بشكل صحيح<br>(مثال: 01012345678).'); 
@@ -509,7 +507,7 @@
             return;
         }
         
-        const phone = purePhoneCheck; // نعتمد الرقم الصافي بعد التأكد
+        const phone = purePhoneCheck;
         const maxLimit = (course === 'Motor Drive') ? 2 : 8;
         const appointmentRows = document.querySelectorAll('.appointment-row'); let appointments = []; let hasDuplicate = false; let tempSet = new Set();
         appointmentRows.forEach(row => { const d = row.querySelector('.date-input').value; const t = row.querySelector('.time-input').value; const key = d + '|' + t; if(tempSet.has(key)) hasDuplicate = true; tempSet.add(key); appointments.push({ date: d, time: t }); });
@@ -644,7 +642,6 @@
         if (!groupSelect) { alert('اختر المجموعة أولاً'); return; }
         
         let table = document.getElementById("groupDataTable");
-        // استنساخ الجدول لعمل تنسيقات مناسبة للإكسيل
         let cloneTable = table.cloneNode(true);
         cloneTable.setAttribute('border', '1');
         cloneTable.style.borderCollapse = 'collapse';
@@ -652,7 +649,6 @@
         cloneTable.style.direction = 'rtl';
         cloneTable.style.fontFamily = 'Tahoma, Arial, sans-serif';
         
-        // تلوين العناوين لملف الإكسيل
         let ths = cloneTable.querySelectorAll('th');
         ths.forEach(th => {
             th.style.backgroundColor = '#fcc01a';
@@ -665,7 +661,6 @@
 
         let html = cloneTable.outerHTML;
         
-        // تجهيز كود الـ HTML اللي بيقراه الإكسيل بترميز UTF-8
         let blob = new Blob(['\ufeff', `
             <html dir="rtl" lang="ar">
             <head><meta charset="UTF-8"></head>
