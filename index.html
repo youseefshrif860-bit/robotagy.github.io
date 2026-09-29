@@ -9,9 +9,9 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <script>
-        // التحديث التلقائي للنسخة (v=37) - إضافة المحرك الزمني لحساب الغياب بالساعة والدقيقة
-        if (window.location.href.indexOf('?v=37') === -1) {
-            window.location.replace(window.location.href.split('?')[0] + '?v=37');
+        // التحديث التلقائي للنسخة (v=38) - إصلاح دقيق لتوقيت مصر ومنع حساب الغياب قبل انتهاء الفترة
+        if (window.location.href.indexOf('?v=38') === -1) {
+            window.location.replace(window.location.href.split('?')[0] + '?v=38');
         }
     </script>
 
@@ -345,31 +345,41 @@
         return /^\d+$/.test(englishNumbers); 
     };
 
-    const today = new Date().toISOString().split('T')[0];
+    // دالة الحصول على تاريخ اليوم بالتوقيت المحلي للجهاز (YYYY-MM-DD)
+    function getLocalDateString() {
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    }
+
+    const today = getLocalDateString();
     document.querySelector('.date-input').setAttribute('min', today);
 
     // ==========================================
-    // دالة المحرك الزمني (الجديدة) لحساب وقت الفترة بدقة
+    // المحرك الزمني الدقيق (إصلاح مشكلة التوقيت المحلي)
     // ==========================================
     function isPeriodPassed(dateStr, periodStr) {
         if (!dateStr) return false;
-        const currentDate = new Date().toISOString().split('T')[0];
+        const currentLocalDate = getLocalDateString();
         
-        // لو تاريخ الموعد قبل النهاردة، يبقى أكيد عدى وفات
-        if (dateStr < currentDate) return true;
-        // لو تاريخ الموعد بكرة أو بعده، يبقى أكيد لسه مجاش
-        if (dateStr > currentDate) return false;
+        // إذا كان تاريخ الموعد قبل تاريخ اليوم، يعتبر منتهي قطعاً
+        if (dateStr < currentLocalDate) return true;
+        // إذا كان تاريخ الموعد في يوم قادم، لسه مجاش قطعاً
+        if (dateStr > currentLocalDate) return false;
 
-        // لو تاريخ الموعد هو "النهاردة"، نقارن الساعة
-        const currentHour = new Date().getHours(); // الساعة الحالية بنظام 24
+        // إذا كان الموعد هو اليوم الحالي: نحدد ساعة انتهاء الفترة
+        const currentHour = new Date().getHours();
         let endHour = 24;
         
-        if (periodStr === 'من 12 ظهراً إلى 3 عصراً') endHour = 15; // 3 عصراً
-        else if (periodStr === 'من 3 عصراً إلى 6 مساءً') endHour = 18; // 6 مساءً
-        else if (periodStr === 'من 6 مساءً إلى 9 مساءً') endHour = 21; // 9 مساءً
-        else if (periodStr === 'من 8 مساءً إلى 11 مساءً') endHour = 23; // 11 مساءً
+        const p = String(periodStr || '');
+        if (p.includes('3 عصراً') || p.includes('15')) endHour = 15;
+        else if (p.includes('6 مساءً') || p.includes('18')) endHour = 18;
+        else if (p.includes('9 مساءً') || p.includes('21')) endHour = 21;
+        else if (p.includes('11 مساءً') || p.includes('23')) endHour = 23;
 
-        // لو الساعة دلوقتي أكبر من أو تساوي ساعة انتهاء الفترة، إذن الفترة انتهت
+        // لا يعتبر غائب إلا إذا تجاوزت الساعة الحالية ساعة انتهاء الفترة
         return currentHour >= endHour; 
     }
 
@@ -438,7 +448,6 @@
                     let validRecords = studentAllRecords.filter(s => !s.canceled);
                     let totalAppointments = validRecords.length;
                     
-                    // استخدام المحرك الزمني هنا
                     let pastRecords = validRecords.filter(s => isPeriodPassed(s.date, s.time));
                     let upcomingRecords = validRecords.filter(s => !isPeriodPassed(s.date, s.time));
                     
@@ -483,7 +492,7 @@
         }
     }
 
-    // ----------------- التسجيل (مع تقييد رقم الهاتف) -----------------
+    // ----------------- التسجيل -----------------
     const ALL_PERIODS = ['من 12 ظهراً إلى 3 عصراً', 'من 3 عصراً إلى 6 مساءً', 'من 6 مساءً إلى 9 مساءً', 'من 8 مساءً إلى 11 مساءً'];
     const defaultSchedule = {
         0: {'من 12 ظهراً إلى 3 عصراً': true, 'من 3 عصراً إلى 6 مساءً': true, 'من 6 مساءً إلى 9 مساءً': true, 'من 8 مساءً إلى 11 مساءً': false},
@@ -832,13 +841,12 @@
         let latestName = allStudentRecords[allStudentRecords.length - 1].name;
         let studentPhone = allStudentRecords[allStudentRecords.length - 1].phone; 
         
-        // دلوقتي هنعرض كل المواعيد في التقرير (المنتهية والقادمة)
         let studentRecords = allStudentRecords; 
         let validRecords = studentRecords.filter(s => !s.canceled);
         let total = validRecords.length; 
         let attendedRecords = validRecords.filter(s => s.attended); 
         
-        // حساب الغياب بناءً على المحرك الزمني (الغياب هو اللي متسجلش حاضر + وقته عدى وانتهى)
+        // حساب الغياب الدقيق: فقط إذا لم يحضر وكانت الفترة قد انتهت فعلياً
         let absent = validRecords.filter(s => !s.attended && isPeriodPassed(s.date, s.time)).length;
         
         let lastAttended = 'لم يحضر أي موعد بعد'; 
@@ -868,7 +876,7 @@
                 if (rec.canceled) statusHTML = '<span style="color:red; font-weight:bold;">ملغي</span>';
                 else if (rec.attended) statusHTML = '<span style="color:green; font-weight:bold;">حاضر ✔</span>';
                 else { 
-                    // لو الفترة عدت وانتهت، اكتبه غائب. لو لسة، سيب المربع مفتوح للحضور
+                    // لو الفترة عدت تماماً يكتب غائب، لو لسة في نفس اليوم أو قادمة يظهر مربع التحضير
                     if (isPeriodPassed(rec.date, rec.time)) {
                         statusHTML = '<span style="color:red; font-weight:bold;">غائب ✘</span>'; 
                     } else {
