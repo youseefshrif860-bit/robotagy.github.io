@@ -9,9 +9,9 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <script>
-        // التحديث التلقائي للنسخة (v=36) - تنظيف واجهة رقم الهاتف مع بقاء حماية الـ 11 رقم
-        if (window.location.href.indexOf('?v=36') === -1) {
-            window.location.replace(window.location.href.split('?')[0] + '?v=36');
+        // التحديث التلقائي للنسخة (v=37) - إضافة المحرك الزمني لحساب الغياب بالساعة والدقيقة
+        if (window.location.href.indexOf('?v=37') === -1) {
+            window.location.replace(window.location.href.split('?')[0] + '?v=37');
         }
     </script>
 
@@ -287,7 +287,7 @@
         <div style="margin-bottom: 15px; font-size: 15px; color: black; line-height: 1.8;">
             <div>رقم الهاتف: <b id="report-phone" style="color: #3b1e5a; font-family: Tahoma;"></b></div>
             <div>إجمالي المواعيد المسجلة (الصحيحة): <b id="report-total" style="color: #3b1e5a;"></b></div>
-            <div>مرات الغياب (لم يحضر): <b id="report-absent" style="color: red;"></b></div>
+            <div>مرات الغياب (لم يحضر بعد انتهاء الموعد): <b id="report-absent" style="color: red;"></b></div>
             <div>تاريخ آخر حضور: <b id="report-last" style="color: green;"></b></div>
         </div>
         
@@ -347,6 +347,31 @@
 
     const today = new Date().toISOString().split('T')[0];
     document.querySelector('.date-input').setAttribute('min', today);
+
+    // ==========================================
+    // دالة المحرك الزمني (الجديدة) لحساب وقت الفترة بدقة
+    // ==========================================
+    function isPeriodPassed(dateStr, periodStr) {
+        if (!dateStr) return false;
+        const currentDate = new Date().toISOString().split('T')[0];
+        
+        // لو تاريخ الموعد قبل النهاردة، يبقى أكيد عدى وفات
+        if (dateStr < currentDate) return true;
+        // لو تاريخ الموعد بكرة أو بعده، يبقى أكيد لسه مجاش
+        if (dateStr > currentDate) return false;
+
+        // لو تاريخ الموعد هو "النهاردة"، نقارن الساعة
+        const currentHour = new Date().getHours(); // الساعة الحالية بنظام 24
+        let endHour = 24;
+        
+        if (periodStr === 'من 12 ظهراً إلى 3 عصراً') endHour = 15; // 3 عصراً
+        else if (periodStr === 'من 3 عصراً إلى 6 مساءً') endHour = 18; // 6 مساءً
+        else if (periodStr === 'من 6 مساءً إلى 9 مساءً') endHour = 21; // 9 مساءً
+        else if (periodStr === 'من 8 مساءً إلى 11 مساءً') endHour = 23; // 11 مساءً
+
+        // لو الساعة دلوقتي أكبر من أو تساوي ساعة انتهاء الفترة، إذن الفترة انتهت
+        return currentHour >= endHour; 
+    }
 
     // ----------------- التنقل -----------------
     function goHome() {
@@ -412,10 +437,13 @@
                     let latestName = studentAllRecords[studentAllRecords.length - 1].name;
                     let validRecords = studentAllRecords.filter(s => !s.canceled);
                     let totalAppointments = validRecords.length;
-                    let pastRecords = validRecords.filter(s => s.date < today);
-                    let upcomingRecords = validRecords.filter(s => s.date >= today);
-                    let attended = pastRecords.filter(s => s.attended).length;
-                    let absent = pastRecords.length - attended;
+                    
+                    // استخدام المحرك الزمني هنا
+                    let pastRecords = validRecords.filter(s => isPeriodPassed(s.date, s.time));
+                    let upcomingRecords = validRecords.filter(s => !isPeriodPassed(s.date, s.time));
+                    
+                    let attended = validRecords.filter(s => s.attended).length;
+                    let absent = pastRecords.filter(s => !s.attended).length;
 
                     resultsHTML += `
                         <div style="background-color: white; color: #3b1e5a; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 3px solid #fcc01a;">
@@ -423,16 +451,16 @@
                             <div style="background: #f9f9f9; padding: 12px; border-radius: 5px; margin-bottom: 15px; text-align: center; border: 1px solid #ddd;">
                                 <div style="font-size: 14px; font-weight: bold;">إجمالي مواعيدك المسجلة</div>
                                 <div style="color: #3b1e5a; font-size: 24px; font-weight: bold; margin: 5px 0;">${totalAppointments}</div>
-                                <div style="font-size: 13px; color: #555; font-weight: bold;">( <span style="color: #888;">فائتة: ${pastRecords.length}</span> &nbsp;|&nbsp; <span style="color: #fcc01a; text-shadow: 0 0 1px #000;">قادمة: ${upcomingRecords.length}</span> )</div>
+                                <div style="font-size: 13px; color: #555; font-weight: bold;">( <span style="color: #888;">منتهية: ${pastRecords.length}</span> &nbsp;|&nbsp; <span style="color: #fcc01a; text-shadow: 0 0 1px #000;">قادمة: ${upcomingRecords.length}</span> )</div>
                             </div>
-                            <h4 style="margin: 0 0 10px 0; font-size: 14px; text-align: center; color: #666;">تفاصيل المواعيد الفائتة (${pastRecords.length}):</h4>
+                            <h4 style="margin: 0 0 10px 0; font-size: 14px; text-align: center; color: #666;">تفاصيل المواعيد المنتهية (${pastRecords.length}):</h4>
                             <div style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px; font-weight: bold; font-size: 14px;">
                                 <div style="flex: 1; min-width: 45%; background: #e6ffe6; padding: 10px; border-radius: 5px; text-align: center; border: 1px solid #c3e6c3;">حضرت<br><span style="color:green; font-size:20px;">${attended}</span></div>
                                 <div style="flex: 1; min-width: 45%; background: #ffe6e6; padding: 10px; border-radius: 5px; text-align: center; border: 1px solid #e6c3c3;">غبت<br><span style="color:red; font-size:20px;">${absent}</span></div>
                             </div>
                         </div>`;
 
-                    resultsHTML += `<h4 style="color:#fcc01a; border-bottom: 1px solid #fcc01a; padding-bottom: 5px; margin-bottom:15px;">مواعيدك القادمة</h4>`;
+                    resultsHTML += `<h4 style="color:#fcc01a; border-bottom: 1px solid #fcc01a; padding-bottom: 5px; margin-bottom:15px;">مواعيدك القادمة (أو الحالية)</h4>`;
                     if (upcomingRecords.length > 0) {
                         upcomingRecords.forEach(app => {
                             resultsHTML += `
@@ -636,7 +664,6 @@
         document.getElementById('groupDataTable').style.display = 'table';
     }
 
-    // ----------------- دالة التصدير للإكسيل -----------------
     function exportGroupToExcel() {
         let groupSelect = document.getElementById('group-select').value;
         if (!groupSelect) { alert('اختر المجموعة أولاً'); return; }
@@ -680,7 +707,6 @@
         document.body.removeChild(a);
     }
 
-    // ----------------- نظام التقييم -----------------
     const LMS_COURSES = {
         'classic_control': { title: 'Classic Control', tasks: 15, exam: true },
         'plc': { title: 'PLC', tasks: 27, exam: true },
@@ -782,7 +808,6 @@
         else { titleArea.innerHTML = LMS_COURSES[courseKey].title; }
     };
 
-
     // ----------------- إظهار تفاصيل الطالب -----------------
     function handleSearch(query) {
         const container = document.getElementById('search-suggestions'); if (!query.trim()) { container.style.display = 'none'; return; }
@@ -807,10 +832,20 @@
         let latestName = allStudentRecords[allStudentRecords.length - 1].name;
         let studentPhone = allStudentRecords[allStudentRecords.length - 1].phone; 
         
-        let studentRecords = allStudentRecords.filter(s => { if (!s.date) return true; return s.date <= today; });
+        // دلوقتي هنعرض كل المواعيد في التقرير (المنتهية والقادمة)
+        let studentRecords = allStudentRecords; 
         let validRecords = studentRecords.filter(s => !s.canceled);
-        let total = validRecords.length; let attendedRecords = validRecords.filter(s => s.attended); let absent = total - attendedRecords.length;
-        let lastAttended = 'لم يحضر أي موعد بعد'; if(attendedRecords.length > 0) { attendedRecords.sort((a,b) => new Date(b.date || 0) - new Date(a.date || 0)); lastAttended = attendedRecords[0].date; }
+        let total = validRecords.length; 
+        let attendedRecords = validRecords.filter(s => s.attended); 
+        
+        // حساب الغياب بناءً على المحرك الزمني (الغياب هو اللي متسجلش حاضر + وقته عدى وانتهى)
+        let absent = validRecords.filter(s => !s.attended && isPeriodPassed(s.date, s.time)).length;
+        
+        let lastAttended = 'لم يحضر أي موعد بعد'; 
+        if(attendedRecords.length > 0) { 
+            attendedRecords.sort((a,b) => new Date(b.date || 0) - new Date(a.date || 0)); 
+            lastAttended = attendedRecords[0].date; 
+        }
         
         document.getElementById('report-name').innerText = 'تقرير الطالب: ' + latestName;
         document.getElementById('report-phone').innerText = studentPhone;
@@ -832,7 +867,14 @@
                 let statusHTML = '';
                 if (rec.canceled) statusHTML = '<span style="color:red; font-weight:bold;">ملغي</span>';
                 else if (rec.attended) statusHTML = '<span style="color:green; font-weight:bold;">حاضر ✔</span>';
-                else { if (rec.date < today) statusHTML = '<span style="color:red; font-weight:bold;">غائب ✘</span>'; else statusHTML = `<input type="checkbox" class="attendance-check" title="تحديد كحاضر" onchange="updateAttendance('${rec.id}', this.checked)">`; }
+                else { 
+                    // لو الفترة عدت وانتهت، اكتبه غائب. لو لسة، سيب المربع مفتوح للحضور
+                    if (isPeriodPassed(rec.date, rec.time)) {
+                        statusHTML = '<span style="color:red; font-weight:bold;">غائب ✘</span>'; 
+                    } else {
+                        statusHTML = `<input type="checkbox" class="attendance-check" title="تحديد كحاضر" onchange="updateAttendance('${rec.id}', this.checked)">`; 
+                    }
+                }
                 let bgStyle = rec.canceled ? "background-color: #f9f9f9; color:#999;" : "";
                 tbody.innerHTML += `<tr style="${bgStyle}"><td style="padding: 8px;">${rec.course || ''}</td><td style="padding: 8px;">${rec.date || ''}</td><td style="padding: 8px;">${rec.time || ''}</td><td style="padding: 8px;">${statusHTML}</td></tr>`;
             });
