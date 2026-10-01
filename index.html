@@ -9,9 +9,9 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <script>
-        // التحديث التلقائي للنسخة (v=38) - إصلاح دقيق لتوقيت مصر ومنع حساب الغياب قبل انتهاء الفترة
-        if (window.location.href.indexOf('?v=38') === -1) {
-            window.location.replace(window.location.href.split('?')[0] + '?v=38');
+        // التحديث التلقائي للنسخة (v=40) - الغياب الدقيق، منع الحجز المتأخر، وتعديل الفترات ديناميكياً
+        if (window.location.href.indexOf('?v=40') === -1) {
+            window.location.replace(window.location.href.split('?')[0] + '?v=40');
         }
     </script>
 
@@ -192,6 +192,7 @@
             <button class="sidebar-btn active" id="btn-nav-dates" onclick="switchDashboardView('dates')">الأيام المسجلة</button>
             <button class="sidebar-btn" id="btn-nav-groups" onclick="switchDashboardView('groups')">إدارة المجموعات</button>
             <button class="sidebar-btn" id="btn-nav-schedule" onclick="switchDashboardView('schedule')">إدارة المواعيد</button>
+            <button class="sidebar-btn" id="btn-nav-periods" onclick="switchDashboardView('periods')">تعديل الفترات</button>
             <button class="sidebar-logout" onclick="logoutAdmin()">تسجيل الخروج</button>
         </div>
 
@@ -236,7 +237,6 @@
             <div id="view-groups" class="view-section">
                 <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #fcc01a; padding-bottom: 10px; margin-bottom: 15px;">
                     <h3 style="color: white; margin: 0;">إدارة المجموعات</h3>
-                    <!-- زر التصدير للإكسيل -->
                     <button id="export-excel-btn" class="add-btn" style="width: auto; background-color: #28a745; margin: 0; display: none;" onclick="exportGroupToExcel()">تصدير للإكسيل 📊</button>
                 </div>
                 
@@ -276,6 +276,18 @@
                 </select>
                 <div id="schedule-slots-container" style="margin-top: 20px;"></div>
             </div>
+
+            <!-- قسم تعديل الفترات -->
+            <div id="view-periods" class="view-section">
+                <h3 style="color: white; border-bottom: 2px solid #fcc01a; padding-bottom: 10px; margin-top: 0;">تعديل الفترات</h3>
+                <p style="color:#ddd; font-size:13px; line-height: 1.6;">
+                    * التعديل هنا سيُطبق على أي طالب جديد بيسجل، ولكن الطلاب اللي سجلوا قبل كده هتفضل مواعيدهم القديمة محفوظة.<br>
+                    * يرجى كتابة ساعة البداية والنهاية بنظام 24 ساعة (مثال: الساعة 3 عصراً تُكتب 15، والساعة 12 بالليل تُكتب 0).
+                </p>
+                <div id="edit-periods-container" style="margin-top: 20px;"></div>
+                <button class="add-btn" style="background-color: #28a745; margin-top: 15px;" onclick="savePeriods()">حفظ التعديلات وتطبيقها</button>
+            </div>
+
         </div>
     </div>
 </div>
@@ -345,7 +357,7 @@
         return /^\d+$/.test(englishNumbers); 
     };
 
-    // دالة الحصول على تاريخ اليوم بالتوقيت المحلي للجهاز (YYYY-MM-DD)
+    // دالة الحصول على تاريخ اليوم بالتوقيت المحلي للجهاز
     function getLocalDateString() {
         const now = new Date();
         const year = now.getFullYear();
@@ -358,29 +370,61 @@
     document.querySelector('.date-input').setAttribute('min', today);
 
     // ==========================================
-    // المحرك الزمني الدقيق (إصلاح مشكلة التوقيت المحلي)
+    // إدارة الفترات الديناميكية
+    // ==========================================
+    let globalPeriods = [
+        {id: "p1", name: "من 12 ظهراً إلى 3 عصراً", start: 12, end: 15},
+        {id: "p2", name: "من 3 عصراً إلى 6 مساءً", start: 15, end: 18},
+        {id: "p3", name: "من 6 مساءً إلى 9 مساءً", start: 18, end: 21},
+        {id: "p4", name: "من 8 مساءً إلى 11 مساءً", start: 20, end: 23}
+    ];
+
+    database.ref('settings/periodsData').on('value', snap => {
+        if (snap.exists()) { globalPeriods = snap.val(); }
+        renderPeriodsEdit();
+    });
+
+    function getPeriodInfo(periodName) {
+        // البحث عن الفترة في الإعدادات الجديدة
+        let p = globalPeriods.find(x => x.name === periodName);
+        if (p) return p;
+        
+        // دعم التوافقية (Fallback) للبيانات القديمة لو تم تغيير الاسم
+        let endHour = 24, startHour = 0;
+        if (periodName.includes('3 عصراً') || periodName.includes('15')) { startHour = 12; endHour = 15; }
+        else if (periodName.includes('6 مساءً') || periodName.includes('18')) { startHour = 15; endHour = 18; }
+        else if (periodName.includes('9 مساءً') || periodName.includes('21')) { startHour = 18; endHour = 21; }
+        else if (periodName.includes('11 مساءً') || periodName.includes('23')) { startHour = 20; endHour = 23; }
+        return { name: periodName, start: startHour, end: endHour };
+    }
+
+    // ==========================================
+    // المحرك الزمني الدقيق 
     // ==========================================
     function isPeriodPassed(dateStr, periodStr) {
         if (!dateStr) return false;
         const currentLocalDate = getLocalDateString();
         
-        // إذا كان تاريخ الموعد قبل تاريخ اليوم، يعتبر منتهي قطعاً
         if (dateStr < currentLocalDate) return true;
-        // إذا كان تاريخ الموعد في يوم قادم، لسه مجاش قطعاً
         if (dateStr > currentLocalDate) return false;
 
-        // إذا كان الموعد هو اليوم الحالي: نحدد ساعة انتهاء الفترة
         const currentHour = new Date().getHours();
-        let endHour = 24;
-        
-        const p = String(periodStr || '');
-        if (p.includes('3 عصراً') || p.includes('15')) endHour = 15;
-        else if (p.includes('6 مساءً') || p.includes('18')) endHour = 18;
-        else if (p.includes('9 مساءً') || p.includes('21')) endHour = 21;
-        else if (p.includes('11 مساءً') || p.includes('23')) endHour = 23;
+        const pInfo = getPeriodInfo(periodStr);
+        // لا يعتبر منتهي إلا لو الساعة تخطت أو ساوت ساعة النهاية
+        return currentHour >= pInfo.end; 
+    }
 
-        // لا يعتبر غائب إلا إذا تجاوزت الساعة الحالية ساعة انتهاء الفترة
-        return currentHour >= endHour; 
+    function isPeriodStarted(dateStr, periodStr) {
+        if (!dateStr) return false;
+        const currentLocalDate = getLocalDateString();
+        
+        if (dateStr < currentLocalDate) return true;
+        if (dateStr > currentLocalDate) return false;
+
+        const currentHour = new Date().getHours();
+        const pInfo = getPeriodInfo(periodStr);
+        // يعتبر بدأ إذا كانت الساعة الحالية تخطت أو ساوت ساعة البداية
+        return currentHour >= pInfo.start;
     }
 
     // ----------------- التنقل -----------------
@@ -492,8 +536,7 @@
         }
     }
 
-    // ----------------- التسجيل -----------------
-    const ALL_PERIODS = ['من 12 ظهراً إلى 3 عصراً', 'من 3 عصراً إلى 6 مساءً', 'من 6 مساءً إلى 9 مساءً', 'من 8 مساءً إلى 11 مساءً'];
+    // ----------------- التسجيل والجدول -----------------
     const defaultSchedule = {
         0: {'من 12 ظهراً إلى 3 عصراً': true, 'من 3 عصراً إلى 6 مساءً': true, 'من 6 مساءً إلى 9 مساءً': true, 'من 8 مساءً إلى 11 مساءً': false},
         1: {'من 12 ظهراً إلى 3 عصراً': false, 'من 3 عصراً إلى 6 مساءً': false, 'من 6 مساءً إلى 9 مساءً': false, 'من 8 مساءً إلى 11 مساءً': true},
@@ -507,13 +550,53 @@
     database.ref('settings/schedule').on('value', (snapshot) => { if (snapshot.exists()) globalSchedule = snapshot.val(); else database.ref('settings/schedule').set(defaultSchedule); });
 
     function updateTimeOptions(element) {
-        const dateVal = element.value; const timeSelect = element.parentElement.querySelector('.time-input'); timeSelect.innerHTML = ''; 
-        if (!dateVal) return; const day = new Date(dateVal).getDay(); 
-        if (day === 5) { let o = document.createElement('option'); o.value = ''; o.text = 'المعمل مغلق الجمعة'; o.disabled = true; o.selected = true; timeSelect.appendChild(o); } else {
-            let defaultOpt = document.createElement('option'); defaultOpt.value = ''; defaultOpt.text = 'اختر الوقت'; defaultOpt.disabled = true; defaultOpt.selected = true; timeSelect.appendChild(defaultOpt);
-            let daySettings = globalSchedule[day] || defaultSchedule[day] || {}; let hasAvailable = false;
-            ALL_PERIODS.forEach(opt => { if(daySettings[opt] === true) { let o = document.createElement('option'); o.value = opt; o.text = opt; timeSelect.appendChild(o); hasAvailable = true; } });
-            if(!hasAvailable) { timeSelect.innerHTML = ''; let o = document.createElement('option'); o.value = ''; o.text = 'لا توجد مواعيد متاحة'; o.disabled = true; o.selected = true; timeSelect.appendChild(o); }
+        const dateVal = element.value; 
+        const timeSelect = element.parentElement.querySelector('.time-input'); 
+        timeSelect.innerHTML = ''; 
+        if (!dateVal) return; 
+        
+        const parts = dateVal.split('-');
+        const localDate = new Date(parts[0], parts[1] - 1, parts[2]);
+        const day = localDate.getDay(); 
+        
+        if (day === 5) { 
+            let o = document.createElement('option'); 
+            o.value = ''; o.text = 'المعمل مغلق الجمعة'; o.disabled = true; o.selected = true; 
+            timeSelect.appendChild(o); 
+        } else {
+            let defaultOpt = document.createElement('option'); 
+            defaultOpt.value = ''; defaultOpt.text = 'اختر الوقت'; defaultOpt.disabled = true; defaultOpt.selected = true; 
+            timeSelect.appendChild(defaultOpt);
+            
+            let daySettings = globalSchedule[day] || defaultSchedule[day] || {}; 
+            let hasAvailable = false;
+            
+            globalPeriods.forEach(p => { 
+                let isActive = daySettings[p.name];
+                if (isActive === undefined) isActive = true; // الافتراضي متاح لو الإعدادات مش موجودة
+                
+                if (isActive) { 
+                    let o = document.createElement('option'); 
+                    o.value = p.name; 
+                    
+                    // هنا المنع الذكي: لو الفترة بدأت، تظهر غير متاحة
+                    if (isPeriodStarted(dateVal, p.name)) {
+                        o.text = p.name + ' (بدأت بالفعل)';
+                        o.disabled = true;
+                    } else {
+                        o.text = p.name; 
+                        hasAvailable = true; 
+                    }
+                    timeSelect.appendChild(o); 
+                } 
+            });
+            
+            if(!hasAvailable) { 
+                timeSelect.innerHTML = ''; 
+                let o = document.createElement('option'); 
+                o.value = ''; o.text = 'لا توجد مواعيد متاحة حالياً'; o.disabled = true; o.selected = true; 
+                timeSelect.appendChild(o); 
+            }
         }
     }
 
@@ -547,7 +630,25 @@
         const phone = purePhoneCheck;
         const maxLimit = (course === 'Motor Drive') ? 2 : 8;
         const appointmentRows = document.querySelectorAll('.appointment-row'); let appointments = []; let hasDuplicate = false; let tempSet = new Set();
-        appointmentRows.forEach(row => { const d = row.querySelector('.date-input').value; const t = row.querySelector('.time-input').value; const key = d + '|' + t; if(tempSet.has(key)) hasDuplicate = true; tempSet.add(key); appointments.push({ date: d, time: t }); });
+        
+        // التحقق المزدوج من عدم تجاوز وقت الموعد المختار
+        let hasLateBooking = false;
+        
+        appointmentRows.forEach(row => { 
+            const d = row.querySelector('.date-input').value; 
+            const t = row.querySelector('.time-input').value; 
+            if (isPeriodStarted(d, t)) hasLateBooking = true;
+            
+            const key = d + '|' + t; 
+            if(tempSet.has(key)) hasDuplicate = true; 
+            tempSet.add(key); 
+            appointments.push({ date: d, time: t }); 
+        });
+
+        if (hasLateBooking) { 
+            showErrorModal('عفواً، لا يمكنك التسجيل في الفترة الحالية لأن وقتها قد بدأ بالفعل، يرجى اختيار فترة قادمة.'); 
+            resetBtn(); return; 
+        }
 
         if (hasDuplicate) { showErrorModal('اخترت نفس الموعد أكثر من مرة.'); resetBtn(); return; }
 
@@ -623,6 +724,49 @@
             if (select && select.value) { renderGroupStudents(select.value); }
         });
     }
+
+    // ==========================================
+    // واجهة وبرمجة تعديل الفترات للإدارة
+    // ==========================================
+    function renderPeriodsEdit() {
+        let container = document.getElementById('edit-periods-container');
+        container.innerHTML = '';
+        globalPeriods.forEach((p, idx) => {
+            container.innerHTML += `
+                <div style="background:rgba(255,255,255,0.1); padding:10px; border-radius:5px; margin-bottom:10px; border: 1px solid #fcc01a;">
+                    <label style="color:#fcc01a; font-weight:bold;">اسم الفترة ${idx + 1}:</label>
+                    <input type="text" id="edit-p-name-${idx}" value="${p.name}" placeholder="مثال: من 12 ظهراً إلى 3 عصراً">
+                    <div style="display:flex; gap:10px;">
+                        <div style="flex:1;">
+                            <label style="font-size:13px;">ساعة البداية (0-23):</label>
+                            <input type="number" id="edit-p-start-${idx}" value="${p.start}" min="0" max="23">
+                        </div>
+                        <div style="flex:1;">
+                            <label style="font-size:13px;">ساعة النهاية (0-23):</label>
+                            <input type="number" id="edit-p-end-${idx}" value="${p.end}" min="0" max="23">
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+    }
+
+    function savePeriods() {
+        if (!confirm('هل أنت متأكد من تعديل الفترات؟\nهذا التعديل سيُطبق على أي تسجيل جديد.')) return;
+        let newPeriods = [];
+        for (let i = 0; i < 4; i++) {
+            newPeriods.push({
+                id: "p" + (i + 1),
+                name: document.getElementById('edit-p-name-' + i).value,
+                start: parseInt(document.getElementById('edit-p-start-' + i).value),
+                end: parseInt(document.getElementById('edit-p-end-' + i).value)
+            });
+        }
+        database.ref('settings/periodsData').set(newPeriods)
+            .then(() => alert('تم حفظ الفترات بنجاح. الجداول ستتحدث فوراً.'))
+            .catch(e => alert(e.message));
+    }
+
 
     function updateGroupsDropdown() {
         let uniqueGroups = new Set(); allStudents.forEach(s => { if (isStrictlyNumber(s.group) && !s.canceled) { uniqueGroups.add(extractPureNumber(s.group)); } });
@@ -846,7 +990,7 @@
         let total = validRecords.length; 
         let attendedRecords = validRecords.filter(s => s.attended); 
         
-        // حساب الغياب الدقيق: فقط إذا لم يحضر وكانت الفترة قد انتهت فعلياً
+        // حساب الغياب الدقيق بناء على المحرك الزمني بعد انتهاء الفترة بالكامل
         let absent = validRecords.filter(s => !s.attended && isPeriodPassed(s.date, s.time)).length;
         
         let lastAttended = 'لم يحضر أي موعد بعد'; 
@@ -876,7 +1020,6 @@
                 if (rec.canceled) statusHTML = '<span style="color:red; font-weight:bold;">ملغي</span>';
                 else if (rec.attended) statusHTML = '<span style="color:green; font-weight:bold;">حاضر ✔</span>';
                 else { 
-                    // لو الفترة عدت تماماً يكتب غائب، لو لسة في نفس اليوم أو قادمة يظهر مربع التحضير
                     if (isPeriodPassed(rec.date, rec.time)) {
                         statusHTML = '<span style="color:red; font-weight:bold;">غائب ✘</span>'; 
                     } else {
@@ -912,13 +1055,23 @@
     function renderScheduleDay(dayVal) {
         const container = document.getElementById('schedule-slots-container'); if (!dayVal) { container.innerHTML = ''; return; }
         let daySettings = globalSchedule[dayVal] || defaultSchedule[dayVal] || {}; container.innerHTML = '';
-        ALL_PERIODS.forEach(period => {
-            let isActive = daySettings[period] === true; let btnClass = isActive ? 'btn-enable' : 'btn-inactive'; let btnText = isActive ? 'مفعل ✔' : 'موقوف ✘'; let actionBtnClass = isActive ? 'btn-disable' : 'btn-enable'; let actionBtnText = isActive ? 'إيقاف' : 'تفعيل';
+        
+        globalPeriods.forEach(p => {
+            let period = p.name;
+            let isActive = daySettings[period];
+            if(isActive === undefined) isActive = true;
+            
+            let btnClass = isActive ? 'btn-enable' : 'btn-inactive'; 
+            let btnText = isActive ? 'مفعل ✔' : 'موقوف ✘'; 
+            let actionBtnClass = isActive ? 'btn-disable' : 'btn-enable'; 
+            let actionBtnText = isActive ? 'إيقاف' : 'تفعيل';
+            
             container.innerHTML += `<div class="toggle-row"><span style="color:white; font-size: 15px;">${period}</span><div style="display:flex; gap:10px;"><span class="toggle-btn ${btnClass}" style="text-align:center;">${btnText}</span><button class="toggle-btn ${actionBtnClass}" onclick="toggleSchedulePeriod(${dayVal}, '${period}', ${!isActive})">${actionBtnText}</button></div></div>`;
         });
     }
 
     function toggleSchedulePeriod(day, period, newState) { if(confirm(`هل أنت متأكد من ${newState ? 'تفعيل' : 'إيقاف'} فترة (${period})؟`)) database.ref(`settings/schedule/${day}/${period}`).set(newState).then(() => { renderScheduleDay(day); }).catch(err => alert("خطأ: " + err)); }
+    
     function renderDatesList() {
         document.getElementById('dates-list').style.display = 'block'; document.getElementById('periods-list').style.display = 'none'; document.getElementById('period-details').style.display = 'none';
         const container = document.getElementById('dates-container'); container.innerHTML = '';
@@ -929,7 +1082,12 @@
     function renderPeriodsList(date) {
         currentSelectedDate = date; currentSelectedPeriod = null; document.getElementById('dates-list').style.display = 'none'; document.getElementById('period-details').style.display = 'none'; document.getElementById('periods-list').style.display = 'block'; document.getElementById('selected-date-title').innerText = `فترات يوم: ${date}`;
         const container = document.getElementById('periods-container'); container.innerHTML = ''; let studentsInDay = allStudents.filter(s => s.date === date); const uniquePeriods = [...new Set(studentsInDay.map(s => s.time))];
-        const timeOrder = { 'من 12 ظهراً إلى 3 عصراً': 1, 'من 3 عصراً إلى 6 مساءً': 2, 'من 6 مساءً إلى 9 مساءً': 3, 'من 8 مساءً إلى 11 مساءً': 4 }; uniquePeriods.sort((a, b) => (timeOrder[a] || 99) - (timeOrder[b] || 99));
+        
+        // الترتيب باستخدام المحرك الزمني عشان يترتبوا صح
+        uniquePeriods.sort((a, b) => {
+            let pA = getPeriodInfo(a).start; let pB = getPeriodInfo(b).start; return pA - pB;
+        });
+        
         uniquePeriods.forEach(period => { const studentsInPeriod = studentsInDay.filter(s => s.time === period).length; const btn = document.createElement('button'); btn.className = 'nav-btn'; btn.innerText = `فترة: ${period} (الطلاب: ${studentsInPeriod})`; btn.onclick = () => showPeriodDetails(date, period); container.appendChild(btn); });
     }
     function showPeriodDetails(date, period) {
