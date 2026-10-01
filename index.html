@@ -9,9 +9,9 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <script>
-        // التحديث التلقائي للنسخة (v=40) - الغياب الدقيق، منع الحجز المتأخر، وتعديل الفترات ديناميكياً
-        if (window.location.href.indexOf('?v=40') === -1) {
-            window.location.replace(window.location.href.split('?')[0] + '?v=40');
+        // التحديث التلقائي للنسخة (v=41) - إصلاح قائمة الفترات لإظهارها مقفولة بـ (بدأت بالفعل) وعدم مسحها
+        if (window.location.href.indexOf('?v=41') === -1) {
+            window.location.replace(window.location.href.split('?')[0] + '?v=41');
         }
     </script>
 
@@ -233,7 +233,7 @@
                 </div>
             </div>
 
-            <!-- إدارة المجموعات وإضافة زر الإكسيل -->
+            <!-- إدارة المجموعات -->
             <div id="view-groups" class="view-section">
                 <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #fcc01a; padding-bottom: 10px; margin-bottom: 15px;">
                     <h3 style="color: white; margin: 0;">إدارة المجموعات</h3>
@@ -262,6 +262,7 @@
                 </div>
             </div>
 
+            <!-- إدارة المواعيد -->
             <div id="view-schedule" class="view-section">
                 <h3 style="color: white; margin-top: 0; border-bottom: 2px solid #fcc01a; padding-bottom: 10px;">إدارة المواعيد</h3>
                 <label>اختر يوم الأسبوع:</label>
@@ -357,7 +358,6 @@
         return /^\d+$/.test(englishNumbers); 
     };
 
-    // دالة الحصول على تاريخ اليوم بالتوقيت المحلي للجهاز
     function getLocalDateString() {
         const now = new Date();
         const year = now.getFullYear();
@@ -385,11 +385,9 @@
     });
 
     function getPeriodInfo(periodName) {
-        // البحث عن الفترة في الإعدادات الجديدة
         let p = globalPeriods.find(x => x.name === periodName);
         if (p) return p;
         
-        // دعم التوافقية (Fallback) للبيانات القديمة لو تم تغيير الاسم
         let endHour = 24, startHour = 0;
         if (periodName.includes('3 عصراً') || periodName.includes('15')) { startHour = 12; endHour = 15; }
         else if (periodName.includes('6 مساءً') || periodName.includes('18')) { startHour = 15; endHour = 18; }
@@ -404,26 +402,20 @@
     function isPeriodPassed(dateStr, periodStr) {
         if (!dateStr) return false;
         const currentLocalDate = getLocalDateString();
-        
         if (dateStr < currentLocalDate) return true;
         if (dateStr > currentLocalDate) return false;
-
         const currentHour = new Date().getHours();
         const pInfo = getPeriodInfo(periodStr);
-        // لا يعتبر منتهي إلا لو الساعة تخطت أو ساوت ساعة النهاية
         return currentHour >= pInfo.end; 
     }
 
     function isPeriodStarted(dateStr, periodStr) {
         if (!dateStr) return false;
         const currentLocalDate = getLocalDateString();
-        
         if (dateStr < currentLocalDate) return true;
         if (dateStr > currentLocalDate) return false;
-
         const currentHour = new Date().getHours();
         const pInfo = getPeriodInfo(periodStr);
-        // يعتبر بدأ إذا كانت الساعة الحالية تخطت أو ساوت ساعة البداية
         return currentHour >= pInfo.start;
     }
 
@@ -464,10 +456,7 @@
         const rawPhone = document.getElementById('manage-phone').value;
         const mPhone = extractPureNumber(rawPhone);
         
-        if (mPhone.length !== 11) { 
-            alert('عفواً، يجب أن يتكون رقم الهاتف من 11 رقم.'); 
-            return; 
-        }
+        if (mPhone.length !== 11) { alert('عفواً، يجب أن يتكون رقم الهاتف من 11 رقم.'); return; }
 
         const mGroup = extractPureNumber(document.getElementById('manage-group').value);
         if (!mGroup) { alert('يرجى ملء رقم المجموعة للبحث'); return; }
@@ -564,34 +553,37 @@
             o.value = ''; o.text = 'المعمل مغلق الجمعة'; o.disabled = true; o.selected = true; 
             timeSelect.appendChild(o); 
         } else {
+            let daySettings = globalSchedule[day] || defaultSchedule[day] || {}; 
+            
+            // متغير للتحقق: هل الإدارة فاتحة أي فترة أصلاً في اليوم ده؟
+            let hasActiveInAdmin = false;
+            
             let defaultOpt = document.createElement('option'); 
             defaultOpt.value = ''; defaultOpt.text = 'اختر الوقت'; defaultOpt.disabled = true; defaultOpt.selected = true; 
             timeSelect.appendChild(defaultOpt);
-            
-            let daySettings = globalSchedule[day] || defaultSchedule[day] || {}; 
-            let hasAvailable = false;
             
             globalPeriods.forEach(p => { 
                 let isActive = daySettings[p.name];
                 if (isActive === undefined) isActive = true; // الافتراضي متاح لو الإعدادات مش موجودة
                 
                 if (isActive) { 
+                    hasActiveInAdmin = true;
                     let o = document.createElement('option'); 
                     o.value = p.name; 
                     
-                    // هنا المنع الذكي: لو الفترة بدأت، تظهر غير متاحة
+                    // هنا المنع الذكي: يفضل ظاهر في القائمة لكن يتقفل لو بدأ
                     if (isPeriodStarted(dateVal, p.name)) {
                         o.text = p.name + ' (بدأت بالفعل)';
                         o.disabled = true;
                     } else {
                         o.text = p.name; 
-                        hasAvailable = true; 
                     }
                     timeSelect.appendChild(o); 
                 } 
             });
             
-            if(!hasAvailable) { 
+            // لو الأدمن أصلاً لاغي كل الفترات من لوحة الإدارة
+            if(!hasActiveInAdmin) { 
                 timeSelect.innerHTML = ''; 
                 let o = document.createElement('option'); 
                 o.value = ''; o.text = 'لا توجد مواعيد متاحة حالياً'; o.disabled = true; o.selected = true; 
@@ -631,7 +623,6 @@
         const maxLimit = (course === 'Motor Drive') ? 2 : 8;
         const appointmentRows = document.querySelectorAll('.appointment-row'); let appointments = []; let hasDuplicate = false; let tempSet = new Set();
         
-        // التحقق المزدوج من عدم تجاوز وقت الموعد المختار
         let hasLateBooking = false;
         
         appointmentRows.forEach(row => { 
@@ -990,7 +981,6 @@
         let total = validRecords.length; 
         let attendedRecords = validRecords.filter(s => s.attended); 
         
-        // حساب الغياب الدقيق بناء على المحرك الزمني بعد انتهاء الفترة بالكامل
         let absent = validRecords.filter(s => !s.attended && isPeriodPassed(s.date, s.time)).length;
         
         let lastAttended = 'لم يحضر أي موعد بعد'; 
@@ -1083,7 +1073,6 @@
         currentSelectedDate = date; currentSelectedPeriod = null; document.getElementById('dates-list').style.display = 'none'; document.getElementById('period-details').style.display = 'none'; document.getElementById('periods-list').style.display = 'block'; document.getElementById('selected-date-title').innerText = `فترات يوم: ${date}`;
         const container = document.getElementById('periods-container'); container.innerHTML = ''; let studentsInDay = allStudents.filter(s => s.date === date); const uniquePeriods = [...new Set(studentsInDay.map(s => s.time))];
         
-        // الترتيب باستخدام المحرك الزمني عشان يترتبوا صح
         uniquePeriods.sort((a, b) => {
             let pA = getPeriodInfo(a).start; let pB = getPeriodInfo(b).start; return pA - pB;
         });
