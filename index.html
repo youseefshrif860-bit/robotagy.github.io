@@ -8,8 +8,8 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <script>
-        if (window.location.href.indexOf('?v=43') === -1) {
-            window.location.replace(window.location.href.split('?')[0] + '?v=43');
+        if (window.location.href.indexOf('?v=44') === -1) {
+            window.location.replace(window.location.href.split('?')[0] + '?v=44');
         }
     </script>
 
@@ -712,7 +712,7 @@
     function loadData() {
         database.ref('students').on('value', (snapshot) => {
             allStudents = []; if (snapshot.exists()) { snapshot.forEach(child => { let val = child.val(); if(val) allStudents.push({ id: child.key, ...val }); }); }
-            document.getElementById('records-counter').innerText = `إجمالي القيود: ${allStudents.length}`;
+            document.getElementById('records-counter').innerText = `إجمالي التسجيلات: ${allStudents.length}`;
             if (currentSelectedStudent) selectStudent(currentSelectedStudent);
             if (currentSelectedDate) {
                 let studentsInDay = allStudents.filter(s => s.date === currentSelectedDate);
@@ -917,15 +917,18 @@
         } else {
             validRecords.sort((a,b) => new Date(a.date || 0) - new Date(b.date || 0));
             validRecords.forEach(rec => {
-                let isChecked = rec.attended ? 'checked' : '';
-                let statusText = '';
-                if (rec.attended) statusText = '<span style="color:green; font-weight:bold;">حاضر</span>';
-                else if (isPeriodPassed(rec.date, rec.time)) statusText = '<span style="color:red; font-weight:bold;">غائب</span>';
-                else statusText = '<span style="color:#fcc01a; font-weight:bold;">قادم</span>';
-
-                let statusHTML = `<div style="display:flex; align-items:center; justify-content:center; gap:5px;"><input type="checkbox" class="attendance-check" ${isChecked} onchange="updateAttendance('${rec.id}', this.checked)"> ${statusText}</div>`;
-                
-                if (rec.canceled) statusHTML = '<span style="color:#999; font-weight:bold;">ملغي</span>';
+                let statusHTML = '';
+                if (rec.canceled) {
+                    statusHTML = '<span style="color:#999; font-weight:bold;">ملغي</span>';
+                } else if (rec.attended) {
+                    statusHTML = `<span style="color:green; font-weight:bold; cursor:pointer;" onclick="updateAttendance('${rec.id}', false)" title="إلغاء الحضور">حاضر ✔</span>`;
+                } else if (isPeriodPassed(rec.date, rec.time)) {
+                    statusHTML = `<span style="color:red; font-weight:bold; cursor:pointer;" onclick="updateAttendance('${rec.id}', true)" title="تحضير متأخر">غائب ✘</span>`;
+                } else if (!isPeriodStarted(rec.date, rec.time)) {
+                    statusHTML = '<span style="color:#fcc01a; font-weight:bold;">قادم ⏳</span>';
+                } else {
+                    statusHTML = `<input type="checkbox" class="attendance-check" onchange="updateAttendance('${rec.id}', this.checked)">`;
+                }
                 
                 let bgStyle = rec.canceled ? "background-color: #f9f9f9; color:#999;" : "";
                 tbody.innerHTML += `<tr style="${bgStyle}"><td style="padding: 8px;">${rec.course || ''}</td><td style="padding: 8px;">${rec.date || ''}</td><td style="padding: 8px;">${rec.time || ''}</td><td style="padding: 8px;">${statusHTML}</td></tr>`;
