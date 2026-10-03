@@ -8,8 +8,8 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <script>
-        if (window.location.href.indexOf('?v=44') === -1) {
-            window.location.replace(window.location.href.split('?')[0] + '?v=44');
+        if (window.location.href.indexOf('?v=45') === -1) {
+            window.location.replace(window.location.href.split('?')[0] + '?v=45');
         }
     </script>
 
@@ -921,9 +921,9 @@
                 if (rec.canceled) {
                     statusHTML = '<span style="color:#999; font-weight:bold;">ملغي</span>';
                 } else if (rec.attended) {
-                    statusHTML = `<span style="color:green; font-weight:bold; cursor:pointer;" onclick="updateAttendance('${rec.id}', false)" title="إلغاء الحضور">حاضر ✔</span>`;
+                    statusHTML = `<span style="color:green; font-weight:bold;">حاضر ✔</span>`;
                 } else if (isPeriodPassed(rec.date, rec.time)) {
-                    statusHTML = `<span style="color:red; font-weight:bold; cursor:pointer;" onclick="updateAttendance('${rec.id}', true)" title="تحضير متأخر">غائب ✘</span>`;
+                    statusHTML = `<span style="color:red; font-weight:bold;">غائب ✘</span>`;
                 } else if (!isPeriodStarted(rec.date, rec.time)) {
                     statusHTML = '<span style="color:#fcc01a; font-weight:bold;">قادم ⏳</span>';
                 } else {
