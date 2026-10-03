@@ -8,8 +8,8 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <script>
-        if (window.location.href.indexOf('?v=46') === -1) {
-            window.location.replace(window.location.href.split('?')[0] + '?v=46');
+        if (window.location.href.indexOf('?v=48') === -1) {
+            window.location.replace(window.location.href.split('?')[0] + '?v=48');
         }
     </script>
 
@@ -66,9 +66,10 @@
         .course-accordion:hover, .course-accordion.active { background-color: #e6e6e6; border-color: #fcc01a; }
         .course-panel { padding: 15px; display: none; background-color: white; border: 1px solid #ddd; border-top: none; border-radius: 0 0 5px 5px; }
         .tasks-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 10px; }
-        .task-item { display: flex; align-items: center; gap: 5px; font-size: 13px; font-family: Tahoma; }
-        .exam-item { display: flex; align-items: center; gap: 5px; font-size: 14px; font-weight: bold; color: #cc0000; margin-top: 15px; border-top: 1px dashed #ddd; padding-top: 10px; }
-        .exam-item input { margin: 0; width: 18px; height: 18px; cursor: pointer; accent-color: #cc0000; }
+        .task-item { display: flex; align-items: center; gap: 5px; font-size: 13px; font-family: Tahoma; padding: 5px; border-radius: 4px; transition: 0.2s; }
+        .task-item:hover { background-color: #f0f0f0; }
+        .exam-item { display: flex; align-items: center; gap: 5px; font-size: 14px; font-weight: bold; margin-top: 15px; border-top: 1px dashed #ddd; padding-top: 10px; padding-bottom: 5px; border-radius: 4px; transition: 0.2s; }
+        .exam-item:hover { background-color: #f0f0f0; }
         .progress-container { width: 100%; background-color: #ddd; border-radius: 5px; margin-top: 5px; height: 8px; overflow: hidden; }
         .progress-bar { height: 100%; background-color: #28a745; width: 0%; transition: width 0.4s ease; }
         .course-title-area { display: flex; flex-direction: column; width: 100%; }
@@ -704,8 +705,18 @@
     function calculateProgressDynamic(courseKey, completedTasksSet, studentProgressData) {
         let limits = LMS_COURSES[courseKey] || { tasks: 0, exam: false };
         let totalItems = limits.tasks + (limits.exam ? 1 : 0);
-        let completed = completedTasksSet[courseKey] ? completedTasksSet[courseKey].size : 0;
-        if (limits.exam && studentProgressData && studentProgressData[courseKey] && studentProgressData[courseKey]['exam']) completed++;
+        let completed = 0;
+
+        for (let i = 1; i <= limits.tasks; i++) {
+            let tName = `Task ${i}`;
+            let inSession = completedTasksSet[courseKey] && completedTasksSet[courseKey].has(tName);
+            let inManual = studentProgressData && studentProgressData[courseKey] && studentProgressData[courseKey][`task_${i}`];
+            if (inSession || inManual) completed++;
+        }
+
+        let examInManual = studentProgressData && studentProgressData[courseKey] && studentProgressData[courseKey]['exam'];
+        if (limits.exam && examInManual) completed++;
+
         return { completed, totalItems, percentage: totalItems === 0 ? 0 : (completed / totalItems) * 100 };
     }
 
@@ -748,7 +759,26 @@
         if (panel.style.display === "block") { panel.style.display = "none"; btn.classList.remove('active'); } else { panel.style.display = "block"; btn.classList.add('active'); }
     }
 
-    async function updateTask(phone, courseKey, taskKey, isChecked) { try { await database.ref(`student_progress/${phone}/${courseKey}/${taskKey}`).set(isChecked); } catch (err) { alert('خطأ: ' + err.message); } }
+    window.toggleLegacyTask = async function(phone, courseKey, taskKey, currentState) {
+        let newState = !currentState;
+        try {
+            await database.ref(`student_progress/${phone}/${courseKey}/${taskKey}`).set(newState);
+            selectStudent(phone);
+        } catch (err) { alert('خطأ في التحديث: ' + err.message); }
+    };
+
+    window.toggleAllTasks = async function(phone, courseKey, isChecked) {
+        let limits = LMS_COURSES[courseKey];
+        if(!limits) return;
+        let updates = {};
+        for(let i=1; i<=limits.tasks; i++) { updates[`task_${i}`] = isChecked; }
+        if(limits.exam) updates['exam'] = isChecked;
+        
+        try {
+            await database.ref(`student_progress/${phone}/${courseKey}`).update(updates);
+            selectStudent(phone);
+        } catch(e) { alert('خطأ: ' + e.message); }
+    };
 
     function buildLMSUI(phone, completedTasksSet, studentProgressData) {
         let container = document.getElementById('lms-container'); container.innerHTML = '';
@@ -757,41 +787,45 @@
             const isCompleted = progress.percentage === 100 && progress.totalItems > 0;
             const checkMark = isCompleted ? '<span style="color: #28a745; font-size: 18px;">✅</span>' : '';
             
+            let selectAllHtml = `<input type="checkbox" style="margin-left: 10px; cursor: pointer; accent-color: #28a745; width: 16px; height: 16px;" ${isCompleted ? 'checked' : ''} onclick="event.stopPropagation()" onchange="toggleAllTasks('${phone}', '${courseKey}', this.checked)" title="تحديد/إلغاء كل الـ Tasks">`;
+
             let accBtn = document.createElement('div'); accBtn.className = 'course-accordion'; accBtn.id = `btn-${courseKey}`; accBtn.onclick = () => toggleAccordion(`btn-${courseKey}`, `panel-${courseKey}`);
-            accBtn.innerHTML = `<div class="course-title-area"><div style="display:flex; justify-content:space-between;"><span>${courseInfo.title} ${checkMark}</span><span style="font-size:12px; color:#666;" id="text-prog-${courseKey}">${progress.completed} / ${progress.totalItems}</span></div><div class="progress-container"><div class="progress-bar" id="bar-prog-${courseKey}" style="width: ${progress.percentage}%;"></div></div></div>`;
+            
+            accBtn.innerHTML = `
+                <div class="course-title-area">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <div style="display:flex; align-items:center;">
+                            ${selectAllHtml}
+                            <span style="margin-right:5px;">${courseInfo.title} ${checkMark}</span>
+                        </div>
+                        <span style="font-size:12px; color:#666;" id="text-prog-${courseKey}">${progress.completed} / ${progress.totalItems}</span>
+                    </div>
+                    <div class="progress-container"><div class="progress-bar" id="bar-prog-${courseKey}" style="width: ${progress.percentage}%;"></div></div>
+                </div>
+            `;
             
             let panel = document.createElement('div'); panel.className = 'course-panel'; panel.id = `panel-${courseKey}`;
             let tasksGrid = document.createElement('div'); tasksGrid.className = 'tasks-grid';
             
             for (let i = 1; i <= courseInfo.tasks; i++) {
                 let taskName = `Task ${i}`;
-                let isTaskCompleted = completedTasksSet[courseKey] && completedTasksSet[courseKey].has(taskName);
+                let inSession = completedTasksSet[courseKey] && completedTasksSet[courseKey].has(taskName);
+                let inManual = studentProgressData && studentProgressData[courseKey] && studentProgressData[courseKey][`task_${i}`];
+                let isTaskCompleted = inSession || inManual;
+                
                 let icon = isTaskCompleted ? '✅' : '⏳'; let color = isTaskCompleted ? '#28a745' : '#999';
-                tasksGrid.innerHTML += `<div class="task-item" style="color:${color};"><span style="font-size:12px;">${icon}</span> ${taskName}</div>`;
+                tasksGrid.innerHTML += `<div class="task-item" style="color:${color}; cursor:pointer;" onclick="toggleLegacyTask('${phone}', '${courseKey}', 'task_${i}', ${!!isTaskCompleted})" title="تعديل يدوي"><span style="font-size:12px;">${icon}</span> ${taskName}</div>`;
             }
             panel.appendChild(tasksGrid);
 
             if (courseInfo.exam) {
-                let isExamChecked = (studentProgressData && studentProgressData[courseKey] && studentProgressData[courseKey]['exam']) ? 'checked' : '';
-                panel.innerHTML += `<label class="exam-item" style="cursor:pointer;"><input type="checkbox" ${isExamChecked} onchange="handleTaskChange('${phone}', '${courseKey}', 'exam', this.checked)"> Final Exam</label>`;
+                let isExamCompleted = (studentProgressData && studentProgressData[courseKey] && studentProgressData[courseKey]['exam']);
+                let eIcon = isExamCompleted ? '✅' : '⏳'; let eColor = isExamCompleted ? '#cc0000' : '#999';
+                panel.innerHTML += `<div class="exam-item" style="cursor:pointer; color:${eColor};" onclick="toggleLegacyTask('${phone}', '${courseKey}', 'exam', ${!!isExamCompleted})" title="تعديل يدوي"><span style="font-size:12px;">${eIcon}</span> Final Exam</div>`;
             }
             container.appendChild(accBtn); container.appendChild(panel);
         });
     }
-
-    window.handleTaskChange = async function(phone, courseKey, taskKey, isChecked) {
-        await updateTask(phone, courseKey, taskKey, isChecked); 
-        const snap = await database.ref('student_progress/' + phone).get(); const studentProgressData = snap.exists() ? snap.val() : {};
-        
-        let studentRecords = allStudents.filter(s => normalizePhone(s.phone) === phone && !s.canceled && s.attended && s.tasks);
-        let cTasks = { classic_control: new Set(), plc: new Set(), motor_drive: new Set() };
-        studentRecords.forEach(r => { let cKey = r.course === 'Classic Control' ? 'classic_control' : (r.course === 'PLC' ? 'plc' : 'motor_drive'); r.tasks.split('|').forEach(t => { if(t.trim()) cTasks[cKey].add(t.trim()); }); });
-
-        const progress = calculateProgressDynamic(courseKey, cTasks, studentProgressData);
-        document.getElementById(`bar-prog-${courseKey}`).style.width = `${progress.percentage}%`; document.getElementById(`text-prog-${courseKey}`).innerText = `${progress.completed} / ${progress.totalItems}`;
-        let titleArea = document.querySelector(`#btn-${courseKey} .course-title-area div:first-child span:first-child`);
-        if (progress.percentage === 100 && progress.totalItems > 0) { titleArea.innerHTML = `${LMS_COURSES[courseKey].title} <span style="color: #28a745; font-size: 18px;">✅</span>`; } else { titleArea.innerHTML = LMS_COURSES[courseKey].title; }
-    };
 
     function handleSearch(query) {
         const container = document.getElementById('search-suggestions'); if (!query.trim()) { container.style.display = 'none'; return; }
