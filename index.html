@@ -8,8 +8,8 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <script>
-        if (window.location.href.indexOf('?v=50') === -1) {
-            window.location.replace(window.location.href.split('?')[0] + '?v=50');
+        if (window.location.href.indexOf('?v=51') === -1) {
+            window.location.replace(window.location.href.split('?')[0] + '?v=51');
         }
     </script>
 
@@ -910,7 +910,8 @@
             });
         }
 
-        const progSnap = await database.ref('student_progress/' + normalizePhone(studentPhone)).get(); const studentProgressData = progSnap.exists() ? snap.val() : {};
+        const progSnap = await database.ref('student_progress/' + normalizePhone(studentPhone)).get(); 
+        const studentProgressData = progSnap.exists() ? progSnap.val() : {};
         buildLMSUI(normalizePhone(studentPhone), cTasks, studentProgressData); document.getElementById('report-modal').style.display = 'flex';
     }
 
