@@ -8,8 +8,8 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <script>
-        if (window.location.href.indexOf('?v=42') === -1) {
-            window.location.replace(window.location.href.split('?')[0] + '?v=42');
+        if (window.location.href.indexOf('?v=43') === -1) {
+            window.location.replace(window.location.href.split('?')[0] + '?v=43');
         }
     </script>
 
@@ -75,7 +75,7 @@
         .course-title-area { display: flex; flex-direction: column; width: 100%; }
 
         .manual-add-box { background: rgba(255,255,255,0.05); padding: 15px; border-radius: 5px; border: 1px solid #fcc01a; margin-bottom: 20px; }
-        .manual-add-box input, .manual-add-box select { margin-bottom: 10px; }
+        .manual-add-box input { margin-bottom: 10px; }
         
         .settings-card { background: rgba(255,255,255,0.05); padding: 15px; border-radius: 5px; border: 1px solid #ddd; margin-bottom: 15px; }
         .settings-card h4 { color: #fcc01a; margin-top: 0; border-bottom: 1px solid #ddd; padding-bottom: 5px; }
@@ -236,11 +236,6 @@
                         <input type="text" id="manual-name" placeholder="اسم الطالب" style="flex: 1; min-width: 150px;">
                         <input type="tel" id="manual-phone" placeholder="رقم الهاتف" style="flex: 1; min-width: 120px;">
                         <input type="text" id="manual-group" placeholder="المجموعة" style="flex: 1; min-width: 80px;">
-                        <select id="manual-course" style="flex: 1; min-width: 120px;">
-                            <option value="PLC">PLC</option>
-                            <option value="Classic Control">Classic Control</option>
-                            <option value="Motor Drive">Motor Drive</option>
-                        </select>
                         <button class="add-btn" style="flex: 1; min-width: 100px; margin:0;" onclick="manualAddStudent()">حفظ الطالب</button>
                     </div>
                 </div>
@@ -312,10 +307,23 @@
         <strong style="color: #3b1e5a; display: block; margin-bottom: 15px; font-size: 18px; border-bottom: 2px solid #fcc01a; padding-bottom: 5px;" id="report-name"></strong>
         <div style="margin-bottom: 15px; font-size: 15px; color: black; line-height: 1.8;">
             <div>رقم الهاتف: <b id="report-phone" style="color: #3b1e5a; font-family: Tahoma;"></b></div>
-            <div>تاريخ السجل: <b id="report-last" style="color: green;"></b></div>
+            <div>إجمالي المواعيد المسجلة: <b id="report-total" style="color: #3b1e5a;"></b></div>
+            <div>مرات الغياب: <b id="report-absent" style="color: red;"></b></div>
+            <div>تاريخ آخر حضور: <b id="report-last" style="color: green;"></b></div>
         </div>
         
-        <strong style="color: #000; display: block; margin-bottom: 10px; font-size: 14px;">السجل الأكاديمي:</strong>
+        <strong style="color: #000; display: block; margin-bottom: 10px; font-size: 14px;">سجل المواعيد:</strong>
+        <div style="overflow-x: auto; max-height: 200px; border: 1px solid #ddd; border-radius: 5px; margin-bottom: 15px;">
+            <table style="width: 100%; font-size: 13px; margin-top: 0; border-radius: 0;">
+                <thead>
+                    <tr><th style="padding: 8px;">الكورس</th><th style="padding: 8px;">التاريخ</th><th style="padding: 8px;">الوقت</th><th style="padding: 8px;">الحالة</th></tr>
+                </thead>
+                <tbody id="report-tbody"></tbody>
+            </table>
+        </div>
+
+        <!-- قسم التقييم ومتابعة المهام -->
+        <strong style="color: #000; display: block; margin-bottom: 10px; font-size: 14px; border-top: 2px solid #ddd; padding-top: 10px;">التقييم الأكاديمي:</strong>
         <div id="lms-container" style="margin-bottom: 15px;"></div>
         
         <button id="block-btn" style="width: 100%; padding: 12px; margin-bottom: 10px; font-size: 15px; color: white; border: none; border-radius: 5px; font-weight: bold; cursor: pointer;"></button>
@@ -599,10 +607,13 @@
                 if (isActive) { 
                     hasActiveInAdmin = true;
                     let o = document.createElement('option'); 
-                    o.value = p.name; o.text = p.name;
+                    o.value = p.name; 
                     
                     if (isLateBookingBlocked && isPeriodStarted(dateVal, p.name)) {
+                        o.text = p.name + ' (بدأت)';
                         o.disabled = true;
+                    } else {
+                        o.text = p.name;
                     }
                     timeSelect.appendChild(o); 
                 } 
@@ -758,11 +769,10 @@
         let name = document.getElementById('manual-name').value;
         let phone = extractPureNumber(document.getElementById('manual-phone').value);
         let group = document.getElementById('manual-group').value;
-        let course = document.getElementById('manual-course').value;
 
-        if(!name || phone.length !== 11 || !group || !course) { alert("يرجى استكمال البيانات (الاسم، الهاتف 11 رقم، المجموعة، الكورس)."); return; }
+        if(!name || phone.length !== 11 || !group) { alert("يرجى استكمال البيانات (الاسم، الهاتف 11 رقم، المجموعة)."); return; }
         
-        const record = { name, phone, group, course, date: "بدون موعد", time: "بدون موعد", attended: false, canceled: false, timestamp: new Date().toLocaleString() };
+        const record = { name, phone, group, course: "غير محدد", date: "بدون موعد", time: "بدون موعد", attended: false, canceled: false, timestamp: new Date().toLocaleString() };
         database.ref('students').push(record).then(() => {
             alert('تم إدراج الطالب بالنظام.');
             document.getElementById('manual-name').value = ''; document.getElementById('manual-phone').value = ''; document.getElementById('manual-group').value = '';
@@ -808,7 +818,6 @@
         let groupSelect = document.getElementById('group-select').value; if (!groupSelect) return;
         let cloneTable = document.getElementById("groupDataTable").cloneNode(true); cloneTable.setAttribute('border', '1'); cloneTable.style.borderCollapse = 'collapse'; cloneTable.style.textAlign = 'center'; cloneTable.style.direction = 'rtl';
         cloneTable.querySelectorAll('th').forEach(th => { th.style.backgroundColor = '#fcc01a'; th.style.color = '#3b1e5a'; th.style.padding = '10px'; }); cloneTable.querySelectorAll('td').forEach(td => { td.style.padding = '8px'; });
-        // remove action column
         cloneTable.querySelectorAll('tr').forEach(tr => tr.removeChild(tr.lastElementChild));
         let blob = new Blob(['\ufeff', `<html dir="rtl" lang="ar"><head><meta charset="UTF-8"></head><body><h2 style="text-align: center; color: #3b1e5a; font-family: Tahoma;">بيانات مجموعة: ${groupSelect} - معمل روبوتاجي</h2>${cloneTable.outerHTML}</body></html>`], { type: 'application/vnd.ms-excel' });
         let url = URL.createObjectURL(blob); let a = document.createElement('a'); a.href = url; a.download = `مجموعة_${groupSelect}_روبوتاجي.xls`; document.body.appendChild(a); a.click(); document.body.removeChild(a);
@@ -889,12 +898,39 @@
         let lastAttended = 'لا يوجد حضور'; let attendedRecords = validRecords.filter(s => s.attended); 
         if(attendedRecords.length > 0) { attendedRecords.sort((a,b) => new Date(b.date || 0) - new Date(a.date || 0)); lastAttended = attendedRecords[0].date; }
         
-        document.getElementById('report-name').innerText = 'السجل الأكاديمي: ' + latestName; document.getElementById('report-phone').innerText = studentPhone; document.getElementById('report-last').innerText = lastAttended;
+        let absent = validRecords.filter(s => !s.attended && isPeriodPassed(s.date, s.time)).length;
+
+        document.getElementById('report-name').innerText = 'السجل الأكاديمي: ' + latestName; 
+        document.getElementById('report-phone').innerText = studentPhone; 
+        document.getElementById('report-last').innerText = lastAttended;
+        document.getElementById('report-total').innerText = validRecords.length;
+        document.getElementById('report-absent').innerText = absent;
         
         let isBlocked = blockedPhonesList.some(b => normalizePhone(b.phone) === normalizePhone(studentPhone));
         let blockBtn = document.getElementById('block-btn');
         if (isBlocked) { blockBtn.innerText = "رفع القيد"; blockBtn.style.backgroundColor = "#28a745"; blockBtn.onclick = () => toggleBlockStudent(studentPhone, latestName, true); } 
         else { blockBtn.innerText = "تقييد الطالب (منع تسجيل)"; blockBtn.style.backgroundColor = "#ff4d4d"; blockBtn.onclick = () => toggleBlockStudent(studentPhone, latestName, false); }
+
+        let tbody = document.getElementById('report-tbody'); tbody.innerHTML = '';
+        if (validRecords.length === 0) { 
+            tbody.innerHTML = `<tr><td colspan="4" style="padding: 10px; color: red; text-align: center; font-weight: bold;">لا توجد مواعيد مسجلة</td></tr>`; 
+        } else {
+            validRecords.sort((a,b) => new Date(a.date || 0) - new Date(b.date || 0));
+            validRecords.forEach(rec => {
+                let isChecked = rec.attended ? 'checked' : '';
+                let statusText = '';
+                if (rec.attended) statusText = '<span style="color:green; font-weight:bold;">حاضر</span>';
+                else if (isPeriodPassed(rec.date, rec.time)) statusText = '<span style="color:red; font-weight:bold;">غائب</span>';
+                else statusText = '<span style="color:#fcc01a; font-weight:bold;">قادم</span>';
+
+                let statusHTML = `<div style="display:flex; align-items:center; justify-content:center; gap:5px;"><input type="checkbox" class="attendance-check" ${isChecked} onchange="updateAttendance('${rec.id}', this.checked)"> ${statusText}</div>`;
+                
+                if (rec.canceled) statusHTML = '<span style="color:#999; font-weight:bold;">ملغي</span>';
+                
+                let bgStyle = rec.canceled ? "background-color: #f9f9f9; color:#999;" : "";
+                tbody.innerHTML += `<tr style="${bgStyle}"><td style="padding: 8px;">${rec.course || ''}</td><td style="padding: 8px;">${rec.date || ''}</td><td style="padding: 8px;">${rec.time || ''}</td><td style="padding: 8px;">${statusHTML}</td></tr>`;
+            });
+        }
 
         const progSnap = await database.ref('student_progress/' + normalizePhone(studentPhone)).get(); const studentProgressData = progSnap.exists() ? progSnap.val() : {};
         buildLMSUI(normalizePhone(studentPhone), studentProgressData); document.getElementById('report-modal').style.display = 'flex';
@@ -947,7 +983,6 @@
         filteredStudents.forEach(row => {
             let isCanceled = row.canceled === true; let bgStyle = isCanceled ? 'background-color: #f1f1f1; color: #a9a9a9;' : ''; 
             
-            // مرونة الحضور: Checkbox تفاعلي دائماً للتحكم بالتعديل
             let isChecked = row.attended ? 'checked' : '';
             let statusHTML = `<input type="checkbox" class="attendance-check" ${isChecked} onchange="updateAttendance('${row.id}', this.checked)">`;
             if (isCanceled) statusHTML = '<span style="color:red; font-weight:bold;">ملغي</span>';
