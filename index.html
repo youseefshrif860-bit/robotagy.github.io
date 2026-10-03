@@ -8,8 +8,8 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <script>
-        if (window.location.href.indexOf('?v=54') === -1) {
-            window.location.replace(window.location.href.split('?')[0] + '?v=54');
+        if (window.location.href.indexOf('?v=55') === -1) {
+            window.location.replace(window.location.href.split('?')[0] + '?v=55');
         }
     </script>
 
@@ -255,7 +255,12 @@
                 <select id="group-select" onchange="renderGroupStudents(this.value)">
                     <option value="" disabled selected>اختر المجموعة</option>
                 </select>
-                <h4 id="group-total-count" style="color: #fcc01a; display: none;"></h4>
+                
+                <!-- زر حذف المجموعة وعدد الطلاب -->
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; margin-top: 10px;">
+                    <h4 id="group-total-count" style="color: #fcc01a; display: none; margin: 0;"></h4>
+                    <button id="delete-group-btn" class="delete-btn" style="display: none; padding: 8px 15px; margin: 0;" onclick="deleteCurrentGroup()">حذف المجموعة بالكامل</button>
+                </div>
                 
                 <div style="overflow-x: auto;">
                     <table id="groupDataTable" style="display: none; min-width: 600px;">
@@ -331,16 +336,15 @@
             
             <!-- زر قائمة الإعدادات العلوية اليسرى -->
             <div style="position:relative;">
-                <button onclick="toggleExtraSettings()" style="background: none; border: none; font-size: 26px; cursor: pointer;" title="ملاحظات وتسليم الأسلاك">⚙️</button>
+                <button onclick="toggleExtraSettings()" style="background: none; border: none; font-size: 26px; cursor: pointer;" title="ملاحظات وتسليم الأسلاك">⚙️️</button>
                 
                 <div id="extra-settings-panel" style="display: none; position: absolute; left: 0; top: 40px; background: white; border: 2px solid #fcc01a; border-radius: 8px; padding: 15px; width: 260px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); z-index: 1000; text-align:right;">
                     <!-- تسليم الأسلاك -->
                     <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #ddd; padding-bottom: 10px; margin-bottom: 10px;">
                         <strong style="font-size: 14px; color: #3b1e5a;">Wires:</strong>
-                        <label style="display: flex; align-items: center; cursor: pointer;">
-                            <span id="wire-status-text" style="font-weight: bold; color: #28a745; font-size: 13px; margin-left: 8px;"></span>
-                            <input type="checkbox" id="wire-checkbox" style="width: 18px; height: 18px; accent-color: #28a745; margin: 0;">
-                        </label>
+                        <div id="wire-wrapper" style="display: flex; align-items: center; justify-content: flex-end; min-width: 40px;">
+                            <!-- Dynamically populated via JS -->
+                        </div>
                     </div>
                     
                     <!-- سجل الملاحظات -->
@@ -761,8 +765,20 @@
         let uniqueStudents = Array.from(phoneMap.values());
         
         let excelBtn = document.getElementById('export-excel-btn');
-        if (uniqueStudents.length > 0) { excelBtn.style.display = 'block'; document.getElementById('group-total-count').style.display = 'block'; document.getElementById('group-total-count').innerText = `إجمالي عدد الطلاب: ${uniqueStudents.length}`; } 
-        else { excelBtn.style.display = 'none'; document.getElementById('group-total-count').style.display = 'none'; }
+        let deleteBtn = document.getElementById('delete-group-btn');
+        let countEl = document.getElementById('group-total-count');
+
+        if (uniqueStudents.length > 0) { 
+            excelBtn.style.display = 'block'; 
+            countEl.style.display = 'block'; 
+            countEl.innerText = `إجمالي عدد الطلاب: ${uniqueStudents.length}`; 
+            deleteBtn.style.display = 'block';
+        } 
+        else { 
+            excelBtn.style.display = 'none'; 
+            countEl.style.display = 'none'; 
+            deleteBtn.style.display = 'none';
+        }
         
         let tbody = document.querySelector('#groupDataTable tbody'); tbody.innerHTML = '';
         uniqueStudents.forEach(st => { 
@@ -778,6 +794,28 @@
         });
         document.getElementById('groupDataTable').style.display = 'table';
     }
+
+    window.deleteCurrentGroup = async function() {
+        let groupSelect = document.getElementById('group-select').value;
+        if (!groupSelect) return;
+
+        if(confirm(`تحذير خطير: هل أنت متأكد من حذف المجموعة [ ${groupSelect} ] بكافة طلابها نهائياً؟ هذا الإجراء لا يمكن التراجع عنه!`)) {
+            let updates = {};
+            allStudents.forEach(s => {
+                if (isStrictlyNumber(s.group) && extractPureNumber(s.group) === groupSelect) {
+                    updates[s.id] = null;
+                }
+            });
+            try {
+                await database.ref('students').update(updates);
+                alert('تم حذف المجموعة بالكامل بنجاح.');
+                document.getElementById('group-select').value = "";
+                renderGroupStudents("");
+            } catch(e) {
+                alert('خطأ: ' + e.message);
+            }
+        }
+    };
 
     function exportGroupToExcel() {
         let groupSelect = document.getElementById('group-select').value; if (!groupSelect) return;
@@ -826,11 +864,25 @@
         } catch(e) { alert('خطأ: ' + e.message); }
     };
 
+    window.renderWireStatus = function(phone, isReceived) {
+        let wrapper = document.getElementById('wire-wrapper');
+        if (isReceived) {
+            wrapper.innerHTML = `<span style="font-weight: bold; color: #28a745; font-size: 14px; cursor: pointer;" onclick="promptWireChange('${phone}', false)" title="إلغاء التسليم">Done</span>`;
+        } else {
+            wrapper.innerHTML = `<input type="checkbox" style="width: 18px; height: 18px; accent-color: #28a745; margin: 0; cursor: pointer;" onchange="handleWireChange('${phone}', true)">`;
+        }
+    }
+
+    window.promptWireChange = function(phone, isChecked) {
+        if (confirm("هل أنت متأكد من تغيير حالة تسليم الأسلاك (إلغاء التسليم)؟")) {
+            handleWireChange(phone, isChecked);
+        }
+    };
+
     window.handleWireChange = async function(phone, isChecked) {
         try {
             await database.ref(`student_progress/${phone}/wire_received`).set(isChecked);
-            let wireText = document.getElementById('wire-status-text');
-            wireText.innerText = isChecked ? 'Done' : '';
+            renderWireStatus(phone, isChecked);
         } catch (err) { alert('خطأ: ' + err.message); }
     };
 
@@ -1004,13 +1056,7 @@
         const studentProgressData = progSnap.exists() ? progSnap.val() : {};
 
         let isWireReceived = studentProgressData.wire_received || false;
-        let wireCheckbox = document.getElementById('wire-checkbox');
-        let wireText = document.getElementById('wire-status-text');
-        
-        wireCheckbox.checked = isWireReceived;
-        wireText.innerText = isWireReceived ? 'Done' : '';
-        wireCheckbox.onchange = (e) => handleWireChange(normalizePhone(studentPhone), e.target.checked);
-
+        renderWireStatus(normalizePhone(studentPhone), isWireReceived);
         renderNotesList(studentProgressData.notesLog || {});
 
         buildLMSUI(normalizePhone(studentPhone), cTasks, studentProgressData); 
