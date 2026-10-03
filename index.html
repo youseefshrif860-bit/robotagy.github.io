@@ -8,8 +8,8 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <script>
-        if (window.location.href.indexOf('?v=48') === -1) {
-            window.location.replace(window.location.href.split('?')[0] + '?v=48');
+        if (window.location.href.indexOf('?v=50') === -1) {
+            window.location.replace(window.location.href.split('?')[0] + '?v=50');
         }
     </script>
 
@@ -370,6 +370,8 @@
     const today = getLocalDateString();
     document.querySelector('.date-input').setAttribute('min', today);
 
+    let openCoursePanels = new Set();
+
     // ==========================================
     // إعدادات النظام 
     // ==========================================
@@ -450,10 +452,10 @@
         let p = globalPeriods.find(x => x.name === periodName);
         if (p) return p;
         let endHour = 24, startHour = 0;
-        if (periodName.includes('3') && periodName.includes('عصراً')) { startHour = 12; endHour = 15; }
-        else if (periodName.includes('6') && periodName.includes('مساءً')) { startHour = 15; endHour = 18; }
-        else if (periodName.includes('9') && periodName.includes('مساءً')) { startHour = 18; endHour = 21; }
-        else if (periodName.includes('11') && periodName.includes('مساءً')) { startHour = 20; endHour = 23; }
+        if (periodName.includes('12')) { startHour = 12; endHour = 15; }
+        else if (periodName.includes('3') && periodName.includes('6')) { startHour = 15; endHour = 18; }
+        else if (periodName.includes('6') && periodName.includes('9')) { startHour = 18; endHour = 21; }
+        else if (periodName.includes('8') && periodName.includes('11')) { startHour = 20; endHour = 23; }
         return { name: periodName, start: startHour, end: endHour };
     }
 
@@ -714,8 +716,9 @@
             if (inSession || inManual) completed++;
         }
 
+        let examInSession = completedTasksSet[courseKey] && completedTasksSet[courseKey].has("Final Exam");
         let examInManual = studentProgressData && studentProgressData[courseKey] && studentProgressData[courseKey]['exam'];
-        if (limits.exam && examInManual) completed++;
+        if (limits.exam && (examInManual || examInSession)) completed++;
 
         return { completed, totalItems, percentage: totalItems === 0 ? 0 : (completed / totalItems) * 100 };
     }
@@ -756,7 +759,14 @@
 
     function toggleAccordion(btnId, panelId) {
         let btn = document.getElementById(btnId); let panel = document.getElementById(panelId);
-        if (panel.style.display === "block") { panel.style.display = "none"; btn.classList.remove('active'); } else { panel.style.display = "block"; btn.classList.add('active'); }
+        let courseKey = btnId.replace('btn-', '');
+        if (panel.style.display === "block") { 
+            panel.style.display = "none"; btn.classList.remove('active'); 
+            openCoursePanels.delete(courseKey);
+        } else { 
+            panel.style.display = "block"; btn.classList.add('active'); 
+            openCoursePanels.add(courseKey);
+        }
     }
 
     window.toggleLegacyTask = async function(phone, courseKey, taskKey, currentState) {
@@ -789,7 +799,11 @@
             
             let selectAllHtml = `<input type="checkbox" style="margin-left: 10px; cursor: pointer; accent-color: #28a745; width: 16px; height: 16px;" ${isCompleted ? 'checked' : ''} onclick="event.stopPropagation()" onchange="toggleAllTasks('${phone}', '${courseKey}', this.checked)" title="تحديد/إلغاء كل الـ Tasks">`;
 
-            let accBtn = document.createElement('div'); accBtn.className = 'course-accordion'; accBtn.id = `btn-${courseKey}`; accBtn.onclick = () => toggleAccordion(`btn-${courseKey}`, `panel-${courseKey}`);
+            let isOpen = openCoursePanels.has(courseKey);
+            let btnClass = isOpen ? 'course-accordion active' : 'course-accordion';
+            let panelDisplay = isOpen ? 'block' : 'none';
+
+            let accBtn = document.createElement('div'); accBtn.className = btnClass; accBtn.id = `btn-${courseKey}`; accBtn.onclick = () => toggleAccordion(`btn-${courseKey}`, `panel-${courseKey}`);
             
             accBtn.innerHTML = `
                 <div class="course-title-area">
@@ -804,7 +818,7 @@
                 </div>
             `;
             
-            let panel = document.createElement('div'); panel.className = 'course-panel'; panel.id = `panel-${courseKey}`;
+            let panel = document.createElement('div'); panel.className = 'course-panel'; panel.id = `panel-${courseKey}`; panel.style.display = panelDisplay;
             let tasksGrid = document.createElement('div'); tasksGrid.className = 'tasks-grid';
             
             for (let i = 1; i <= courseInfo.tasks; i++) {
@@ -819,7 +833,10 @@
             panel.appendChild(tasksGrid);
 
             if (courseInfo.exam) {
-                let isExamCompleted = (studentProgressData && studentProgressData[courseKey] && studentProgressData[courseKey]['exam']);
+                let examInSession = completedTasksSet[courseKey] && completedTasksSet[courseKey].has("Final Exam");
+                let examInManual = studentProgressData && studentProgressData[courseKey] && studentProgressData[courseKey]['exam'];
+                let isExamCompleted = examInSession || examInManual;
+                
                 let eIcon = isExamCompleted ? '✅' : '⏳'; let eColor = isExamCompleted ? '#cc0000' : '#999';
                 panel.innerHTML += `<div class="exam-item" style="cursor:pointer; color:${eColor};" onclick="toggleLegacyTask('${phone}', '${courseKey}', 'exam', ${!!isExamCompleted})" title="تعديل يدوي"><span style="font-size:12px;">${eIcon}</span> Final Exam</div>`;
             }
@@ -893,7 +910,7 @@
             });
         }
 
-        const progSnap = await database.ref('student_progress/' + normalizePhone(studentPhone)).get(); const studentProgressData = progSnap.exists() ? progSnap.val() : {};
+        const progSnap = await database.ref('student_progress/' + normalizePhone(studentPhone)).get(); const studentProgressData = progSnap.exists() ? snap.val() : {};
         buildLMSUI(normalizePhone(studentPhone), cTasks, studentProgressData); document.getElementById('report-modal').style.display = 'flex';
     }
 
@@ -915,12 +932,44 @@
         if (status) {
             if(!course || course === 'غير محدد') { database.ref('students/' + id).update({ attended: true, tasks: null }); return; }
             pendingAttendanceId = id; pendingAttendanceCourse = course;
+            
+            let studentRecord = allStudents.find(s => s.id === id);
+            let phone = studentRecord ? normalizePhone(studentRecord.phone) : null;
             let courseKey = course === 'Classic Control' ? 'classic_control' : (course === 'PLC' ? 'plc' : 'motor_drive');
-            let limits = LMS_COURSES[courseKey] || {tasks: 0};
-            let container = document.getElementById('task-checkboxes'); container.innerHTML = '';
-            for(let i=1; i<=limits.tasks; i++) {
-                container.innerHTML += `<label style="background:#f4f4f4; padding:5px 10px; border-radius:5px; border:1px solid #ddd; display:flex; align-items:center; gap:5px; cursor:pointer;"><input type="checkbox" value="Task ${i}" class="task-cb" style="margin:0;"> Task ${i}</label>`;
+            let limits = LMS_COURSES[courseKey] || {tasks: 0, exam: false};
+            
+            let completedSet = new Set();
+            let stProg = {};
+            if (phone) {
+                stProg = allProgress[phone] || {};
+                let sRecs = allStudents.filter(s => normalizePhone(s.phone) === phone && !s.canceled && s.attended && s.tasks && s.course === course);
+                sRecs.forEach(r => { r.tasks.split('|').forEach(t => { if(t.trim()) completedSet.add(t.trim()); }); });
             }
+
+            let container = document.getElementById('task-checkboxes'); container.innerHTML = '';
+            let hasTasks = false;
+            
+            for(let i=1; i<=limits.tasks; i++) {
+                let tName = `Task ${i}`;
+                let inManual = stProg[courseKey] && stProg[courseKey][`task_${i}`];
+                if (!completedSet.has(tName) && !inManual) {
+                    container.innerHTML += `<label style="background:#f4f4f4; padding:5px 10px; border-radius:5px; border:1px solid #ddd; display:flex; align-items:center; gap:5px; cursor:pointer;"><input type="checkbox" value="Task ${i}" class="task-cb" style="margin:0;"> Task ${i}</label>`;
+                    hasTasks = true;
+                }
+            }
+
+            if (limits.exam) {
+                let inManual = stProg[courseKey] && stProg[courseKey]['exam'];
+                if (!completedSet.has("Final Exam") && !inManual) {
+                    container.innerHTML += `<label style="background:#ffe6e6; padding:5px 10px; border-radius:5px; border:1px solid #ff4d4d; display:flex; align-items:center; gap:5px; cursor:pointer; color:#cc0000; font-weight:bold;"><input type="checkbox" value="Final Exam" class="task-cb" style="margin:0;"> Final Exam</label>`;
+                    hasTasks = true;
+                }
+            }
+
+            if(!hasTasks) {
+                container.innerHTML = `<div style="text-align:center; width:100%; color:#28a745; font-weight:bold; padding:10px;">(الطالب أتم جميع مهام هذا الكورس ✅)</div>`;
+            }
+
             document.getElementById('task-course-name').innerText = course; document.getElementById('task-modal').style.display = 'flex';
             if(checkboxElem) checkboxElem.checked = false; 
         } else {
