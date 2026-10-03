@@ -8,8 +8,8 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <script>
-        if (window.location.href.indexOf('?v=45') === -1) {
-            window.location.replace(window.location.href.split('?')[0] + '?v=45');
+        if (window.location.href.indexOf('?v=46') === -1) {
+            window.location.replace(window.location.href.split('?')[0] + '?v=46');
         }
     </script>
 
@@ -66,8 +66,7 @@
         .course-accordion:hover, .course-accordion.active { background-color: #e6e6e6; border-color: #fcc01a; }
         .course-panel { padding: 15px; display: none; background-color: white; border: 1px solid #ddd; border-top: none; border-radius: 0 0 5px 5px; }
         .tasks-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)); gap: 10px; }
-        .task-item { display: flex; align-items: center; gap: 5px; font-size: 13px; color: #333; font-family: Tahoma; }
-        .task-item input { margin: 0; width: 16px; height: 16px; cursor: pointer; accent-color: #28a745; }
+        .task-item { display: flex; align-items: center; gap: 5px; font-size: 13px; font-family: Tahoma; }
         .exam-item { display: flex; align-items: center; gap: 5px; font-size: 14px; font-weight: bold; color: #cc0000; margin-top: 15px; border-top: 1px dashed #ddd; padding-top: 10px; }
         .exam-item input { margin: 0; width: 18px; height: 18px; cursor: pointer; accent-color: #cc0000; }
         .progress-container { width: 100%; background-color: #ddd; border-radius: 5px; margin-top: 5px; height: 8px; overflow: hidden; }
@@ -172,6 +171,17 @@
         <button type="button" class="back-btn" style="width: 100%; margin-top: 10px;" onclick="closeLogin()">إلغاء</button>
     </form>
     <p id="login-msg" style="text-align:center; color:#ff4d4d; font-weight:bold; margin-top: 15px;"></p>
+</div>
+
+<!-- نافذة اختيار الـ Tasks عند التحضير -->
+<div class="modal-overlay" id="task-modal" style="z-index: 1002;">
+    <div class="modal-content" style="max-width: 400px; text-align: center;">
+        <h3 style="color:#fcc01a; margin-top:0; border-bottom: 2px solid #ddd; padding-bottom: 10px;">تسجيل الـ Tasks</h3>
+        <p style="font-size: 14px; margin-bottom: 20px;">حضور كورس <b id="task-course-name" style="color:#3b1e5a;"></b><br>يرجى تحديد الـ Tasks المنجزة:</p>
+        <div id="task-checkboxes" style="display:flex; flex-wrap:wrap; justify-content:center; gap:10px; margin-bottom:20px; max-height: 200px; overflow-y: auto; padding: 10px; border: 1px solid #eee; border-radius: 5px;"></div>
+        <button class="submit-btn" onclick="saveAttendanceWithTasks()">تأكيد وحفظ</button>
+        <button class="back-btn" style="width:100%; margin-top:10px;" onclick="cancelTaskSelection()">إلغاء الحضور</button>
+    </div>
 </div>
 
 <!-- لوحة الإدارة -->
@@ -303,11 +313,11 @@
 
 <!-- تقرير الطالب والمهام -->
 <div class="modal-overlay" id="report-modal">
-    <div class="modal-content" style="max-width: 600px;">
+    <div class="modal-content" style="max-width: 650px;">
         <strong style="color: #3b1e5a; display: block; margin-bottom: 15px; font-size: 18px; border-bottom: 2px solid #fcc01a; padding-bottom: 5px;" id="report-name"></strong>
         <div style="margin-bottom: 15px; font-size: 15px; color: black; line-height: 1.8;">
             <div>رقم الهاتف: <b id="report-phone" style="color: #3b1e5a; font-family: Tahoma;"></b></div>
-            <div>إجمالي المواعيد المسجلة: <b id="report-total" style="color: #3b1e5a;"></b></div>
+            <div>إجمالي التسجيلات: <b id="report-total" style="color: #3b1e5a;"></b></div>
             <div>مرات الغياب: <b id="report-absent" style="color: red;"></b></div>
             <div>تاريخ آخر حضور: <b id="report-last" style="color: green;"></b></div>
         </div>
@@ -316,14 +326,13 @@
         <div style="overflow-x: auto; max-height: 200px; border: 1px solid #ddd; border-radius: 5px; margin-bottom: 15px;">
             <table style="width: 100%; font-size: 13px; margin-top: 0; border-radius: 0;">
                 <thead>
-                    <tr><th style="padding: 8px;">الكورس</th><th style="padding: 8px;">التاريخ</th><th style="padding: 8px;">الوقت</th><th style="padding: 8px;">الحالة</th></tr>
+                    <tr><th style="padding: 8px;">الكورس</th><th style="padding: 8px;">التاريخ</th><th style="padding: 8px;">الوقت</th><th style="padding: 8px;">Tasks</th><th style="padding: 8px;">الحالة</th></tr>
                 </thead>
                 <tbody id="report-tbody"></tbody>
             </table>
         </div>
 
-        <!-- قسم التقييم ومتابعة المهام -->
-        <strong style="color: #000; display: block; margin-bottom: 10px; font-size: 14px; border-top: 2px solid #ddd; padding-top: 10px;">التقييم الأكاديمي:</strong>
+        <strong style="color: #000; display: block; margin-bottom: 10px; font-size: 14px; border-top: 2px solid #ddd; padding-top: 10px;">سجل الـ Tasks المنجزة:</strong>
         <div id="lms-container" style="margin-bottom: 15px;"></div>
         
         <button id="block-btn" style="width: 100%; padding: 12px; margin-bottom: 10px; font-size: 15px; color: white; border: none; border-radius: 5px; font-weight: bold; cursor: pointer;"></button>
@@ -361,7 +370,7 @@
     document.querySelector('.date-input').setAttribute('min', today);
 
     // ==========================================
-    // إعدادات النظام الديناميكية (الكورسات و الحجز المتأخر)
+    // إعدادات النظام 
     // ==========================================
     let isLateBookingBlocked = false;
     let LMS_COURSES = {
@@ -404,7 +413,7 @@
                             <input type="number" id="limit-${c.key}" value="${c.limit}" min="1">
                         </div>
                         <div style="flex:1; min-width:120px;">
-                            <label style="font-size:13px;">عدد المهام (Tasks):</label>
+                            <label style="font-size:13px;">Tasks Count:</label>
                             <input type="number" id="tasks-${c.key}" value="${c.tasks}" min="0">
                         </div>
                         <div style="flex:1; min-width:120px;">
@@ -418,25 +427,15 @@
         });
     }
 
-    function toggleBlockLateBooking() {
-        database.ref('settings/blockLateBooking').set(!isLateBookingBlocked);
-    }
-
+    function toggleBlockLateBooking() { database.ref('settings/blockLateBooking').set(!isLateBookingBlocked); }
     function saveCourseSettings() {
         let updates = {};
         Object.values(LMS_COURSES).forEach(c => {
-            updates[c.key] = {
-                limit: parseInt(document.getElementById(`limit-${c.key}`).value),
-                tasks: parseInt(document.getElementById(`tasks-${c.key}`).value),
-                exam: document.getElementById(`exam-${c.key}`).checked
-            };
+            updates[c.key] = { limit: parseInt(document.getElementById(`limit-${c.key}`).value), tasks: parseInt(document.getElementById(`tasks-${c.key}`).value), exam: document.getElementById(`exam-${c.key}`).checked };
         });
-        database.ref('settings/courses').update(updates).then(()=> alert('تم تحديث إعدادات الكورسات بنجاح.'));
+        database.ref('settings/courses').update(updates).then(()=> alert('تم تحديث الإعدادات.'));
     }
 
-    // ==========================================
-    // إدارة الفترات
-    // ==========================================
     let globalPeriods = [
         {id: "p1", name: "من 12 ظهراً إلى 3 عصراً", start: 12, end: 15},
         {id: "p2", name: "من 3 عصراً إلى 6 مساءً", start: 15, end: 18},
@@ -444,10 +443,7 @@
         {id: "p4", name: "من 8 مساءً إلى 11 مساءً", start: 20, end: 23}
     ];
 
-    database.ref('settings/periodsData').on('value', snap => {
-        if (snap.exists()) globalPeriods = snap.val();
-        renderPeriodsEdit();
-    });
+    database.ref('settings/periodsData').on('value', snap => { if (snap.exists()) globalPeriods = snap.val(); renderPeriodsEdit(); });
 
     function getPeriodInfo(periodName) {
         let p = globalPeriods.find(x => x.name === periodName);
@@ -476,7 +472,6 @@
         return new Date().getHours() >= getPeriodInfo(periodStr).start;
     }
 
-    // ----------------- التنقل -----------------
     function goHome() {
         document.getElementById('admin-view').style.display = 'none';
         document.getElementById('login-view').style.display = 'none';
@@ -487,13 +482,8 @@
     function showLogin() {
         document.getElementById('student-view').style.display = 'none';
         document.getElementById('manage-view').style.display = 'none';
-        if (auth.currentUser) {
-            document.getElementById('login-view').style.display = 'none';
-            document.getElementById('admin-view').style.display = 'block';
-        } else {
-            document.getElementById('admin-view').style.display = 'none';
-            document.getElementById('login-view').style.display = 'block';
-        }
+        if (auth.currentUser) { document.getElementById('login-view').style.display = 'none'; document.getElementById('admin-view').style.display = 'block'; } 
+        else { document.getElementById('admin-view').style.display = 'none'; document.getElementById('login-view').style.display = 'block'; }
     }
 
     function closeLogin() { goHome(); document.getElementById('login-msg').innerText = ''; }
@@ -504,7 +494,6 @@
         document.getElementById('manage-view').style.display = 'block';
     }
 
-    // ----------------- واجهة الطالب -----------------
     async function searchMyVisits() {
         const rawPhone = document.getElementById('manage-phone').value;
         const mPhone = extractPureNumber(rawPhone);
@@ -512,18 +501,14 @@
         const mGroup = extractPureNumber(document.getElementById('manage-group').value);
         if (!mGroup) { alert('يرجى ملء رقم المجموعة.'); return; }
 
-        const btn = document.querySelector('#manage-view .submit-btn');
-        btn.innerText = 'جاري البحث...';
+        const btn = document.querySelector('#manage-view .submit-btn'); btn.innerText = 'جاري البحث...';
         
         try {
-            const snap = await database.ref('students').get();
-            let resultsHTML = '';
+            const snap = await database.ref('students').get(); let resultsHTML = '';
             if (snap.exists()) {
-                let data = snap.val();
-                let studentAllRecords = [];
+                let data = snap.val(); let studentAllRecords = [];
                 Object.keys(data).forEach(key => {
-                    let s = data[key];
-                    if (normalizePhone(s.phone) === mPhone && extractPureNumber(s.group) === mGroup) { studentAllRecords.push({id: key, ...s}); }
+                    let s = data[key]; if (normalizePhone(s.phone) === mPhone && extractPureNumber(s.group) === mGroup) studentAllRecords.push({id: key, ...s});
                 });
 
                 if (studentAllRecords.length > 0) {
@@ -531,30 +516,13 @@
                     let latestName = studentAllRecords[studentAllRecords.length - 1].name;
                     let validRecords = studentAllRecords.filter(s => !s.canceled && s.date && s.date !== "بدون موعد");
                     let totalAppointments = validRecords.length;
-                    
-                    let pastRecords = validRecords.filter(s => isPeriodPassed(s.date, s.time));
                     let upcomingRecords = validRecords.filter(s => !isPeriodPassed(s.date, s.time));
-                    
-                    let attended = validRecords.filter(s => s.attended).length;
-                    let absent = pastRecords.filter(s => !s.attended).length;
 
-                    resultsHTML += `
-                        <div style="background-color: white; color: #3b1e5a; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 3px solid #fcc01a;">
-                            <h3 style="margin-top: 0; margin-bottom: 15px; border-bottom: 2px solid #ddd; padding-bottom: 5px; text-align: center;">أهلاً بك، ${latestName}</h3>
-                            <div style="background: #f9f9f9; padding: 12px; border-radius: 5px; margin-bottom: 15px; text-align: center; border: 1px solid #ddd;">
-                                <div style="font-size: 14px; font-weight: bold;">المواعيد المسجلة</div>
-                                <div style="color: #3b1e5a; font-size: 24px; font-weight: bold; margin: 5px 0;">${totalAppointments}</div>
-                            </div>
-                        </div>`;
-
+                    resultsHTML += `<div style="background-color: white; color: #3b1e5a; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 3px solid #fcc01a;"><h3 style="margin-top: 0; margin-bottom: 15px; border-bottom: 2px solid #ddd; padding-bottom: 5px; text-align: center;">أهلاً بك، ${latestName}</h3><div style="background: #f9f9f9; padding: 12px; border-radius: 5px; margin-bottom: 15px; text-align: center; border: 1px solid #ddd;"><div style="font-size: 14px; font-weight: bold;">المواعيد المسجلة</div><div style="color: #3b1e5a; font-size: 24px; font-weight: bold; margin: 5px 0;">${totalAppointments}</div></div></div>`;
                     resultsHTML += `<h4 style="color:#fcc01a; border-bottom: 1px solid #fcc01a; padding-bottom: 5px; margin-bottom:15px;">المواعيد القادمة</h4>`;
                     if (upcomingRecords.length > 0) {
                         upcomingRecords.forEach(app => {
-                            resultsHTML += `
-                            <div style="background: rgba(255,255,255,0.1); padding: 15px; border-radius: 5px; margin-bottom: 10px; display:flex; justify-content:space-between; align-items:center;">
-                                <div><div style="color:#fcc01a; font-weight:bold; font-size:16px;">${app.course}</div><div style="font-size:14px; margin-top:5px;">${app.date} <br> ${app.time}</div></div>
-                                <button class="delete-btn" style="padding:10px 15px; background-color:#ff4d4d;" onclick="cancelMyApp('${app.id}')">إلغاء</button>
-                            </div>`;
+                            resultsHTML += `<div style="background: rgba(255,255,255,0.1); padding: 15px; border-radius: 5px; margin-bottom: 10px; display:flex; justify-content:space-between; align-items:center;"><div><div style="color:#fcc01a; font-weight:bold; font-size:16px;">${app.course}</div><div style="font-size:14px; margin-top:5px;">${app.date} <br> ${app.time}</div></div><button class="delete-btn" style="padding:10px 15px; background-color:#ff4d4d;" onclick="cancelMyApp('${app.id}')">إلغاء</button></div>`;
                         });
                     } else { resultsHTML += '<p style="text-align:center; color:#ddd; font-weight:bold;">لا توجد مواعيد قادمة.</p>'; }
                 } else { resultsHTML = '<p style="text-align:center; color:#ff4d4d; background:white; padding:10px; border-radius:5px; font-weight:bold;">لا توجد بيانات متطابقة.</p>'; }
@@ -564,11 +532,7 @@
         btn.innerText = 'بحث';
     }
 
-    function cancelMyApp(id) {
-        if(confirm('تأكيد إلغاء الموعد؟')) {
-            database.ref('students/' + id).update({ canceled: true }).then(() => { alert('تم الإلغاء.'); searchMyVisits(); }).catch((error) => { alert('خطأ: ' + error.message); });
-        }
-    }
+    function cancelMyApp(id) { if(confirm('تأكيد إلغاء الموعد؟')) database.ref('students/' + id).update({ canceled: true }).then(() => { alert('تم الإلغاء.'); searchMyVisits(); }).catch(e => alert(e.message)); }
 
     const defaultSchedule = {
         0: {'من 12 ظهراً إلى 3 عصراً': true, 'من 3 عصراً إلى 6 مساءً': true, 'من 6 مساءً إلى 9 مساءً': true, 'من 8 مساءً إلى 11 مساءً': false},
@@ -580,49 +544,27 @@
     };
     
     let globalSchedule = JSON.parse(JSON.stringify(defaultSchedule));
-    database.ref('settings/schedule').on('value', (snapshot) => { if (snapshot.exists()) globalSchedule = snapshot.val(); else database.ref('settings/schedule').set(defaultSchedule); });
+    database.ref('settings/schedule').on('value', snap => { if (snap.exists()) globalSchedule = snap.val(); else database.ref('settings/schedule').set(defaultSchedule); });
 
     function updateTimeOptions(element) {
-        const dateVal = element.value; 
-        const timeSelect = element.parentElement.querySelector('.time-input'); 
-        timeSelect.innerHTML = ''; 
+        const dateVal = element.value; const timeSelect = element.parentElement.querySelector('.time-input'); timeSelect.innerHTML = ''; 
         if (!dateVal) return; 
+        const parts = dateVal.split('-'); const localDate = new Date(parts[0], parts[1] - 1, parts[2]); const day = localDate.getDay(); 
         
-        const parts = dateVal.split('-');
-        const localDate = new Date(parts[0], parts[1] - 1, parts[2]);
-        const day = localDate.getDay(); 
-        
-        if (day === 5) { 
-            let o = document.createElement('option'); o.value = ''; o.text = 'المعمل مغلق الجمعة'; o.disabled = true; o.selected = true; timeSelect.appendChild(o); 
-        } else {
-            let daySettings = globalSchedule[day] || defaultSchedule[day] || {}; 
-            let hasActiveInAdmin = false;
-            
+        if (day === 5) { let o = document.createElement('option'); o.value = ''; o.text = 'المعمل مغلق الجمعة'; o.disabled = true; o.selected = true; timeSelect.appendChild(o); } 
+        else {
+            let daySettings = globalSchedule[day] || defaultSchedule[day] || {}; let hasActiveInAdmin = false;
             let defaultOpt = document.createElement('option'); defaultOpt.value = ''; defaultOpt.text = 'اختر الوقت'; defaultOpt.disabled = true; defaultOpt.selected = true; timeSelect.appendChild(defaultOpt);
             
             globalPeriods.forEach(p => { 
-                let isActive = daySettings[p.name];
-                if (isActive === undefined) isActive = true;
-                
+                let isActive = daySettings[p.name]; if (isActive === undefined) isActive = true;
                 if (isActive) { 
-                    hasActiveInAdmin = true;
-                    let o = document.createElement('option'); 
-                    o.value = p.name; 
-                    
-                    if (isLateBookingBlocked && isPeriodStarted(dateVal, p.name)) {
-                        o.text = p.name + ' (بدأت)';
-                        o.disabled = true;
-                    } else {
-                        o.text = p.name;
-                    }
+                    hasActiveInAdmin = true; let o = document.createElement('option'); o.value = p.name; 
+                    if (isLateBookingBlocked && isPeriodStarted(dateVal, p.name)) { o.text = p.name + ' (بدأت)'; o.disabled = true; } else { o.text = p.name; }
                     timeSelect.appendChild(o); 
                 } 
             });
-            
-            if(!hasActiveInAdmin) { 
-                timeSelect.innerHTML = ''; 
-                let o = document.createElement('option'); o.value = ''; o.text = 'لا توجد مواعيد متاحة حالياً'; o.disabled = true; o.selected = true; timeSelect.appendChild(o); 
-            }
+            if(!hasActiveInAdmin) { timeSelect.innerHTML = ''; let o = document.createElement('option'); o.value = ''; o.text = 'لا توجد مواعيد متاحة حالياً'; o.disabled = true; o.selected = true; timeSelect.appendChild(o); }
         }
     }
 
@@ -641,27 +583,15 @@
         const submitBtn = document.getElementById('main-submit-btn'); submitBtn.disabled = true; submitBtn.innerText = 'جاري المعالجة...'; submitBtn.style.opacity = '0.7';
         function resetBtn() { submitBtn.disabled = false; submitBtn.innerText = 'تأكيد التسجيل'; submitBtn.style.opacity = '1'; isSubmitting = false; }
 
-        const name = document.getElementById('name').value; 
-        const phoneInput = document.getElementById('phone').value;
-        const group = document.getElementById('group').value; 
-        const course = document.getElementById('course').value;
+        const name = document.getElementById('name').value; const phoneInput = document.getElementById('phone').value; const group = document.getElementById('group').value; const course = document.getElementById('course').value;
+        const purePhoneCheck = extractPureNumber(phoneInput); if (purePhoneCheck.length !== 11) { showErrorModal('الرجاء التأكد من إدخال 11 رقماً.'); resetBtn(); return; }
+        const phone = purePhoneCheck; const courseKey = course === 'Classic Control' ? 'classic_control' : (course === 'PLC' ? 'plc' : 'motor_drive'); const maxLimit = LMS_COURSES[courseKey].limit || 8;
         
-        const purePhoneCheck = extractPureNumber(phoneInput);
-        if (purePhoneCheck.length !== 11) { showErrorModal('الرجاء التأكد من إدخال 11 رقماً.'); resetBtn(); return; }
-        
-        const phone = purePhoneCheck;
-        const courseKey = course === 'Classic Control' ? 'classic_control' : (course === 'PLC' ? 'plc' : 'motor_drive');
-        const maxLimit = LMS_COURSES[courseKey].limit || 8;
-        
-        const appointmentRows = document.querySelectorAll('.appointment-row'); let appointments = []; let hasDuplicate = false; let tempSet = new Set();
-        let hasLateBooking = false;
-        
+        const appointmentRows = document.querySelectorAll('.appointment-row'); let appointments = []; let hasDuplicate = false; let tempSet = new Set(); let hasLateBooking = false;
         appointmentRows.forEach(row => { 
-            const d = row.querySelector('.date-input').value; 
-            const t = row.querySelector('.time-input').value; 
+            const d = row.querySelector('.date-input').value; const t = row.querySelector('.time-input').value; 
             if (isLateBookingBlocked && isPeriodStarted(d, t)) hasLateBooking = true;
-            const key = d + '|' + t; 
-            if(tempSet.has(key)) hasDuplicate = true; tempSet.add(key); appointments.push({ date: d, time: t }); 
+            const key = d + '|' + t; if(tempSet.has(key)) hasDuplicate = true; tempSet.add(key); appointments.push({ date: d, time: t }); 
         });
 
         if (hasLateBooking) { showErrorModal('عفواً، لا يمكنك التسجيل في الفترة الحالية لانتهاء وقت الاستقبال.'); resetBtn(); return; }
@@ -673,14 +603,13 @@
             if (isBlocked) { showErrorModal('الحساب مقيد، يرجى مراجعة الإدارة.'); resetBtn(); return; }
 
             const snapshot = await database.ref('students').get(); let dbData = []; if (snapshot.exists()) { const data = snapshot.val(); Object.keys(data).forEach(key => dbData.push(data[key])); }
-
             for (let i = 0; i < appointments.length; i++) {
                 const app = appointments[i];
                 let currentCountInDB = dbData.filter(d => normalizeText(d.date) === normalizeText(app.date) && normalizeText(d.time) === normalizeText(app.time) && normalizeText(d.course) === normalizeText(course) && d.canceled !== true).length;
                 if (currentCountInDB >= maxLimit) { showErrorModal(`الموعد (${app.date}) فترة (${app.time}) ممتلئ.`); resetBtn(); return; }
             }
 
-            let promises = []; appointments.forEach(app => { const record = { name, phone, group, course, date: app.date, time: app.time, attended: false, canceled: false, timestamp: new Date().toLocaleString() }; promises.push(database.ref('students').push(record)); });
+            let promises = []; appointments.forEach(app => { const record = { name, phone, group, course, date: app.date, time: app.time, attended: false, tasks: null, canceled: false, timestamp: new Date().toLocaleString() }; promises.push(database.ref('students').push(record)); });
             await Promise.all(promises);
 
             const list = document.getElementById('modal-appointments-list'); list.innerHTML = '';
@@ -725,18 +654,13 @@
             updateGroupsDropdown();
         });
 
-        database.ref('blocked_phones').on('value', (snapshot) => { 
-            blockedPhonesList = []; if (snapshot.exists()) { snapshot.forEach(child => blockedPhonesList.push({ id: child.key, phone: child.val().phone, name: child.val().name })); } 
-        });
-
+        database.ref('blocked_phones').on('value', (snapshot) => { blockedPhonesList = []; if (snapshot.exists()) { snapshot.forEach(child => blockedPhonesList.push({ id: child.key, phone: child.val().phone, name: child.val().name })); } });
         database.ref('student_progress').on('value', (snapshot) => {
             allProgress = snapshot.exists() ? snapshot.val() : {};
-            let select = document.getElementById('group-select');
-            if (select && select.value) { renderGroupStudents(select.value); }
+            let select = document.getElementById('group-select'); if (select && select.value) { renderGroupStudents(select.value); }
         });
     }
 
-    // ----------------- إضافة وتعديل الفترات -----------------
     function renderPeriodsEdit() {
         let container = document.getElementById('edit-periods-container'); container.innerHTML = '';
         globalPeriods.forEach((p, idx) => {
@@ -756,38 +680,33 @@
         if (!confirm('تأكيد تحديث الخريطة الزمنية للفترات؟')) return;
         let newPeriods = [];
         for (let i = 0; i < 4; i++) {
-            newPeriods.push({
-                id: "p" + (i + 1), name: document.getElementById('edit-p-name-' + i).value,
-                start: parseInt(document.getElementById('edit-p-start-' + i).value), end: parseInt(document.getElementById('edit-p-end-' + i).value)
-            });
+            newPeriods.push({ id: "p" + (i + 1), name: document.getElementById('edit-p-name-' + i).value, start: parseInt(document.getElementById('edit-p-start-' + i).value), end: parseInt(document.getElementById('edit-p-end-' + i).value) });
         }
         database.ref('settings/periodsData').set(newPeriods).then(() => alert('تم التحديث.')).catch(e => alert(e.message));
     }
 
-    // ----------------- إدارة المجموعات والإضافة اليدوية -----------------
     function manualAddStudent() {
-        let name = document.getElementById('manual-name').value;
-        let phone = extractPureNumber(document.getElementById('manual-phone').value);
-        let group = document.getElementById('manual-group').value;
-
+        let name = document.getElementById('manual-name').value; let phone = extractPureNumber(document.getElementById('manual-phone').value); let group = document.getElementById('manual-group').value;
         if(!name || phone.length !== 11 || !group) { alert("يرجى استكمال البيانات (الاسم، الهاتف 11 رقم، المجموعة)."); return; }
-        
-        const record = { name, phone, group, course: "غير محدد", date: "بدون موعد", time: "بدون موعد", attended: false, canceled: false, timestamp: new Date().toLocaleString() };
-        database.ref('students').push(record).then(() => {
-            alert('تم إدراج الطالب بالنظام.');
-            document.getElementById('manual-name').value = ''; document.getElementById('manual-phone').value = ''; document.getElementById('manual-group').value = '';
-        }).catch(err => alert("خطأ: " + err.message));
+        const record = { name, phone, group, course: "غير محدد", date: "بدون موعد", time: "بدون موعد", attended: false, tasks: null, canceled: false, timestamp: new Date().toLocaleString() };
+        database.ref('students').push(record).then(() => { alert('تم إدراج الطالب بالنظام.'); document.getElementById('manual-name').value = ''; document.getElementById('manual-phone').value = ''; document.getElementById('manual-group').value = ''; }).catch(err => alert("خطأ: " + err.message));
     }
 
-    function deleteStudentFinal(id) {
-        if (confirm('تأكيد الحذف النهائي من قاعدة البيانات؟')) database.ref('students/' + id).remove().catch(error => alert('خطأ: ' + error.message));
-    }
+    function deleteStudentFinal(id) { if (confirm('تأكيد الحذف النهائي من قاعدة البيانات؟')) database.ref('students/' + id).remove().catch(error => alert('خطأ: ' + error.message)); }
 
     function updateGroupsDropdown() {
         let uniqueGroups = new Set(); allStudents.forEach(s => { if (isStrictlyNumber(s.group) && !s.canceled) { uniqueGroups.add(extractPureNumber(s.group)); } });
         let select = document.getElementById('group-select'); let currentVal = select.value; select.innerHTML = '<option value="" disabled selected>اختر المجموعة</option>';
         Array.from(uniqueGroups).sort((a, b) => parseInt(a) - parseInt(b)).forEach(num => { let o = document.createElement('option'); o.value = num; o.text = num; select.appendChild(o); });
         if (currentVal && uniqueGroups.has(currentVal)) { select.value = currentVal; renderGroupStudents(currentVal); }
+    }
+
+    function calculateProgressDynamic(courseKey, completedTasksSet, studentProgressData) {
+        let limits = LMS_COURSES[courseKey] || { tasks: 0, exam: false };
+        let totalItems = limits.tasks + (limits.exam ? 1 : 0);
+        let completed = completedTasksSet[courseKey] ? completedTasksSet[courseKey].size : 0;
+        if (limits.exam && studentProgressData && studentProgressData[courseKey] && studentProgressData[courseKey]['exam']) completed++;
+        return { completed, totalItems, percentage: totalItems === 0 ? 0 : (completed / totalItems) * 100 };
     }
 
     function renderGroupStudents(selectedGroupNumber) {
@@ -797,19 +716,20 @@
         let uniqueStudents = Array.from(phoneMap.values());
         
         let excelBtn = document.getElementById('export-excel-btn');
-        if (uniqueStudents.length > 0) {
-            excelBtn.style.display = 'block'; document.getElementById('group-total-count').style.display = 'block'; 
-            document.getElementById('group-total-count').innerText = `إجمالي عدد الطلاب: ${uniqueStudents.length}`;
-        } else {
-            excelBtn.style.display = 'none'; document.getElementById('group-total-count').style.display = 'none'; 
-        }
+        if (uniqueStudents.length > 0) { excelBtn.style.display = 'block'; document.getElementById('group-total-count').style.display = 'block'; document.getElementById('group-total-count').innerText = `إجمالي عدد الطلاب: ${uniqueStudents.length}`; } 
+        else { excelBtn.style.display = 'none'; document.getElementById('group-total-count').style.display = 'none'; }
         
         let tbody = document.querySelector('#groupDataTable tbody'); tbody.innerHTML = '';
         uniqueStudents.forEach(st => { 
             let pureGrp = extractPureNumber(st.group); let normPhone = normalizePhone(st.phone); let stProg = allProgress[normPhone] || {};
-            let cProg = calculateProgress('classic_control', stProg); let pProg = calculateProgress('plc', stProg); let dProg = calculateProgress('motor_drive', stProg);
-            let cText = cProg.percentage === 100 ? '✅' : `${cProg.completed}/${cProg.totalItems}`; let pText = pProg.percentage === 100 ? '✅' : `${pProg.completed}/${pProg.totalItems}`; let dText = dProg.percentage === 100 ? '✅' : `${dProg.completed}/${dProg.totalItems}`;
-            tbody.innerHTML += `<tr><td>${st.name || ''}</td><td>${st.phone || ''}</td><td style="font-weight: bold; color: #3b1e5a;">${pureGrp}</td><td style="font-size: 13px; font-weight: bold; color:#cc0000;">${cText}</td><td style="font-size: 13px; font-weight: bold; color:#cc0000;">${pText}</td><td style="font-size: 13px; font-weight: bold; color:#cc0000;">${dText}</td><td><button class="delete-btn" onclick="deleteStudentFinal('${st.id}')">حذف</button></td></tr>`; 
+            let studentRecords = allStudents.filter(s => normalizePhone(s.phone) === normPhone && !s.canceled && s.attended && s.tasks);
+            let cTasks = { classic_control: new Set(), plc: new Set(), motor_drive: new Set() };
+            studentRecords.forEach(r => { let cKey = r.course === 'Classic Control' ? 'classic_control' : (r.course === 'PLC' ? 'plc' : 'motor_drive'); r.tasks.split('|').forEach(t => { if(t.trim()) cTasks[cKey].add(t.trim()); }); });
+
+            let cProg = calculateProgressDynamic('classic_control', cTasks, stProg); let pProg = calculateProgressDynamic('plc', cTasks, stProg); let dProg = calculateProgressDynamic('motor_drive', cTasks, stProg);
+            let cText = cProg.percentage === 100 && cProg.totalItems > 0 ? '✅' : `${cProg.completed}/${cProg.totalItems}`; let pText = pProg.percentage === 100 && pProg.totalItems > 0 ? '✅' : `${pProg.completed}/${pProg.totalItems}`; let dText = dProg.percentage === 100 && dProg.totalItems > 0 ? '✅' : `${dProg.completed}/${dProg.totalItems}`;
+            
+            tbody.innerHTML += `<tr><td><span onclick="selectStudent('${st.phone}')" style="cursor: pointer;">${st.name || ''}</span></td><td>${st.phone || ''}</td><td style="font-weight: bold; color: #3b1e5a;">${pureGrp}</td><td style="font-size: 13px; font-weight: bold; color:#cc0000;">${cText}</td><td style="font-size: 13px; font-weight: bold; color:#cc0000;">${pText}</td><td style="font-size: 13px; font-weight: bold; color:#cc0000;">${dText}</td><td><button class="delete-btn" onclick="deleteStudentFinal('${st.id}')">حذف</button></td></tr>`; 
         });
         document.getElementById('groupDataTable').style.display = 'table';
     }
@@ -823,30 +743,18 @@
         let url = URL.createObjectURL(blob); let a = document.createElement('a'); a.href = url; a.download = `مجموعة_${groupSelect}_روبوتاجي.xls`; document.body.appendChild(a); a.click(); document.body.removeChild(a);
     }
 
-    function calculateProgress(courseKey, studentData) {
-        let limits = LMS_COURSES[courseKey] || { tasks: 0, exam: false };
-        let totalItems = limits.tasks + (limits.exam ? 1 : 0);
-        let completed = 0;
-        if (studentData && studentData[courseKey]) {
-            for (let i = 1; i <= limits.tasks; i++) { if (studentData[courseKey][`task_${i}`]) completed++; }
-            if (limits.exam && studentData[courseKey]['exam']) completed++;
-        }
-        return { completed, totalItems, percentage: totalItems === 0 ? 0 : (completed / totalItems) * 100 };
-    }
-
     function toggleAccordion(btnId, panelId) {
         let btn = document.getElementById(btnId); let panel = document.getElementById(panelId);
         if (panel.style.display === "block") { panel.style.display = "none"; btn.classList.remove('active'); } else { panel.style.display = "block"; btn.classList.add('active'); }
     }
 
-    async function updateTask(phone, courseKey, taskKey, isChecked) {
-        try { await database.ref(`student_progress/${phone}/${courseKey}/${taskKey}`).set(isChecked); } catch (err) { alert('خطأ في حفظ التقييم: ' + err.message); }
-    }
+    async function updateTask(phone, courseKey, taskKey, isChecked) { try { await database.ref(`student_progress/${phone}/${courseKey}/${taskKey}`).set(isChecked); } catch (err) { alert('خطأ: ' + err.message); } }
 
-    function buildLMSUI(phone, studentData) {
+    function buildLMSUI(phone, completedTasksSet, studentProgressData) {
         let container = document.getElementById('lms-container'); container.innerHTML = '';
         Object.keys(LMS_COURSES).forEach(courseKey => {
-            const courseInfo = LMS_COURSES[courseKey]; const progress = calculateProgress(courseKey, studentData); const isCompleted = progress.percentage === 100 && progress.totalItems > 0;
+            const courseInfo = LMS_COURSES[courseKey]; const progress = calculateProgressDynamic(courseKey, completedTasksSet, studentProgressData); 
+            const isCompleted = progress.percentage === 100 && progress.totalItems > 0;
             const checkMark = isCompleted ? '<span style="color: #28a745; font-size: 18px;">✅</span>' : '';
             
             let accBtn = document.createElement('div'); accBtn.className = 'course-accordion'; accBtn.id = `btn-${courseKey}`; accBtn.onclick = () => toggleAccordion(`btn-${courseKey}`, `panel-${courseKey}`);
@@ -856,22 +764,30 @@
             let tasksGrid = document.createElement('div'); tasksGrid.className = 'tasks-grid';
             
             for (let i = 1; i <= courseInfo.tasks; i++) {
-                let isChecked = (studentData && studentData[courseKey] && studentData[courseKey][`task_${i}`]) ? 'checked' : '';
-                tasksGrid.innerHTML += `<label class="task-item"><input type="checkbox" ${isChecked} onchange="handleTaskChange('${phone}', '${courseKey}', 'task_${i}', this.checked)"> Task ${i}</label>`;
+                let taskName = `Task ${i}`;
+                let isTaskCompleted = completedTasksSet[courseKey] && completedTasksSet[courseKey].has(taskName);
+                let icon = isTaskCompleted ? '✅' : '⏳'; let color = isTaskCompleted ? '#28a745' : '#999';
+                tasksGrid.innerHTML += `<div class="task-item" style="color:${color};"><span style="font-size:12px;">${icon}</span> ${taskName}</div>`;
             }
             panel.appendChild(tasksGrid);
 
             if (courseInfo.exam) {
-                let isExamChecked = (studentData && studentData[courseKey] && studentData[courseKey]['exam']) ? 'checked' : '';
-                panel.innerHTML += `<label class="exam-item"><input type="checkbox" ${isExamChecked} onchange="handleTaskChange('${phone}', '${courseKey}', 'exam', this.checked)"> الاختبار النهائي</label>`;
+                let isExamChecked = (studentProgressData && studentProgressData[courseKey] && studentProgressData[courseKey]['exam']) ? 'checked' : '';
+                panel.innerHTML += `<label class="exam-item" style="cursor:pointer;"><input type="checkbox" ${isExamChecked} onchange="handleTaskChange('${phone}', '${courseKey}', 'exam', this.checked)"> Final Exam</label>`;
             }
             container.appendChild(accBtn); container.appendChild(panel);
         });
     }
 
     window.handleTaskChange = async function(phone, courseKey, taskKey, isChecked) {
-        await updateTask(phone, courseKey, taskKey, isChecked); const snap = await database.ref('student_progress/' + phone).get(); const freshData = snap.exists() ? snap.val() : {};
-        const progress = calculateProgress(courseKey, freshData);
+        await updateTask(phone, courseKey, taskKey, isChecked); 
+        const snap = await database.ref('student_progress/' + phone).get(); const studentProgressData = snap.exists() ? snap.val() : {};
+        
+        let studentRecords = allStudents.filter(s => normalizePhone(s.phone) === phone && !s.canceled && s.attended && s.tasks);
+        let cTasks = { classic_control: new Set(), plc: new Set(), motor_drive: new Set() };
+        studentRecords.forEach(r => { let cKey = r.course === 'Classic Control' ? 'classic_control' : (r.course === 'PLC' ? 'plc' : 'motor_drive'); r.tasks.split('|').forEach(t => { if(t.trim()) cTasks[cKey].add(t.trim()); }); });
+
+        const progress = calculateProgressDynamic(courseKey, cTasks, studentProgressData);
         document.getElementById(`bar-prog-${courseKey}`).style.width = `${progress.percentage}%`; document.getElementById(`text-prog-${courseKey}`).innerText = `${progress.completed} / ${progress.totalItems}`;
         let titleArea = document.querySelector(`#btn-${courseKey} .course-title-area div:first-child span:first-child`);
         if (progress.percentage === 100 && progress.totalItems > 0) { titleArea.innerHTML = `${LMS_COURSES[courseKey].title} <span style="color: #28a745; font-size: 18px;">✅</span>`; } else { titleArea.innerHTML = LMS_COURSES[courseKey].title; }
@@ -912,31 +828,39 @@
         else { blockBtn.innerText = "تقييد الطالب (منع تسجيل)"; blockBtn.style.backgroundColor = "#ff4d4d"; blockBtn.onclick = () => toggleBlockStudent(studentPhone, latestName, false); }
 
         let tbody = document.getElementById('report-tbody'); tbody.innerHTML = '';
+        
+        let cTasks = { classic_control: new Set(), plc: new Set(), motor_drive: new Set() };
+
         if (validRecords.length === 0) { 
-            tbody.innerHTML = `<tr><td colspan="4" style="padding: 10px; color: red; text-align: center; font-weight: bold;">لا توجد مواعيد مسجلة</td></tr>`; 
+            tbody.innerHTML = `<tr><td colspan="5" style="padding: 10px; color: red; text-align: center; font-weight: bold;">لا توجد مواعيد مسجلة</td></tr>`; 
         } else {
             validRecords.sort((a,b) => new Date(a.date || 0) - new Date(b.date || 0));
             validRecords.forEach(rec => {
-                let statusHTML = '';
+                if (rec.attended && rec.tasks) {
+                    let cKey = rec.course === 'Classic Control' ? 'classic_control' : (rec.course === 'PLC' ? 'plc' : 'motor_drive');
+                    rec.tasks.split('|').forEach(t => { if(t.trim()) cTasks[cKey].add(t.trim()); });
+                }
+
+                let statusHTML = ''; let tasksStr = rec.tasks ? rec.tasks.split('|').join(' , ') : '-';
                 if (rec.canceled) {
                     statusHTML = '<span style="color:#999; font-weight:bold;">ملغي</span>';
                 } else if (rec.attended) {
-                    statusHTML = `<span style="color:green; font-weight:bold;">حاضر ✔</span>`;
+                    statusHTML = `<span style="color:green; font-weight:bold; cursor:pointer;" onclick="updateAttendance('${rec.id}', '${rec.course}', false, this)" title="إلغاء الحضور">حاضر ✔</span>`;
                 } else if (isPeriodPassed(rec.date, rec.time)) {
-                    statusHTML = `<span style="color:red; font-weight:bold;">غائب ✘</span>`;
+                    statusHTML = `<span style="color:red; font-weight:bold; cursor:pointer;" onclick="updateAttendance('${rec.id}', '${rec.course}', true, this)" title="تحضير متأخر">غائب ✘</span>`;
                 } else if (!isPeriodStarted(rec.date, rec.time)) {
                     statusHTML = '<span style="color:#fcc01a; font-weight:bold;">قادم ⏳</span>';
                 } else {
-                    statusHTML = `<input type="checkbox" class="attendance-check" onchange="updateAttendance('${rec.id}', this.checked)">`;
+                    statusHTML = `<input type="checkbox" class="attendance-check" onchange="updateAttendance('${rec.id}', '${rec.course}', this.checked, this)">`;
                 }
                 
                 let bgStyle = rec.canceled ? "background-color: #f9f9f9; color:#999;" : "";
-                tbody.innerHTML += `<tr style="${bgStyle}"><td style="padding: 8px;">${rec.course || ''}</td><td style="padding: 8px;">${rec.date || ''}</td><td style="padding: 8px;">${rec.time || ''}</td><td style="padding: 8px;">${statusHTML}</td></tr>`;
+                tbody.innerHTML += `<tr style="${bgStyle}"><td style="padding: 8px;">${rec.course || ''}</td><td style="padding: 8px;">${rec.date || ''}</td><td style="padding: 8px;">${rec.time || ''}</td><td style="padding: 8px; font-weight:bold; color:#3b1e5a; font-size:12px;">${tasksStr}</td><td style="padding: 8px;">${statusHTML}</td></tr>`;
             });
         }
 
         const progSnap = await database.ref('student_progress/' + normalizePhone(studentPhone)).get(); const studentProgressData = progSnap.exists() ? progSnap.val() : {};
-        buildLMSUI(normalizePhone(studentPhone), studentProgressData); document.getElementById('report-modal').style.display = 'flex';
+        buildLMSUI(normalizePhone(studentPhone), cTasks, studentProgressData); document.getElementById('report-modal').style.display = 'flex';
     }
 
     async function toggleBlockStudent(phone, name, currentlyBlocked) {
@@ -949,6 +873,33 @@
     }
     function closeReportModal() { currentSelectedStudent = null; document.getElementById('report-modal').style.display = 'none'; }
     document.addEventListener('click', function(e) { if(e.target.id !== 'search-student') document.getElementById('search-suggestions').style.display = 'none'; });
+
+    // ----------------- ربط الـ Tasks بالحضور -----------------
+    let pendingAttendanceId = null; let pendingAttendanceCourse = null;
+
+    function updateAttendance(id, course, status, checkboxElem) {
+        if (status) {
+            if(!course || course === 'غير محدد') { database.ref('students/' + id).update({ attended: true, tasks: null }); return; }
+            pendingAttendanceId = id; pendingAttendanceCourse = course;
+            let courseKey = course === 'Classic Control' ? 'classic_control' : (course === 'PLC' ? 'plc' : 'motor_drive');
+            let limits = LMS_COURSES[courseKey] || {tasks: 0};
+            let container = document.getElementById('task-checkboxes'); container.innerHTML = '';
+            for(let i=1; i<=limits.tasks; i++) {
+                container.innerHTML += `<label style="background:#f4f4f4; padding:5px 10px; border-radius:5px; border:1px solid #ddd; display:flex; align-items:center; gap:5px; cursor:pointer;"><input type="checkbox" value="Task ${i}" class="task-cb" style="margin:0;"> Task ${i}</label>`;
+            }
+            document.getElementById('task-course-name').innerText = course; document.getElementById('task-modal').style.display = 'flex';
+            if(checkboxElem) checkboxElem.checked = false; 
+        } else {
+            database.ref('students/' + id).update({ attended: false, tasks: null });
+        }
+    }
+
+    function saveAttendanceWithTasks() {
+        let selectedTasks = []; document.querySelectorAll('.task-cb:checked').forEach(cb => selectedTasks.push(cb.value));
+        let tasksStr = selectedTasks.join(' | ');
+        database.ref('students/' + pendingAttendanceId).update({ attended: true, tasks: tasksStr.length > 0 ? tasksStr : null }).then(() => { document.getElementById('task-modal').style.display = 'none'; pendingAttendanceId = null; });
+    }
+    function cancelTaskSelection() { pendingAttendanceId = null; document.getElementById('task-modal').style.display = 'none'; }
 
     // ----------------- سجل الأيام والتفاصيل -----------------
     function renderScheduleDay(dayVal) {
@@ -987,17 +938,16 @@
             let isCanceled = row.canceled === true; let bgStyle = isCanceled ? 'background-color: #f1f1f1; color: #a9a9a9;' : ''; 
             
             let isChecked = row.attended ? 'checked' : '';
-            let statusHTML = `<input type="checkbox" class="attendance-check" ${isChecked} onchange="updateAttendance('${row.id}', this.checked)">`;
+            let statusHTML = `<input type="checkbox" class="attendance-check" ${isChecked} onchange="updateAttendance('${row.id}', '${row.course}', this.checked, this)">`;
             if (isCanceled) statusHTML = '<span style="color:red; font-weight:bold;">ملغي</span>';
             
             let controlsHTML = `<button class="delete-btn" onclick="deleteStudentFinal('${row.id}')">حذف</button>`; 
             if (isCanceled) controlsHTML = `<button class="add-btn" style="padding:5px; margin-bottom:5px; font-size:12px; display:block; width:100%;" onclick="restoreStudent('${row.id}')">استرجاع</button>` + controlsHTML;
             
-            tbody.innerHTML += `<tr style="${bgStyle}"><td>${row.name || ''}</td><td>${row.phone || ''}</td><td style="font-weight:bold;">${extractPureNumber(row.group)}</td><td style="font-weight: bold; color: #3b1e5a;">${row.course || ''}</td><td>${row.date || ''}</td><td>${row.time || ''}</td><td>${statusHTML}</td><td>${controlsHTML}</td></tr>`;
+            tbody.innerHTML += `<tr style="${bgStyle}"><td><span onclick="selectStudent('${row.phone}')" style="cursor: pointer;">${row.name || ''}</span></td><td>${row.phone || ''}</td><td style="font-weight:bold;">${extractPureNumber(row.group)}</td><td style="font-weight: bold; color: #3b1e5a;">${row.course || ''}</td><td>${row.date || ''}</td><td>${row.time || ''}</td><td>${statusHTML}</td><td>${controlsHTML}</td></tr>`;
         });
     }
 
-    function updateAttendance(id, status) { database.ref('students/' + id).update({ attended: status }); }
     function restoreStudent(id) { if(confirm('تأكيد الاسترجاع؟')) database.ref('students/' + id).update({ canceled: null }); }
     function backToDates() { currentSelectedDate = null; currentSelectedPeriod = null; renderDatesList(); }
     function backToPeriods() { currentSelectedPeriod = null; renderPeriodsList(currentSelectedDate); }
