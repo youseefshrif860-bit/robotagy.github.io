@@ -8,8 +8,8 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <script>
-        if (window.location.href.indexOf('?v=51') === -1) {
-            window.location.replace(window.location.href.split('?')[0] + '?v=51');
+        if (window.location.href.indexOf('?v=52') === -1) {
+            window.location.replace(window.location.href.split('?')[0] + '?v=52');
         }
     </script>
 
@@ -331,6 +331,24 @@
                 </thead>
                 <tbody id="report-tbody"></tbody>
             </table>
+        </div>
+
+        <strong style="color: #000; display: block; margin-bottom: 10px; font-size: 14px; border-top: 2px solid #ddd; padding-top: 10px;">إعدادات إضافية:</strong>
+        
+        <!-- قسم تسليم الأسلاك -->
+        <div style="display: flex; justify-content: space-between; align-items: center; background: #f4f4f4; padding: 10px; border-radius: 5px; border: 1px solid #ddd; margin-bottom: 10px;">
+            <strong style="font-size: 14px; color: #3b1e5a;">تسليم طقم الأسلاك (Wires):</strong>
+            <label style="display: flex; align-items: center; cursor: pointer;">
+                <span id="wire-status-text" style="font-weight: bold; color: #cc0000; font-size: 13px;">لم يستلم ❌</span>
+                <input type="checkbox" id="wire-checkbox" style="width: 18px; height: 18px; accent-color: #28a745; margin: 0 10px 0 0;">
+            </label>
+        </div>
+
+        <!-- قسم الملاحظات -->
+        <div style="background: #f4f4f4; padding: 10px; border-radius: 5px; border: 1px solid #ddd; margin-bottom: 15px;">
+            <strong style="font-size: 14px; color: #3b1e5a; display: block; margin-bottom: 5px;">ملاحظات الإدارة:</strong>
+            <textarea id="student-notes" rows="3" style="width: 100%; border: 1px solid #ccc; border-radius: 5px; padding: 8px; font-family: Tahoma; font-size: 13px; resize: vertical; box-sizing: border-box;" placeholder="اكتب ملاحظاتك عن أداء الطالب أو أي تفاصيل أخرى..."></textarea>
+            <button id="save-notes-btn" style="background: #3b1e5a; color: white; border: none; padding: 8px; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 13px; margin-top: 5px; width: 100%; transition: 0.3s;">حفظ الملاحظات</button>
         </div>
 
         <strong style="color: #000; display: block; margin-bottom: 10px; font-size: 14px; border-top: 2px solid #ddd; padding-top: 10px;">سجل الـ Tasks المنجزة:</strong>
@@ -790,6 +808,26 @@
         } catch(e) { alert('خطأ: ' + e.message); }
     };
 
+    // وظائف إضافة وتعديل الأسلاك والملاحظات
+    window.handleWireChange = async function(phone, isChecked) {
+        try {
+            await database.ref(`student_progress/${phone}/wire_received`).set(isChecked);
+            document.getElementById('wire-status-text').innerText = isChecked ? 'تم الاستلام ✅' : 'لم يستلم ❌';
+            document.getElementById('wire-status-text').style.color = isChecked ? '#28a745' : '#cc0000';
+        } catch (err) { alert('خطأ: ' + err.message); }
+    };
+
+    window.handleNotesSave = async function(phone) {
+        let notes = document.getElementById('student-notes').value.trim();
+        let btn = document.getElementById('save-notes-btn');
+        btn.innerText = 'جاري الحفظ...';
+        try {
+            await database.ref(`student_progress/${phone}/notes`).set(notes);
+            setTimeout(() => { btn.innerText = 'تم الحفظ ✅'; btn.style.backgroundColor = '#28a745'; }, 300);
+            setTimeout(() => { btn.innerText = 'حفظ الملاحظات'; btn.style.backgroundColor = '#3b1e5a'; }, 2000);
+        } catch (err) { alert('خطأ: ' + err.message); btn.innerText = 'حفظ الملاحظات'; }
+    };
+
     function buildLMSUI(phone, completedTasksSet, studentProgressData) {
         let container = document.getElementById('lms-container'); container.innerHTML = '';
         Object.keys(LMS_COURSES).forEach(courseKey => {
@@ -912,7 +950,22 @@
 
         const progSnap = await database.ref('student_progress/' + normalizePhone(studentPhone)).get(); 
         const studentProgressData = progSnap.exists() ? progSnap.val() : {};
-        buildLMSUI(normalizePhone(studentPhone), cTasks, studentProgressData); document.getElementById('report-modal').style.display = 'flex';
+
+        // تحديث إعدادات الطالب الإضافية (سلك التوصيل + الملاحظات)
+        let isWireReceived = studentProgressData.wire_received || false;
+        let wireCheckbox = document.getElementById('wire-checkbox');
+        let wireText = document.getElementById('wire-status-text');
+        
+        wireCheckbox.checked = isWireReceived;
+        wireText.innerText = isWireReceived ? 'تم الاستلام ✅' : 'لم يستلم ❌';
+        wireText.style.color = isWireReceived ? '#28a745' : '#cc0000';
+        wireCheckbox.onchange = (e) => handleWireChange(normalizePhone(studentPhone), e.target.checked);
+
+        document.getElementById('student-notes').value = studentProgressData.notes || '';
+        document.getElementById('save-notes-btn').onclick = () => handleNotesSave(normalizePhone(studentPhone));
+
+        buildLMSUI(normalizePhone(studentPhone), cTasks, studentProgressData); 
+        document.getElementById('report-modal').style.display = 'flex';
     }
 
     async function toggleBlockStudent(phone, name, currentlyBlocked) {
