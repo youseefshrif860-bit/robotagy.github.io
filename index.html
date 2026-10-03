@@ -8,8 +8,8 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <script>
-        if (window.location.href.indexOf('?v=52') === -1) {
-            window.location.replace(window.location.href.split('?')[0] + '?v=52');
+        if (window.location.href.indexOf('?v=53') === -1) {
+            window.location.replace(window.location.href.split('?')[0] + '?v=53');
         }
     </script>
 
@@ -337,10 +337,10 @@
         
         <!-- قسم تسليم الأسلاك -->
         <div style="display: flex; justify-content: space-between; align-items: center; background: #f4f4f4; padding: 10px; border-radius: 5px; border: 1px solid #ddd; margin-bottom: 10px;">
-            <strong style="font-size: 14px; color: #3b1e5a;">تسليم طقم الأسلاك (Wires):</strong>
+            <strong style="font-size: 14px; color: #3b1e5a;">Wires:</strong>
             <label style="display: flex; align-items: center; cursor: pointer;">
-                <span id="wire-status-text" style="font-weight: bold; color: #cc0000; font-size: 13px;">لم يستلم ❌</span>
-                <input type="checkbox" id="wire-checkbox" style="width: 18px; height: 18px; accent-color: #28a745; margin: 0 10px 0 0;">
+                <span id="wire-status-text" style="font-weight: bold; color: #28a745; font-size: 13px; margin-left: 8px;"></span>
+                <input type="checkbox" id="wire-checkbox" style="width: 18px; height: 18px; accent-color: #28a745; margin: 0;">
             </label>
         </div>
 
@@ -812,8 +812,8 @@
     window.handleWireChange = async function(phone, isChecked) {
         try {
             await database.ref(`student_progress/${phone}/wire_received`).set(isChecked);
-            document.getElementById('wire-status-text').innerText = isChecked ? 'تم الاستلام ✅' : 'لم يستلم ❌';
-            document.getElementById('wire-status-text').style.color = isChecked ? '#28a745' : '#cc0000';
+            let wireText = document.getElementById('wire-status-text');
+            wireText.innerText = isChecked ? 'Done' : '';
         } catch (err) { alert('خطأ: ' + err.message); }
     };
 
@@ -957,8 +957,7 @@
         let wireText = document.getElementById('wire-status-text');
         
         wireCheckbox.checked = isWireReceived;
-        wireText.innerText = isWireReceived ? 'تم الاستلام ✅' : 'لم يستلم ❌';
-        wireText.style.color = isWireReceived ? '#28a745' : '#cc0000';
+        wireText.innerText = isWireReceived ? 'Done' : '';
         wireCheckbox.onchange = (e) => handleWireChange(normalizePhone(studentPhone), e.target.checked);
 
         document.getElementById('student-notes').value = studentProgressData.notes || '';
