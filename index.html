@@ -8,8 +8,8 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <script>
-        if (window.location.href.indexOf('?v=53') === -1) {
-            window.location.replace(window.location.href.split('?')[0] + '?v=53');
+        if (window.location.href.indexOf('?v=54') === -1) {
+            window.location.replace(window.location.href.split('?')[0] + '?v=54');
         }
     </script>
 
@@ -314,13 +314,44 @@
 
 <!-- تقرير الطالب والمهام -->
 <div class="modal-overlay" id="report-modal">
-    <div class="modal-content" style="max-width: 650px;">
-        <strong style="color: #3b1e5a; display: block; margin-bottom: 15px; font-size: 18px; border-bottom: 2px solid #fcc01a; padding-bottom: 5px;" id="report-name"></strong>
-        <div style="margin-bottom: 15px; font-size: 15px; color: black; line-height: 1.8;">
-            <div>رقم الهاتف: <b id="report-phone" style="color: #3b1e5a; font-family: Tahoma;"></b></div>
-            <div>إجمالي التسجيلات: <b id="report-total" style="color: #3b1e5a;"></b></div>
-            <div>مرات الغياب: <b id="report-absent" style="color: red;"></b></div>
-            <div>تاريخ آخر حضور: <b id="report-last" style="color: green;"></b></div>
+    <div class="modal-content" style="max-width: 650px; position:relative;">
+        
+        <!-- القسم العلوي: البيانات + زر الإعدادات -->
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; border-bottom: 2px solid #fcc01a; padding-bottom:10px; margin-bottom: 15px;">
+            <!-- بيانات الطالب -->
+            <div>
+                <strong style="color: #3b1e5a; font-size: 18px;" id="report-name"></strong>
+                <div style="margin-top: 10px; font-size: 14px; color: black; line-height: 1.8;">
+                    <div>رقم الهاتف: <b id="report-phone" style="color: #3b1e5a; font-family: Tahoma;"></b></div>
+                    <div>إجمالي التسجيلات: <b id="report-total" style="color: #3b1e5a;"></b></div>
+                    <div>مرات الغياب: <b id="report-absent" style="color: red;"></b></div>
+                    <div>تاريخ آخر حضور: <b id="report-last" style="color: green;"></b></div>
+                </div>
+            </div>
+            
+            <!-- زر قائمة الإعدادات العلوية اليسرى -->
+            <div style="position:relative;">
+                <button onclick="toggleExtraSettings()" style="background: none; border: none; font-size: 26px; cursor: pointer;" title="ملاحظات وتسليم الأسلاك">⚙️</button>
+                
+                <div id="extra-settings-panel" style="display: none; position: absolute; left: 0; top: 40px; background: white; border: 2px solid #fcc01a; border-radius: 8px; padding: 15px; width: 260px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); z-index: 1000; text-align:right;">
+                    <!-- تسليم الأسلاك -->
+                    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #ddd; padding-bottom: 10px; margin-bottom: 10px;">
+                        <strong style="font-size: 14px; color: #3b1e5a;">Wires:</strong>
+                        <label style="display: flex; align-items: center; cursor: pointer;">
+                            <span id="wire-status-text" style="font-weight: bold; color: #28a745; font-size: 13px; margin-left: 8px;"></span>
+                            <input type="checkbox" id="wire-checkbox" style="width: 18px; height: 18px; accent-color: #28a745; margin: 0;">
+                        </label>
+                    </div>
+                    
+                    <!-- سجل الملاحظات -->
+                    <strong style="font-size: 14px; color: #3b1e5a; display: block; margin-bottom: 5px;">ملاحظات الإدارة:</strong>
+                    <div id="notes-list-container" style="max-height: 150px; overflow-y: auto; margin-bottom: 10px;"></div>
+                    <div style="display:flex; gap:5px;">
+                        <input type="text" id="new-note-input" placeholder="أضف ملاحظة جديدة..." style="margin:0; padding:5px; flex:1; font-size:12px; border:1px solid #ccc; border-radius:3px; font-family: Tahoma;">
+                        <button onclick="saveNewNote()" style="background:#28a745; color:white; border:none; padding:5px 12px; border-radius:3px; cursor:pointer; font-weight:bold;">+</button>
+                    </div>
+                </div>
+            </div>
         </div>
         
         <strong style="color: #000; display: block; margin-bottom: 10px; font-size: 14px;">سجل المواعيد:</strong>
@@ -331,24 +362,6 @@
                 </thead>
                 <tbody id="report-tbody"></tbody>
             </table>
-        </div>
-
-        <strong style="color: #000; display: block; margin-bottom: 10px; font-size: 14px; border-top: 2px solid #ddd; padding-top: 10px;">إعدادات إضافية:</strong>
-        
-        <!-- قسم تسليم الأسلاك -->
-        <div style="display: flex; justify-content: space-between; align-items: center; background: #f4f4f4; padding: 10px; border-radius: 5px; border: 1px solid #ddd; margin-bottom: 10px;">
-            <strong style="font-size: 14px; color: #3b1e5a;">Wires:</strong>
-            <label style="display: flex; align-items: center; cursor: pointer;">
-                <span id="wire-status-text" style="font-weight: bold; color: #28a745; font-size: 13px; margin-left: 8px;"></span>
-                <input type="checkbox" id="wire-checkbox" style="width: 18px; height: 18px; accent-color: #28a745; margin: 0;">
-            </label>
-        </div>
-
-        <!-- قسم الملاحظات -->
-        <div style="background: #f4f4f4; padding: 10px; border-radius: 5px; border: 1px solid #ddd; margin-bottom: 15px;">
-            <strong style="font-size: 14px; color: #3b1e5a; display: block; margin-bottom: 5px;">ملاحظات الإدارة:</strong>
-            <textarea id="student-notes" rows="3" style="width: 100%; border: 1px solid #ccc; border-radius: 5px; padding: 8px; font-family: Tahoma; font-size: 13px; resize: vertical; box-sizing: border-box;" placeholder="اكتب ملاحظاتك عن أداء الطالب أو أي تفاصيل أخرى..."></textarea>
-            <button id="save-notes-btn" style="background: #3b1e5a; color: white; border: none; padding: 8px; border-radius: 5px; cursor: pointer; font-weight: bold; font-size: 13px; margin-top: 5px; width: 100%; transition: 0.3s;">حفظ الملاحظات</button>
         </div>
 
         <strong style="color: #000; display: block; margin-bottom: 10px; font-size: 14px; border-top: 2px solid #ddd; padding-top: 10px;">سجل الـ Tasks المنجزة:</strong>
@@ -787,6 +800,11 @@
         }
     }
 
+    function toggleExtraSettings() {
+        let panel = document.getElementById('extra-settings-panel');
+        panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
+    }
+
     window.toggleLegacyTask = async function(phone, courseKey, taskKey, currentState) {
         let newState = !currentState;
         try {
@@ -808,7 +826,6 @@
         } catch(e) { alert('خطأ: ' + e.message); }
     };
 
-    // وظائف إضافة وتعديل الأسلاك والملاحظات
     window.handleWireChange = async function(phone, isChecked) {
         try {
             await database.ref(`student_progress/${phone}/wire_received`).set(isChecked);
@@ -817,16 +834,50 @@
         } catch (err) { alert('خطأ: ' + err.message); }
     };
 
-    window.handleNotesSave = async function(phone) {
-        let notes = document.getElementById('student-notes').value.trim();
-        let btn = document.getElementById('save-notes-btn');
-        btn.innerText = 'جاري الحفظ...';
+    window.saveNewNote = async function() {
+        let input = document.getElementById('new-note-input');
+        let text = input.value.trim();
+        if(!text || !currentSelectedStudent) return;
+        
+        let dateStr = getLocalDateString();
+        
         try {
-            await database.ref(`student_progress/${phone}/notes`).set(notes);
-            setTimeout(() => { btn.innerText = 'تم الحفظ ✅'; btn.style.backgroundColor = '#28a745'; }, 300);
-            setTimeout(() => { btn.innerText = 'حفظ الملاحظات'; btn.style.backgroundColor = '#3b1e5a'; }, 2000);
-        } catch (err) { alert('خطأ: ' + err.message); btn.innerText = 'حفظ الملاحظات'; }
+            await database.ref(`student_progress/${currentSelectedStudent}/notesLog`).push({ text: text, date: dateStr });
+            input.value = '';
+            const progSnap = await database.ref('student_progress/' + currentSelectedStudent).get();
+            renderNotesList(progSnap.exists() ? progSnap.val().notesLog || {} : {});
+        } catch(e) { alert('خطأ: ' + e.message); }
     };
+
+    window.deleteNote = async function(noteId) {
+        if(!confirm('حذف الملاحظة؟') || !currentSelectedStudent) return;
+        try {
+            await database.ref(`student_progress/${currentSelectedStudent}/notesLog/${noteId}`).remove();
+            const progSnap = await database.ref('student_progress/' + currentSelectedStudent).get();
+            renderNotesList(progSnap.exists() ? progSnap.val().notesLog || {} : {});
+        } catch(e) { alert(e.message); }
+    };
+
+    function renderNotesList(notesObj) {
+        let container = document.getElementById('notes-list-container');
+        container.innerHTML = '';
+        let keys = Object.keys(notesObj);
+        if(keys.length === 0) {
+            container.innerHTML = '<div style="color:#aaa; font-size:11px; text-align:center;">لا توجد ملاحظات سابقة</div>';
+            return;
+        }
+        keys.forEach(key => {
+            let note = notesObj[key];
+            container.innerHTML += `
+                <div style="background:#f4f4f4; padding:8px; border-radius:5px; margin-bottom:5px; position:relative; font-size:12px; color:black; border: 1px solid #ddd; padding-left: 20px;">
+                    <button onclick="deleteNote('${key}')" style="position:absolute; top:4px; left:4px; background:none; border:none; color:#cc0000; cursor:pointer; font-size:12px;" title="حذف الملاحظة">✖</button>
+                    <div style="word-wrap:break-word; font-family: Tahoma; line-height: 1.5;">${note.text}</div>
+                    <div style="font-size:10px; color:#aaa; text-align:left; margin-top:4px;">${note.date}</div>
+                </div>
+            `;
+        });
+        container.scrollTop = container.scrollHeight;
+    }
 
     function buildLMSUI(phone, completedTasksSet, studentProgressData) {
         let container = document.getElementById('lms-container'); container.innerHTML = '';
@@ -892,6 +943,7 @@
     }
 
     async function selectStudent(studentPhoneParam) {
+        document.getElementById('extra-settings-panel').style.display = 'none';
         let targetPhone = normalizePhone(studentPhoneParam); currentSelectedStudent = targetPhone; document.getElementById('search-student').value = ''; document.getElementById('search-suggestions').style.display = 'none';
         let allStudentRecords = allStudents.filter(s => normalizePhone(s.phone) === targetPhone);
         if(allStudentRecords.length === 0) { closeReportModal(); return; }
@@ -951,7 +1003,6 @@
         const progSnap = await database.ref('student_progress/' + normalizePhone(studentPhone)).get(); 
         const studentProgressData = progSnap.exists() ? progSnap.val() : {};
 
-        // تحديث إعدادات الطالب الإضافية (سلك التوصيل + الملاحظات)
         let isWireReceived = studentProgressData.wire_received || false;
         let wireCheckbox = document.getElementById('wire-checkbox');
         let wireText = document.getElementById('wire-status-text');
@@ -960,8 +1011,7 @@
         wireText.innerText = isWireReceived ? 'Done' : '';
         wireCheckbox.onchange = (e) => handleWireChange(normalizePhone(studentPhone), e.target.checked);
 
-        document.getElementById('student-notes').value = studentProgressData.notes || '';
-        document.getElementById('save-notes-btn').onclick = () => handleNotesSave(normalizePhone(studentPhone));
+        renderNotesList(studentProgressData.notesLog || {});
 
         buildLMSUI(normalizePhone(studentPhone), cTasks, studentProgressData); 
         document.getElementById('report-modal').style.display = 'flex';
@@ -975,7 +1025,11 @@
             if (confirm(`تأكيد تقييد الطالب؟`)) { await database.ref('blocked_phones').push({ phone: phone, name: name }); alert('تم تقييد الطالب.'); selectStudent(phone); }
         }
     }
-    function closeReportModal() { currentSelectedStudent = null; document.getElementById('report-modal').style.display = 'none'; }
+    function closeReportModal() { 
+        currentSelectedStudent = null; 
+        document.getElementById('report-modal').style.display = 'none'; 
+        document.getElementById('extra-settings-panel').style.display = 'none';
+    }
     document.addEventListener('click', function(e) { if(e.target.id !== 'search-student') document.getElementById('search-suggestions').style.display = 'none'; });
 
     // ----------------- ربط الـ Tasks بالحضور -----------------
