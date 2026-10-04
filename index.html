@@ -8,8 +8,8 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <script>
-        if (window.location.href.indexOf('?v=57') === -1) {
-            window.location.replace(window.location.href.split('?')[0] + '?v=57');
+        if (window.location.href.indexOf('?v=58') === -1) {
+            window.location.replace(window.location.href.split('?')[0] + '?v=58');
         }
     </script>
 
@@ -208,20 +208,25 @@
                 <div id="dates-list">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
                         <h3 style="color: white; margin: 0;">الأيام المسجلة</h3>
-                        <button class="delete-all-btn" style="margin-bottom: 0;" onclick="deleteAllData()">تفريغ قاعدة البيانات</button>
                     </div>
                     <div id="records-counter" style="text-align: center; color: #fcc01a; font-weight: bold; margin-bottom: 15px; font-size: 15px; background: rgba(255,255,255,0.1); padding: 5px; border-radius: 5px;"></div>
                     <div id="dates-container"></div>
                 </div>
 
                 <div id="periods-list" style="display: none;">
-                    <button class="back-btn" style="margin-bottom: 15px;" onclick="backToDates()">الرجوع ↲</button>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
+                        <button class="back-btn" style="margin: 0;" onclick="backToDates()">الرجوع</button>
+                        <button class="delete-btn" style="margin: 0; padding: 10px 15px; font-size: 14px;" onclick="deleteAllInDay()">حذف اليوم</button>
+                    </div>
                     <h3 id="selected-date-title" style="text-align: center; color: #fcc01a; margin-top: 0;"></h3>
                     <div id="periods-container"></div>
                 </div>
 
                 <div id="period-details" style="display: none;">
-                    <button class="back-btn" style="margin-bottom: 15px;" onclick="backToPeriods()">الرجوع للفترات ↲</button>
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 15px;">
+                        <button class="back-btn" style="margin: 0;" onclick="backToPeriods()">الرجوع</button>
+                        <button class="delete-btn" style="margin: 0; padding: 10px 15px; font-size: 14px;" onclick="deleteAllInPeriod()">حذف الفترة</button>
+                    </div>
                     <h3 id="selected-period-title" style="text-align: center; color: #fcc01a; margin-top: 0;"></h3>
                     <div style="overflow-x: auto;">
                         <table id="dataTable">
@@ -1227,9 +1232,37 @@
     function renderDatesList() {
         document.getElementById('dates-list').style.display = 'block'; document.getElementById('periods-list').style.display = 'none'; document.getElementById('period-details').style.display = 'none';
         const container = document.getElementById('dates-container'); container.innerHTML = '';
-        let rawDates = allStudents.filter(s => s.date && s.date !== "بدون موعد").map(s => s.date); const uniqueDates = [...new Set(rawDates)]; uniqueDates.sort((a, b) => new Date(a) - new Date(b));
+        let rawDates = allStudents.filter(s => s.date && s.date !== "بدون موعد").map(s => s.date); 
+        const uniqueDates = [...new Set(rawDates)]; uniqueDates.sort((a, b) => b.localeCompare(a));
         if (uniqueDates.length === 0) { container.innerHTML = `<p style="text-align: center; color: white;">لا توجد سجلات</p>`; return; }
-        uniqueDates.forEach(date => { const studentsInDay = allStudents.filter(s => s.date === date); const periodsCount = new Set(studentsInDay.map(s => s.time)).size; const btn = document.createElement('button'); btn.className = 'nav-btn'; btn.innerText = `يوم: ${date}  (سجلات: ${studentsInDay.length})`; btn.onclick = () => renderPeriodsList(date); container.appendChild(btn); });
+        
+        let tree = {};
+        uniqueDates.forEach(date => {
+            let [year, month, day] = date.split('-');
+            if(!tree[year]) tree[year] = {};
+            if(!tree[year][month]) tree[year][month] = [];
+            tree[year][month].push(date);
+        });
+
+        Object.keys(tree).sort((a,b) => b-a).forEach(year => {
+            let yearBtn = document.createElement('button'); yearBtn.className = 'nav-btn'; yearBtn.innerText = year; yearBtn.style.marginBottom = '5px';
+            let yearPanel = document.createElement('div'); yearPanel.style.display = 'none'; yearPanel.style.paddingRight = '10px'; yearPanel.style.borderRight = '2px solid #fcc01a'; yearPanel.style.marginBottom = '10px';
+            yearBtn.onclick = () => { yearPanel.style.display = yearPanel.style.display === 'block' ? 'none' : 'block'; };
+
+            Object.keys(tree[year]).sort((a,b) => b-a).forEach(month => {
+                let monthBtn = document.createElement('button'); monthBtn.className = 'nav-btn'; monthBtn.style.backgroundColor = '#ddd'; monthBtn.style.color = '#3b1e5a'; monthBtn.style.padding = '10px'; monthBtn.style.fontSize = '16px'; monthBtn.style.marginBottom = '5px'; monthBtn.innerText = month;
+                let monthPanel = document.createElement('div'); monthPanel.style.display = 'none'; monthPanel.style.paddingRight = '10px'; monthPanel.style.borderRight = '2px solid #ddd'; monthPanel.style.marginBottom = '10px';
+                monthBtn.onclick = () => { monthPanel.style.display = monthPanel.style.display === 'block' ? 'none' : 'block'; };
+                
+                tree[year][month].forEach(date => {
+                    const studentsInDay = allStudents.filter(s => s.date === date); 
+                    const btn = document.createElement('button'); btn.className = 'nav-btn'; btn.style.backgroundColor = 'white'; btn.style.color = '#3b1e5a'; btn.style.border = '1px solid #fcc01a'; btn.style.padding = '10px'; btn.style.fontSize = '15px'; btn.innerText = `${date} (${studentsInDay.length})`; btn.onclick = () => renderPeriodsList(date); 
+                    monthPanel.appendChild(btn); 
+                });
+                yearPanel.appendChild(monthBtn); yearPanel.appendChild(monthPanel);
+            });
+            container.appendChild(yearBtn); container.appendChild(yearPanel);
+        });
     }
     
     function renderPeriodsList(date) {
@@ -1261,8 +1294,8 @@
     function restoreStudent(id) { if(confirm('تأكيد الاسترجاع؟')) database.ref('students/' + id).update({ canceled: null }); }
     function backToDates() { currentSelectedDate = null; currentSelectedPeriod = null; renderDatesList(); }
     function backToPeriods() { currentSelectedPeriod = null; renderPeriodsList(currentSelectedDate); }
-    function deleteAllInPeriod() { if (confirm(`حذف سجلات هذه الفترة؟`)) { let updates = {}; allStudents.filter(s => s.date === currentSelectedDate && s.time === currentSelectedPeriod).forEach(student => updates[student.id] = null); database.ref('students').update(updates); } }
-    function deleteAllInDay() { if (confirm(`حذف كافة سجلات اليوم؟`)) { let updates = {}; allStudents.filter(s => s.date === currentSelectedDate).forEach(student => updates[student.id] = null); database.ref('students').update(updates); } }
+    function deleteAllInPeriod() { if (confirm(`حذف؟`)) { let updates = {}; allStudents.filter(s => s.date === currentSelectedDate && s.time === currentSelectedPeriod).forEach(student => updates[student.id] = null); database.ref('students').update(updates).then(backToPeriods); } }
+    function deleteAllInDay() { if (confirm(`حذف؟`)) { let updates = {}; allStudents.filter(s => s.date === currentSelectedDate).forEach(student => updates[student.id] = null); database.ref('students').update(updates).then(backToDates); } }
     function deleteAllData() { if (confirm('تحذير: سيتم مسح كافة القيود، هل أنت متأكد؟')) database.ref('students').remove(); }
 </script>
 </body>
