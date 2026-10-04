@@ -8,8 +8,8 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <script>
-        if (window.location.href.indexOf('?v=58') === -1) {
-            window.location.replace(window.location.href.split('?')[0] + '?v=58');
+        if (window.location.href.indexOf('?v=59') === -1) {
+            window.location.replace(window.location.href.split('?')[0] + '?v=59');
         }
     </script>
 
@@ -1229,39 +1229,87 @@
 
     function toggleSchedulePeriod(day, period, newState) { if(confirm(`تعديل حالة الفترة؟`)) database.ref(`settings/schedule/${day}/${period}`).set(newState).then(() => { renderScheduleDay(day); }); }
     
+    // شجرة التواريخ + الحذف
+    window.deleteAllInYear = function(year) {
+        if (confirm(`حذف كافة سجلات سنة ${year}؟`)) {
+            let updates = {};
+            allStudents.filter(s => s.date && s.date.startsWith(year)).forEach(student => updates[student.id] = null);
+            database.ref('students').update(updates);
+        }
+    };
+
+    window.deleteAllInMonth = function(year, month) {
+        if (confirm(`حذف كافة سجلات شهر ${month} لسنة ${year}؟`)) {
+            let updates = {};
+            let prefix = `${year}-${month}`;
+            allStudents.filter(s => s.date && s.date.startsWith(prefix)).forEach(student => updates[student.id] = null);
+            database.ref('students').update(updates);
+        }
+    };
+
     function renderDatesList() {
         document.getElementById('dates-list').style.display = 'block'; document.getElementById('periods-list').style.display = 'none'; document.getElementById('period-details').style.display = 'none';
         const container = document.getElementById('dates-container'); container.innerHTML = '';
-        let rawDates = allStudents.filter(s => s.date && s.date !== "بدون موعد").map(s => s.date); 
-        const uniqueDates = [...new Set(rawDates)]; uniqueDates.sort((a, b) => b.localeCompare(a));
-        if (uniqueDates.length === 0) { container.innerHTML = `<p style="text-align: center; color: white;">لا توجد سجلات</p>`; return; }
         
+        let validStudents = allStudents.filter(s => s.date && s.date !== "بدون موعد");
+        if (validStudents.length === 0) { container.innerHTML = `<p style="text-align: center; color: white;">لا توجد سجلات</p>`; return; }
+
         let tree = {};
-        uniqueDates.forEach(date => {
-            let [year, month, day] = date.split('-');
-            if(!tree[year]) tree[year] = {};
-            if(!tree[year][month]) tree[year][month] = [];
-            tree[year][month].push(date);
+        validStudents.forEach(s => {
+            let [year, month, day] = s.date.split('-');
+            if(!tree[year]) tree[year] = { records: [], months: {} };
+            tree[year].records.push(s);
+            if(!tree[year].months[month]) tree[year].months[month] = { records: [], days: {} };
+            tree[year].months[month].records.push(s);
+            if(!tree[year].months[month].days[day]) tree[year].months[month].days[day] = [];
+            tree[year].months[month].days[day].push(s);
         });
 
-        Object.keys(tree).sort((a,b) => b-a).forEach(year => {
-            let yearBtn = document.createElement('button'); yearBtn.className = 'nav-btn'; yearBtn.innerText = year; yearBtn.style.marginBottom = '5px';
+        Object.keys(tree).sort((a, b) => b - a).forEach(year => {
+            let yearData = tree[year];
+            let uniqueYearStudents = new Set(yearData.records.map(s => normalizePhone(s.phone))).size;
+            
+            let yearRow = document.createElement('div'); yearRow.style = 'display: flex; gap: 5px; margin-bottom: 5px;';
+            let yearBtn = document.createElement('button'); yearBtn.className = 'nav-btn'; yearBtn.style.margin = '0'; yearBtn.style.flex = '1';
+            yearBtn.innerText = `${year} (طلاب: ${uniqueYearStudents})`;
+            
+            let yearDelBtn = document.createElement('button'); yearDelBtn.className = 'delete-btn'; yearDelBtn.style.margin = '0'; yearDelBtn.innerText = '🗑️';
+            yearDelBtn.onclick = () => deleteAllInYear(year);
+
+            yearRow.appendChild(yearBtn); yearRow.appendChild(yearDelBtn);
+
             let yearPanel = document.createElement('div'); yearPanel.style.display = 'none'; yearPanel.style.paddingRight = '10px'; yearPanel.style.borderRight = '2px solid #fcc01a'; yearPanel.style.marginBottom = '10px';
             yearBtn.onclick = () => { yearPanel.style.display = yearPanel.style.display === 'block' ? 'none' : 'block'; };
 
-            Object.keys(tree[year]).sort((a,b) => b-a).forEach(month => {
-                let monthBtn = document.createElement('button'); monthBtn.className = 'nav-btn'; monthBtn.style.backgroundColor = '#ddd'; monthBtn.style.color = '#3b1e5a'; monthBtn.style.padding = '10px'; monthBtn.style.fontSize = '16px'; monthBtn.style.marginBottom = '5px'; monthBtn.innerText = month;
+            Object.keys(yearData.months).sort((a, b) => b - a).forEach(month => {
+                let monthData = yearData.months[month];
+                let uniqueMonthStudents = new Set(monthData.records.map(s => normalizePhone(s.phone))).size;
+
+                let monthRow = document.createElement('div'); monthRow.style = 'display: flex; gap: 5px; margin-bottom: 5px;';
+                let monthBtn = document.createElement('button'); monthBtn.className = 'nav-btn'; monthBtn.style.backgroundColor = '#ddd'; monthBtn.style.color = '#3b1e5a'; monthBtn.style.padding = '10px'; monthBtn.style.fontSize = '16px'; monthBtn.style.margin = '0'; monthBtn.style.flex = '1';
+                monthBtn.innerText = `${month} (طلاب: ${uniqueMonthStudents})`;
+                
+                let monthDelBtn = document.createElement('button'); monthDelBtn.className = 'delete-btn'; monthDelBtn.style.margin = '0'; monthDelBtn.innerText = '🗑️';
+                monthDelBtn.onclick = () => deleteAllInMonth(year, month);
+
+                monthRow.appendChild(monthBtn); monthRow.appendChild(monthDelBtn);
+
                 let monthPanel = document.createElement('div'); monthPanel.style.display = 'none'; monthPanel.style.paddingRight = '10px'; monthPanel.style.borderRight = '2px solid #ddd'; monthPanel.style.marginBottom = '10px';
                 monthBtn.onclick = () => { monthPanel.style.display = monthPanel.style.display === 'block' ? 'none' : 'block'; };
-                
-                tree[year][month].forEach(date => {
-                    const studentsInDay = allStudents.filter(s => s.date === date); 
-                    const btn = document.createElement('button'); btn.className = 'nav-btn'; btn.style.backgroundColor = 'white'; btn.style.color = '#3b1e5a'; btn.style.border = '1px solid #fcc01a'; btn.style.padding = '10px'; btn.style.fontSize = '15px'; btn.innerText = `${date} (${studentsInDay.length})`; btn.onclick = () => renderPeriodsList(date); 
-                    monthPanel.appendChild(btn); 
+
+                Object.keys(monthData.days).sort((a, b) => b - a).forEach(day => {
+                    let dayRecords = monthData.days[day];
+                    let uniqueDayStudents = new Set(dayRecords.map(s => normalizePhone(s.phone))).size;
+                    let fullDate = `${year}-${month}-${day}`;
+
+                    const btn = document.createElement('button'); btn.className = 'nav-btn'; btn.style.backgroundColor = 'white'; btn.style.color = '#3b1e5a'; btn.style.border = '1px solid #fcc01a'; btn.style.padding = '10px'; btn.style.fontSize = '15px'; btn.style.marginBottom = '5px';
+                    btn.innerText = `${fullDate} (طلاب: ${uniqueDayStudents})`;
+                    btn.onclick = () => renderPeriodsList(fullDate);
+                    monthPanel.appendChild(btn);
                 });
-                yearPanel.appendChild(monthBtn); yearPanel.appendChild(monthPanel);
+                yearPanel.appendChild(monthRow); yearPanel.appendChild(monthPanel);
             });
-            container.appendChild(yearBtn); container.appendChild(yearPanel);
+            container.appendChild(yearRow); container.appendChild(yearPanel);
         });
     }
     
