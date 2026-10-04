@@ -8,8 +8,8 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <script>
-        if (window.location.href.indexOf('?v=55') === -1) {
-            window.location.replace(window.location.href.split('?')[0] + '?v=55');
+        if (window.location.href.indexOf('?v=56') === -1) {
+            window.location.replace(window.location.href.split('?')[0] + '?v=56');
         }
     </script>
 
@@ -148,7 +148,7 @@
 <!-- التنبيهات -->
 <div class="modal-overlay" id="success-modal">
     <div class="modal-content">
-        <strong style="color: black; display: block; margin-bottom: 10px; font-size: 16px;">تم تأكيد التسجيل. بيان المواعيد:</strong>
+        <strong style="color: black; display: block; margin-bottom: 10px; font-size: 16px;" id="success-msg-display">تم تأكيد التسجيل. بيان المواعيد:</strong>
         <ul id="modal-appointments-list" style="margin: 0; padding-right: 20px; color: black; line-height: 1.8; font-size: 14px;"></ul>
         <button class="modal-close-btn" onclick="closeSuccessModal()">موافق</button>
     </div>
@@ -238,7 +238,10 @@
             <div id="view-groups" class="view-section">
                 <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #fcc01a; padding-bottom: 10px; margin-bottom: 15px;">
                     <h3 style="color: white; margin: 0;">إدارة المجموعات</h3>
-                    <button id="export-excel-btn" class="add-btn" style="width: auto; background-color: #28a745; margin: 0; display: none;" onclick="exportGroupToExcel()">تصدير إكسيل 📊</button>
+                    <div style="display: flex; gap: 10px;">
+                        <button id="delete-group-btn" class="delete-btn" style="display: none; padding: 10px; margin: 0;" onclick="deleteEntireGroup()">حذف المجموعة 🗑️</button>
+                        <button id="export-excel-btn" class="add-btn" style="width: auto; background-color: #28a745; margin: 0; display: none;" onclick="exportGroupToExcel()">تصدير إكسيل 📊</button>
+                    </div>
                 </div>
 
                 <div class="manual-add-box">
@@ -255,12 +258,7 @@
                 <select id="group-select" onchange="renderGroupStudents(this.value)">
                     <option value="" disabled selected>اختر المجموعة</option>
                 </select>
-                
-                <!-- زر حذف المجموعة وعدد الطلاب -->
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; margin-top: 10px;">
-                    <h4 id="group-total-count" style="color: #fcc01a; display: none; margin: 0;"></h4>
-                    <button id="delete-group-btn" class="delete-btn" style="display: none; padding: 8px 15px; margin: 0;" onclick="deleteCurrentGroup()">حذف المجموعة بالكامل</button>
-                </div>
+                <h4 id="group-total-count" style="color: #fcc01a; display: none;"></h4>
                 
                 <div style="overflow-x: auto;">
                     <table id="groupDataTable" style="display: none; min-width: 600px;">
@@ -285,7 +283,7 @@
                 <h3 style="color: white; margin-top: 0; border-bottom: 2px solid #fcc01a; padding-bottom: 10px;">جدول الأيام</h3>
                 <select id="schedule-day-select" onchange="renderScheduleDay(this.value)">
                     <option value="" disabled selected>اختر اليوم</option>
-                    <option value="6">السبت</option><option value="0">الأحد</option><option value="1">الإثنين</option><option value="2">الثلاثاء</option><option value="3">الأربعاء</option><option value="4">الخميس</option>
+                    <option value="6">السبت</option><option value="0">الأحد</option><option value="1">الإثنين</option><option value="2">الثلاثاء</option><option value="3">الأربعاء</option><option value="4">الخميس</option><option value="5">الجمعة</option>
                 </select>
                 <div id="schedule-slots-container" style="margin-top: 20px;"></div>
             </div>
@@ -310,7 +308,9 @@
                 </div>
 
                 <div id="courses-settings-container"></div>
-                <button class="add-btn" style="margin-top: 15px;" onclick="saveCourseSettings()">حفظ إعدادات الكورسات</button>
+                <div id="messages-settings-container"></div>
+                
+                <button class="add-btn" style="margin-top: 15px;" onclick="saveSystemSettings()">حفظ كافة إعدادات النظام</button>
             </div>
 
         </div>
@@ -336,14 +336,15 @@
             
             <!-- زر قائمة الإعدادات العلوية اليسرى -->
             <div style="position:relative;">
-                <button onclick="toggleExtraSettings()" style="background: none; border: none; font-size: 26px; cursor: pointer;" title="ملاحظات وتسليم الأسلاك">⚙️️</button>
+                <button onclick="toggleExtraSettings()" style="background: none; border: none; font-size: 26px; cursor: pointer;" title="ملاحظات وتسليم الأسلاك">⚙️</button>
                 
                 <div id="extra-settings-panel" style="display: none; position: absolute; left: 0; top: 40px; background: white; border: 2px solid #fcc01a; border-radius: 8px; padding: 15px; width: 260px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); z-index: 1000; text-align:right;">
                     <!-- تسليم الأسلاك -->
                     <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #ddd; padding-bottom: 10px; margin-bottom: 10px;">
                         <strong style="font-size: 14px; color: #3b1e5a;">Wires:</strong>
-                        <div id="wire-wrapper" style="display: flex; align-items: center; justify-content: flex-end; min-width: 40px;">
-                            <!-- Dynamically populated via JS -->
+                        <div style="display: flex; align-items: center;">
+                            <span id="wire-status-text" style="font-weight: bold; color: #28a745; font-size: 14px; cursor: pointer; display: none;" onclick="promptWireRevert()" title="تعديل الحالة">Done</span>
+                            <input type="checkbox" id="wire-checkbox" style="width: 18px; height: 18px; accent-color: #28a745; margin: 0; cursor: pointer;" onchange="handleWireChange(this.checked)">
                         </div>
                     </div>
                     
@@ -408,7 +409,28 @@
     let openCoursePanels = new Set();
 
     // ==========================================
-    // إعدادات النظام 
+    // رسائل النظام القابلة للتخصيص
+    // ==========================================
+    let SYSTEM_MESSAGES = {
+        no_slots: "لا توجد مواعيد متاحة حالياً",
+        late_block: "عفواً، لا يمكنك التسجيل في الفترة الحالية لانتهاء وقت الاستقبال.",
+        duplicate: "تكرار في المواعيد المختارة.",
+        blocked: "الحساب مقيد، يرجى مراجعة الإدارة.",
+        full: "عفواً، هذا الموعد ممتلئ.",
+        success: "تم تأكيد التسجيل بنجاح. بيان المواعيد:",
+        not_found: "لا توجد بيانات متطابقة.",
+        phone_err: "الرجاء التأكد من إدخال رقم هاتف مكون من 11 رقماً."
+    };
+
+    database.ref('settings/messages').on('value', snap => {
+        if(snap.exists()) {
+            Object.assign(SYSTEM_MESSAGES, snap.val());
+        }
+        renderSystemSettingsUI();
+    });
+
+    // ==========================================
+    // إعدادات الكورسات والفترات
     // ==========================================
     let isLateBookingBlocked = false;
     let LMS_COURSES = {
@@ -438,11 +460,11 @@
             btn.className = "toggle-btn btn-enable"; btn.innerText = "تفعيل المنع";
         }
 
-        let container = document.getElementById('courses-settings-container');
-        container.innerHTML = '';
+        let coursesContainer = document.getElementById('courses-settings-container');
+        coursesContainer.innerHTML = '';
         Object.values(LMS_COURSES).forEach(c => {
             let isExam = c.exam ? "checked" : "";
-            container.innerHTML += `
+            coursesContainer.innerHTML += `
                 <div class="settings-card">
                     <h4>إعدادات: ${c.title}</h4>
                     <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
@@ -463,15 +485,45 @@
                 </div>
             `;
         });
+
+        let msgsContainer = document.getElementById('messages-settings-container');
+        msgsContainer.innerHTML = `
+            <div class="settings-card" style="margin-top: 20px;">
+                <h4>تخصيص رسائل النظام (واجهة الطالب)</h4>
+                <div style="display:flex; flex-direction:column; gap:10px;">
+                    <div><label style="font-size:13px; color:#fcc01a;">رسالة نجاح التسجيل:</label><input type="text" id="msg-success" value="${SYSTEM_MESSAGES.success}"></div>
+                    <div><label style="font-size:13px; color:#fcc01a;">رسالة اكتمال العدد:</label><input type="text" id="msg-full" value="${SYSTEM_MESSAGES.full}"></div>
+                    <div><label style="font-size:13px; color:#fcc01a;">رسالة الإغلاق (انتهاء وقت الاستقبال):</label><input type="text" id="msg-late" value="${SYSTEM_MESSAGES.late_block}"></div>
+                    <div><label style="font-size:13px; color:#fcc01a;">رسالة اليوم المغلق (لا توجد مواعيد):</label><input type="text" id="msg-no-slots" value="${SYSTEM_MESSAGES.no_slots}"></div>
+                    <div><label style="font-size:13px; color:#fcc01a;">رسالة الحساب المقيد:</label><input type="text" id="msg-blocked" value="${SYSTEM_MESSAGES.blocked}"></div>
+                    <div><label style="font-size:13px; color:#fcc01a;">رسالة تكرار المواعيد:</label><input type="text" id="msg-duplicate" value="${SYSTEM_MESSAGES.duplicate}"></div>
+                    <div><label style="font-size:13px; color:#fcc01a;">رسالة عدم وجود بيانات للبحث:</label><input type="text" id="msg-not-found" value="${SYSTEM_MESSAGES.not_found}"></div>
+                    <div><label style="font-size:13px; color:#fcc01a;">رسالة خطأ رقم الهاتف:</label><input type="text" id="msg-phone-err" value="${SYSTEM_MESSAGES.phone_err}"></div>
+                </div>
+            </div>
+        `;
     }
 
     function toggleBlockLateBooking() { database.ref('settings/blockLateBooking').set(!isLateBookingBlocked); }
-    function saveCourseSettings() {
+    
+    function saveSystemSettings() {
         let updates = {};
         Object.values(LMS_COURSES).forEach(c => {
             updates[c.key] = { limit: parseInt(document.getElementById(`limit-${c.key}`).value), tasks: parseInt(document.getElementById(`tasks-${c.key}`).value), exam: document.getElementById(`exam-${c.key}`).checked };
         });
-        database.ref('settings/courses').update(updates).then(()=> alert('تم تحديث الإعدادات.'));
+        database.ref('settings/courses').update(updates);
+
+        let msgs = {
+            full: document.getElementById('msg-full').value,
+            late_block: document.getElementById('msg-late').value,
+            no_slots: document.getElementById('msg-no-slots').value,
+            blocked: document.getElementById('msg-blocked').value,
+            duplicate: document.getElementById('msg-duplicate').value,
+            success: document.getElementById('msg-success').value,
+            not_found: document.getElementById('msg-not-found').value,
+            phone_err: document.getElementById('msg-phone-err').value
+        };
+        database.ref('settings/messages').update(msgs).then(() => alert('تم حفظ إعدادات النظام وتحديث الرسائل بنجاح.'));
     }
 
     let globalPeriods = [
@@ -535,7 +587,7 @@
     async function searchMyVisits() {
         const rawPhone = document.getElementById('manage-phone').value;
         const mPhone = extractPureNumber(rawPhone);
-        if (mPhone.length !== 11) { alert('يرجى إدخال رقم هاتف مكون من 11 رقماً.'); return; }
+        if (mPhone.length !== 11) { alert(SYSTEM_MESSAGES.phone_err); return; }
         const mGroup = extractPureNumber(document.getElementById('manage-group').value);
         if (!mGroup) { alert('يرجى ملء رقم المجموعة.'); return; }
 
@@ -563,8 +615,8 @@
                             resultsHTML += `<div style="background: rgba(255,255,255,0.1); padding: 15px; border-radius: 5px; margin-bottom: 10px; display:flex; justify-content:space-between; align-items:center;"><div><div style="color:#fcc01a; font-weight:bold; font-size:16px;">${app.course}</div><div style="font-size:14px; margin-top:5px;">${app.date} <br> ${app.time}</div></div><button class="delete-btn" style="padding:10px 15px; background-color:#ff4d4d;" onclick="cancelMyApp('${app.id}')">إلغاء</button></div>`;
                         });
                     } else { resultsHTML += '<p style="text-align:center; color:#ddd; font-weight:bold;">لا توجد مواعيد قادمة.</p>'; }
-                } else { resultsHTML = '<p style="text-align:center; color:#ff4d4d; background:white; padding:10px; border-radius:5px; font-weight:bold;">لا توجد بيانات متطابقة.</p>'; }
-            } else { resultsHTML = '<p style="text-align:center; color:#ff4d4d;">لا توجد بيانات مسجلة.</p>'; }
+                } else { resultsHTML = `<p style="text-align:center; color:#ff4d4d; background:white; padding:10px; border-radius:5px; font-weight:bold;">${SYSTEM_MESSAGES.not_found}</p>`; }
+            } else { resultsHTML = `<p style="text-align:center; color:#ff4d4d;">${SYSTEM_MESSAGES.not_found}</p>`; }
             document.getElementById('manage-results').innerHTML = resultsHTML;
         } catch(e) { alert('خطأ: ' + e); }
         btn.innerText = 'بحث';
@@ -578,6 +630,7 @@
         2: {'من 12 ظهراً إلى 3 عصراً': false, 'من 3 عصراً إلى 6 مساءً': false, 'من 6 مساءً إلى 9 مساءً': false, 'من 8 مساءً إلى 11 مساءً': true},
         3: {'من 12 ظهراً إلى 3 عصراً': false, 'من 3 عصراً إلى 6 مساءً': false, 'من 6 مساءً إلى 9 مساءً': false, 'من 8 مساءً إلى 11 مساءً': true},
         4: {'من 12 ظهراً إلى 3 عصراً': true, 'من 3 عصراً إلى 6 مساءً': true, 'من 6 مساءً إلى 9 مساءً': true, 'من 8 مساءً إلى 11 مساءً': false},
+        5: {'من 12 ظهراً إلى 3 عصراً': false, 'من 3 عصراً إلى 6 مساءً': false, 'من 6 مساءً إلى 9 مساءً': false, 'من 8 مساءً إلى 11 مساءً': false},
         6: {'من 12 ظهراً إلى 3 عصراً': true, 'من 3 عصراً إلى 6 مساءً': true, 'من 6 مساءً إلى 9 مساءً': true, 'من 8 مساءً إلى 11 مساءً': false}
     };
     
@@ -589,21 +642,18 @@
         if (!dateVal) return; 
         const parts = dateVal.split('-'); const localDate = new Date(parts[0], parts[1] - 1, parts[2]); const day = localDate.getDay(); 
         
-        if (day === 5) { let o = document.createElement('option'); o.value = ''; o.text = 'المعمل مغلق الجمعة'; o.disabled = true; o.selected = true; timeSelect.appendChild(o); } 
-        else {
-            let daySettings = globalSchedule[day] || defaultSchedule[day] || {}; let hasActiveInAdmin = false;
-            let defaultOpt = document.createElement('option'); defaultOpt.value = ''; defaultOpt.text = 'اختر الوقت'; defaultOpt.disabled = true; defaultOpt.selected = true; timeSelect.appendChild(defaultOpt);
-            
-            globalPeriods.forEach(p => { 
-                let isActive = daySettings[p.name]; if (isActive === undefined) isActive = true;
-                if (isActive) { 
-                    hasActiveInAdmin = true; let o = document.createElement('option'); o.value = p.name; 
-                    if (isLateBookingBlocked && isPeriodStarted(dateVal, p.name)) { o.text = p.name + ' (بدأت)'; o.disabled = true; } else { o.text = p.name; }
-                    timeSelect.appendChild(o); 
-                } 
-            });
-            if(!hasActiveInAdmin) { timeSelect.innerHTML = ''; let o = document.createElement('option'); o.value = ''; o.text = 'لا توجد مواعيد متاحة حالياً'; o.disabled = true; o.selected = true; timeSelect.appendChild(o); }
-        }
+        let daySettings = globalSchedule[day] || defaultSchedule[day] || {}; let hasActiveInAdmin = false;
+        let defaultOpt = document.createElement('option'); defaultOpt.value = ''; defaultOpt.text = 'اختر الوقت'; defaultOpt.disabled = true; defaultOpt.selected = true; timeSelect.appendChild(defaultOpt);
+        
+        globalPeriods.forEach(p => { 
+            let isActive = daySettings[p.name]; if (isActive === undefined) isActive = true;
+            if (isActive) { 
+                hasActiveInAdmin = true; let o = document.createElement('option'); o.value = p.name; 
+                if (isLateBookingBlocked && isPeriodStarted(dateVal, p.name)) { o.text = p.name + ' (بدأت)'; o.disabled = true; } else { o.text = p.name; }
+                timeSelect.appendChild(o); 
+            } 
+        });
+        if(!hasActiveInAdmin) { timeSelect.innerHTML = ''; let o = document.createElement('option'); o.value = ''; o.text = SYSTEM_MESSAGES.no_slots; o.disabled = true; o.selected = true; timeSelect.appendChild(o); }
     }
 
     function addAppointment() {
@@ -622,7 +672,7 @@
         function resetBtn() { submitBtn.disabled = false; submitBtn.innerText = 'تأكيد التسجيل'; submitBtn.style.opacity = '1'; isSubmitting = false; }
 
         const name = document.getElementById('name').value; const phoneInput = document.getElementById('phone').value; const group = document.getElementById('group').value; const course = document.getElementById('course').value;
-        const purePhoneCheck = extractPureNumber(phoneInput); if (purePhoneCheck.length !== 11) { showErrorModal('الرجاء التأكد من إدخال 11 رقماً.'); resetBtn(); return; }
+        const purePhoneCheck = extractPureNumber(phoneInput); if (purePhoneCheck.length !== 11) { showErrorModal(SYSTEM_MESSAGES.phone_err); resetBtn(); return; }
         const phone = purePhoneCheck; const courseKey = course === 'Classic Control' ? 'classic_control' : (course === 'PLC' ? 'plc' : 'motor_drive'); const maxLimit = LMS_COURSES[courseKey].limit || 8;
         
         const appointmentRows = document.querySelectorAll('.appointment-row'); let appointments = []; let hasDuplicate = false; let tempSet = new Set(); let hasLateBooking = false;
@@ -632,19 +682,19 @@
             const key = d + '|' + t; if(tempSet.has(key)) hasDuplicate = true; tempSet.add(key); appointments.push({ date: d, time: t }); 
         });
 
-        if (hasLateBooking) { showErrorModal('عفواً، لا يمكنك التسجيل في الفترة الحالية لانتهاء وقت الاستقبال.'); resetBtn(); return; }
-        if (hasDuplicate) { showErrorModal('تكرار في المواعيد المختارة.'); resetBtn(); return; }
+        if (hasLateBooking) { showErrorModal(SYSTEM_MESSAGES.late_block); resetBtn(); return; }
+        if (hasDuplicate) { showErrorModal(SYSTEM_MESSAGES.duplicate); resetBtn(); return; }
 
         try {
             const blockedSnap = await database.ref('blocked_phones').get(); let isBlocked = false; const normalizedInputPhone = normalizePhone(phone);
             if (blockedSnap.exists()) { const blockedData = blockedSnap.val(); Object.keys(blockedData).forEach(key => { if (normalizePhone(blockedData[key].phone) === normalizedInputPhone) isBlocked = true; }); }
-            if (isBlocked) { showErrorModal('الحساب مقيد، يرجى مراجعة الإدارة.'); resetBtn(); return; }
+            if (isBlocked) { showErrorModal(SYSTEM_MESSAGES.blocked); resetBtn(); return; }
 
             const snapshot = await database.ref('students').get(); let dbData = []; if (snapshot.exists()) { const data = snapshot.val(); Object.keys(data).forEach(key => dbData.push(data[key])); }
             for (let i = 0; i < appointments.length; i++) {
                 const app = appointments[i];
                 let currentCountInDB = dbData.filter(d => normalizeText(d.date) === normalizeText(app.date) && normalizeText(d.time) === normalizeText(app.time) && normalizeText(d.course) === normalizeText(course) && d.canceled !== true).length;
-                if (currentCountInDB >= maxLimit) { showErrorModal(`الموعد (${app.date}) فترة (${app.time}) ممتلئ.`); resetBtn(); return; }
+                if (currentCountInDB >= maxLimit) { showErrorModal(`${SYSTEM_MESSAGES.full} (${app.date} - ${app.time})`); resetBtn(); return; }
             }
 
             let promises = []; appointments.forEach(app => { const record = { name, phone, group, course, date: app.date, time: app.time, attended: false, tasks: null, canceled: false, timestamp: new Date().toLocaleString() }; promises.push(database.ref('students').push(record)); });
@@ -652,6 +702,7 @@
 
             const list = document.getElementById('modal-appointments-list'); list.innerHTML = '';
             appointments.forEach(app => list.innerHTML += `<li>تاريخ: <b>${app.date}</b> &nbsp;|&nbsp; <b>${app.time}</b></li>`);
+            document.getElementById('success-msg-display').innerText = SYSTEM_MESSAGES.success;
             document.getElementById('success-modal').style.display = 'flex'; document.getElementById('regForm').reset();
             document.getElementById('appointments-container').innerHTML = `<div class="appointment-row" style="display: flex; gap: 10px; margin-bottom: 10px; align-items: center;"><input type="date" class="date-input" min="${today}" required onchange="updateTimeOptions(this)" style="margin:0; width: 50%;"><select class="time-input" required style="margin:0; width: 50%;"><option value="" disabled selected>اختر التاريخ أولاً</option></select></div>`;
             resetBtn(); setTimeout(() => { closeSuccessModal(); }, 5000);
@@ -732,6 +783,36 @@
 
     function deleteStudentFinal(id) { if (confirm('تأكيد الحذف النهائي من قاعدة البيانات؟')) database.ref('students/' + id).remove().catch(error => alert('خطأ: ' + error.message)); }
 
+    window.deleteEntireGroup = async function() {
+        let groupSelect = document.getElementById('group-select').value;
+        if (!groupSelect) return;
+
+        if(confirm(`تحذير خطير: هل أنت متأكد من حذف المجموعة (${groupSelect}) بجميع طلابها وسجلاتها نهائياً؟ هذا الإجراء لا يمكن التراجع عنه!`)) {
+            let studentsInGroup = allStudents.filter(s => { return isStrictlyNumber(s.group) && extractPureNumber(s.group) === groupSelect; });
+            
+            let updates = {};
+            let progressUpdates = {};
+            
+            studentsInGroup.forEach(st => {
+                updates[st.id] = null;
+                progressUpdates[normalizePhone(st.phone)] = null;
+            });
+
+            try {
+                await database.ref('students').update(updates);
+                await database.ref('student_progress').update(progressUpdates);
+                alert('تم حذف المجموعة وكل تفاصيلها بنجاح.');
+                document.getElementById('group-select').value = '';
+                document.getElementById('groupDataTable').style.display = 'none';
+                document.getElementById('export-excel-btn').style.display = 'none';
+                document.getElementById('delete-group-btn').style.display = 'none';
+                document.getElementById('group-total-count').style.display = 'none';
+            } catch(err) {
+                alert('خطأ: ' + err.message);
+            }
+        }
+    };
+
     function updateGroupsDropdown() {
         let uniqueGroups = new Set(); allStudents.forEach(s => { if (isStrictlyNumber(s.group) && !s.canceled) { uniqueGroups.add(extractPureNumber(s.group)); } });
         let select = document.getElementById('group-select'); let currentVal = select.value; select.innerHTML = '<option value="" disabled selected>اختر المجموعة</option>';
@@ -765,19 +846,18 @@
         let uniqueStudents = Array.from(phoneMap.values());
         
         let excelBtn = document.getElementById('export-excel-btn');
-        let deleteBtn = document.getElementById('delete-group-btn');
-        let countEl = document.getElementById('group-total-count');
+        let deleteGrpBtn = document.getElementById('delete-group-btn');
 
         if (uniqueStudents.length > 0) { 
             excelBtn.style.display = 'block'; 
-            countEl.style.display = 'block'; 
-            countEl.innerText = `إجمالي عدد الطلاب: ${uniqueStudents.length}`; 
-            deleteBtn.style.display = 'block';
+            deleteGrpBtn.style.display = 'block';
+            document.getElementById('group-total-count').style.display = 'block'; 
+            document.getElementById('group-total-count').innerText = `إجمالي عدد الطلاب: ${uniqueStudents.length}`; 
         } 
         else { 
             excelBtn.style.display = 'none'; 
-            countEl.style.display = 'none'; 
-            deleteBtn.style.display = 'none';
+            deleteGrpBtn.style.display = 'none';
+            document.getElementById('group-total-count').style.display = 'none'; 
         }
         
         let tbody = document.querySelector('#groupDataTable tbody'); tbody.innerHTML = '';
@@ -794,28 +874,6 @@
         });
         document.getElementById('groupDataTable').style.display = 'table';
     }
-
-    window.deleteCurrentGroup = async function() {
-        let groupSelect = document.getElementById('group-select').value;
-        if (!groupSelect) return;
-
-        if(confirm(`تحذير خطير: هل أنت متأكد من حذف المجموعة [ ${groupSelect} ] بكافة طلابها نهائياً؟ هذا الإجراء لا يمكن التراجع عنه!`)) {
-            let updates = {};
-            allStudents.forEach(s => {
-                if (isStrictlyNumber(s.group) && extractPureNumber(s.group) === groupSelect) {
-                    updates[s.id] = null;
-                }
-            });
-            try {
-                await database.ref('students').update(updates);
-                alert('تم حذف المجموعة بالكامل بنجاح.');
-                document.getElementById('group-select').value = "";
-                renderGroupStudents("");
-            } catch(e) {
-                alert('خطأ: ' + e.message);
-            }
-        }
-    };
 
     function exportGroupToExcel() {
         let groupSelect = document.getElementById('group-select').value; if (!groupSelect) return;
@@ -864,26 +922,26 @@
         } catch(e) { alert('خطأ: ' + e.message); }
     };
 
-    window.renderWireStatus = function(phone, isReceived) {
-        let wrapper = document.getElementById('wire-wrapper');
-        if (isReceived) {
-            wrapper.innerHTML = `<span style="font-weight: bold; color: #28a745; font-size: 14px; cursor: pointer;" onclick="promptWireChange('${phone}', false)" title="إلغاء التسليم">Done</span>`;
-        } else {
-            wrapper.innerHTML = `<input type="checkbox" style="width: 18px; height: 18px; accent-color: #28a745; margin: 0; cursor: pointer;" onchange="handleWireChange('${phone}', true)">`;
-        }
-    }
-
-    window.promptWireChange = function(phone, isChecked) {
-        if (confirm("هل أنت متأكد من تغيير حالة تسليم الأسلاك (إلغاء التسليم)؟")) {
-            handleWireChange(phone, isChecked);
-        }
+    window.handleWireChange = async function(isChecked) {
+        if(!currentSelectedStudent) return;
+        try {
+            await database.ref(`student_progress/${currentSelectedStudent}/wire_received`).set(isChecked);
+            document.getElementById('wire-checkbox').style.display = 'none';
+            document.getElementById('wire-status-text').style.display = 'inline-block';
+        } catch (err) { alert('خطأ: ' + err.message); }
     };
 
-    window.handleWireChange = async function(phone, isChecked) {
-        try {
-            await database.ref(`student_progress/${phone}/wire_received`).set(isChecked);
-            renderWireStatus(phone, isChecked);
-        } catch (err) { alert('خطأ: ' + err.message); }
+    window.promptWireRevert = async function() {
+        if(!currentSelectedStudent) return;
+        if(confirm("تأكيد التراجع؟ سيتم إرجاع الحالة إلى (لم يتم التسليم).")) {
+            try {
+                await database.ref(`student_progress/${currentSelectedStudent}/wire_received`).set(false);
+                document.getElementById('wire-status-text').style.display = 'none';
+                let cb = document.getElementById('wire-checkbox');
+                cb.style.display = 'inline-block';
+                cb.checked = false;
+            } catch (err) { alert('خطأ: ' + err.message); }
+        }
     };
 
     window.saveNewNote = async function() {
@@ -1056,7 +1114,18 @@
         const studentProgressData = progSnap.exists() ? progSnap.val() : {};
 
         let isWireReceived = studentProgressData.wire_received || false;
-        renderWireStatus(normalizePhone(studentPhone), isWireReceived);
+        let wireCheckbox = document.getElementById('wire-checkbox');
+        let wireText = document.getElementById('wire-status-text');
+        
+        if(isWireReceived) {
+            wireCheckbox.style.display = 'none';
+            wireText.style.display = 'inline-block';
+        } else {
+            wireCheckbox.style.display = 'inline-block';
+            wireCheckbox.checked = false;
+            wireText.style.display = 'none';
+        }
+
         renderNotesList(studentProgressData.notesLog || {});
 
         buildLMSUI(normalizePhone(studentPhone), cTasks, studentProgressData); 
