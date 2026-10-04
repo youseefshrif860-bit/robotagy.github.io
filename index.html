@@ -8,8 +8,8 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <script>
-        if (window.location.href.indexOf('?v=56') === -1) {
-            window.location.replace(window.location.href.split('?')[0] + '?v=56');
+        if (window.location.href.indexOf('?v=57') === -1) {
+            window.location.replace(window.location.href.split('?')[0] + '?v=57');
         }
     </script>
 
@@ -412,7 +412,7 @@
     // رسائل النظام القابلة للتخصيص
     // ==========================================
     let SYSTEM_MESSAGES = {
-        no_slots: "لا توجد مواعيد متاحة حالياً",
+        closed_day: "المعمل مغلق يوم",
         late_block: "عفواً، لا يمكنك التسجيل في الفترة الحالية لانتهاء وقت الاستقبال.",
         duplicate: "تكرار في المواعيد المختارة.",
         blocked: "الحساب مقيد، يرجى مراجعة الإدارة.",
@@ -493,8 +493,8 @@
                 <div style="display:flex; flex-direction:column; gap:10px;">
                     <div><label style="font-size:13px; color:#fcc01a;">رسالة نجاح التسجيل:</label><input type="text" id="msg-success" value="${SYSTEM_MESSAGES.success}"></div>
                     <div><label style="font-size:13px; color:#fcc01a;">رسالة اكتمال العدد:</label><input type="text" id="msg-full" value="${SYSTEM_MESSAGES.full}"></div>
+                    <div><label style="font-size:13px; color:#fcc01a;">رسالة الإغلاق الكلي لليوم (يُضاف بعدها اسم اليوم تلقائياً):</label><input type="text" id="msg-closed-day" value="${SYSTEM_MESSAGES.closed_day}"></div>
                     <div><label style="font-size:13px; color:#fcc01a;">رسالة الإغلاق (انتهاء وقت الاستقبال):</label><input type="text" id="msg-late" value="${SYSTEM_MESSAGES.late_block}"></div>
-                    <div><label style="font-size:13px; color:#fcc01a;">رسالة اليوم المغلق (لا توجد مواعيد):</label><input type="text" id="msg-no-slots" value="${SYSTEM_MESSAGES.no_slots}"></div>
                     <div><label style="font-size:13px; color:#fcc01a;">رسالة الحساب المقيد:</label><input type="text" id="msg-blocked" value="${SYSTEM_MESSAGES.blocked}"></div>
                     <div><label style="font-size:13px; color:#fcc01a;">رسالة تكرار المواعيد:</label><input type="text" id="msg-duplicate" value="${SYSTEM_MESSAGES.duplicate}"></div>
                     <div><label style="font-size:13px; color:#fcc01a;">رسالة عدم وجود بيانات للبحث:</label><input type="text" id="msg-not-found" value="${SYSTEM_MESSAGES.not_found}"></div>
@@ -516,7 +516,7 @@
         let msgs = {
             full: document.getElementById('msg-full').value,
             late_block: document.getElementById('msg-late').value,
-            no_slots: document.getElementById('msg-no-slots').value,
+            closed_day: document.getElementById('msg-closed-day').value,
             blocked: document.getElementById('msg-blocked').value,
             duplicate: document.getElementById('msg-duplicate').value,
             success: document.getElementById('msg-success').value,
@@ -641,6 +641,7 @@
         const dateVal = element.value; const timeSelect = element.parentElement.querySelector('.time-input'); timeSelect.innerHTML = ''; 
         if (!dateVal) return; 
         const parts = dateVal.split('-'); const localDate = new Date(parts[0], parts[1] - 1, parts[2]); const day = localDate.getDay(); 
+        const dayNames = ["الأحد", "الإثنين", "الثلاثاء", "الأربعاء", "الخميس", "الجمعة", "السبت"];
         
         let daySettings = globalSchedule[day] || defaultSchedule[day] || {}; let hasActiveInAdmin = false;
         let defaultOpt = document.createElement('option'); defaultOpt.value = ''; defaultOpt.text = 'اختر الوقت'; defaultOpt.disabled = true; defaultOpt.selected = true; timeSelect.appendChild(defaultOpt);
@@ -653,7 +654,11 @@
                 timeSelect.appendChild(o); 
             } 
         });
-        if(!hasActiveInAdmin) { timeSelect.innerHTML = ''; let o = document.createElement('option'); o.value = ''; o.text = SYSTEM_MESSAGES.no_slots; o.disabled = true; o.selected = true; timeSelect.appendChild(o); }
+        
+        if(!hasActiveInAdmin) { 
+            timeSelect.innerHTML = ''; 
+            let o = document.createElement('option'); o.value = ''; o.text = `${SYSTEM_MESSAGES.closed_day} ${dayNames[day]}`; o.disabled = true; o.selected = true; timeSelect.appendChild(o); 
+        }
     }
 
     function addAppointment() {
