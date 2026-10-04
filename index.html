@@ -8,8 +8,8 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <script>
-        if (window.location.href.indexOf('?v=59') === -1) {
-            window.location.replace(window.location.href.split('?')[0] + '?v=59');
+        if (window.location.href.indexOf('?v=60') === -1) {
+            window.location.replace(window.location.href.split('?')[0] + '?v=60');
         }
     </script>
 
@@ -48,7 +48,9 @@
 
         .dashboard-layout { display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start; }
         .sidebar { background-color: #2a1540; padding: 20px; border-radius: 10px; width: 100%; max-width: 250px; box-sizing: border-box; display: flex; flex-direction: column; gap: 10px; }
-        .sidebar-title { color: #fcc01a; text-align: center; margin-top: 0; margin-bottom: 20px; font-size: 22px; }
+        .sidebar-title { color: #fcc01a; text-align: center; margin-top: 0; margin-bottom: 5px; font-size: 22px; }
+        #admin-name-display { text-align: center; color: #0c0213; font-weight: bold; font-size: 14px; margin-bottom: 20px; text-shadow: 0px 0px 3px rgba(255, 255, 255, 0.4); font-family: Tahoma; letter-spacing: 1px; }
+        
         .sidebar-btn { background-color: #4c2673; color: white; border: 1px solid #fcc01a; padding: 12px; border-radius: 5px; font-weight: bold; cursor: pointer; text-align: right; transition: 0.3s; }
         .sidebar-btn:hover, .sidebar-btn.active { background-color: #fcc01a; color: #3b1e5a; }
         .sidebar-logout { background-color: #ff4d4d; color: white; border: none; padding: 12px; border-radius: 5px; font-weight: bold; cursor: pointer; margin-top: 20px; text-align: center; }
@@ -190,6 +192,7 @@
     <div class="dashboard-layout">
         <div class="sidebar">
             <h3 class="sidebar-title">لوحة التحكم</h3>
+            <div id="admin-name-display"></div>
             <div style="position: relative; margin-bottom: 15px;">
                 <input type="text" id="search-student" placeholder="بحث باسم أو هاتف..." oninput="handleSearch(this.value)" autocomplete="off" style="margin: 0; border: 2px solid #fcc01a; background: #fff; color: #000; font-weight: bold; padding: 8px;">
                 <div id="search-suggestions"></div>
@@ -348,7 +351,7 @@
                     <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #ddd; padding-bottom: 10px; margin-bottom: 10px;">
                         <strong style="font-size: 14px; color: #3b1e5a;">Wires:</strong>
                         <div style="display: flex; align-items: center;">
-                            <span id="wire-status-text" style="font-weight: bold; color: #28a745; font-size: 14px; cursor: pointer; display: none;" onclick="promptWireRevert()" title="تعديل الحالة">Done</span>
+                            <span id="wire-status-text" style="font-weight: bold; color: #28a745; font-size: 14px; cursor: pointer; display: none;" onclick="promptWireRevert()">Done</span>
                             <input type="checkbox" id="wire-checkbox" style="width: 18px; height: 18px; accent-color: #28a745; margin: 0; cursor: pointer;" onchange="handleWireChange(this.checked)">
                         </div>
                     </div>
@@ -412,6 +415,20 @@
     document.querySelector('.date-input').setAttribute('min', today);
 
     let openCoursePanels = new Set();
+    let currentAdminName = ""; // لحفظ اسم الأدمن الحالي
+
+    auth.onAuthStateChanged(user => {
+        if(user) {
+            let emailName = user.email.split('@')[0];
+            currentAdminName = "ENG:" + emailName;
+            let displayElem = document.getElementById('admin-name-display');
+            if(displayElem) displayElem.innerText = currentAdminName;
+        } else {
+            currentAdminName = "";
+            let displayElem = document.getElementById('admin-name-display');
+            if(displayElem) displayElem.innerText = "";
+        }
+    });
 
     // ==========================================
     // رسائل النظام القابلة للتخصيص
@@ -935,9 +952,14 @@
     window.handleWireChange = async function(isChecked) {
         if(!currentSelectedStudent) return;
         try {
-            await database.ref(`student_progress/${currentSelectedStudent}/wire_received`).set(isChecked);
+            await database.ref(`student_progress/${currentSelectedStudent}`).update({
+                wire_received: isChecked,
+                wire_by: isChecked ? currentAdminName : null
+            });
             document.getElementById('wire-checkbox').style.display = 'none';
-            document.getElementById('wire-status-text').style.display = 'inline-block';
+            let wireText = document.getElementById('wire-status-text');
+            wireText.style.display = 'inline-block';
+            wireText.title = currentAdminName;
         } catch (err) { alert('خطأ: ' + err.message); }
     };
 
@@ -945,8 +967,13 @@
         if(!currentSelectedStudent) return;
         if(confirm("تأكيد التراجع؟ سيتم إرجاع الحالة إلى (لم يتم التسليم).")) {
             try {
-                await database.ref(`student_progress/${currentSelectedStudent}/wire_received`).set(false);
-                document.getElementById('wire-status-text').style.display = 'none';
+                await database.ref(`student_progress/${currentSelectedStudent}`).update({
+                    wire_received: false,
+                    wire_by: null
+                });
+                let wireText = document.getElementById('wire-status-text');
+                wireText.style.display = 'none';
+                wireText.title = '';
                 let cb = document.getElementById('wire-checkbox');
                 cb.style.display = 'inline-block';
                 cb.checked = false;
@@ -962,7 +989,7 @@
         let dateStr = getLocalDateString();
         
         try {
-            await database.ref(`student_progress/${currentSelectedStudent}/notesLog`).push({ text: text, date: dateStr });
+            await database.ref(`student_progress/${currentSelectedStudent}/notesLog`).push({ text: text, date: dateStr, by: currentAdminName });
             input.value = '';
             const progSnap = await database.ref('student_progress/' + currentSelectedStudent).get();
             renderNotesList(progSnap.exists() ? progSnap.val().notesLog || {} : {});
@@ -988,11 +1015,12 @@
         }
         keys.forEach(key => {
             let note = notesObj[key];
+            let byText = note.by ? ` title="${note.by}"` : '';
             container.innerHTML += `
                 <div style="background:#f4f4f4; padding:8px; border-radius:5px; margin-bottom:5px; position:relative; font-size:12px; color:black; border: 1px solid #ddd; padding-left: 20px;">
                     <button onclick="deleteNote('${key}')" style="position:absolute; top:4px; left:4px; background:none; border:none; color:#cc0000; cursor:pointer; font-size:12px;" title="حذف الملاحظة">✖</button>
                     <div style="word-wrap:break-word; font-family: Tahoma; line-height: 1.5;">${note.text}</div>
-                    <div style="font-size:10px; color:#aaa; text-align:left; margin-top:4px;">${note.date}</div>
+                    <div style="font-size:10px; color:#aaa; text-align:left; margin-top:4px; width:fit-content; cursor:help;" ${byText}>${note.date}</div>
                 </div>
             `;
         });
@@ -1103,10 +1131,12 @@
                 }
 
                 let statusHTML = ''; let tasksStr = rec.tasks ? rec.tasks.split('|').join(' , ') : '-';
+                let byStr = rec.attended_by ? ` title="${rec.attended_by}"` : '';
+
                 if (rec.canceled) {
                     statusHTML = '<span style="color:#999; font-weight:bold;">ملغي</span>';
                 } else if (rec.attended) {
-                    statusHTML = `<span style="color:green; font-weight:bold; cursor:pointer;" onclick="updateAttendance('${rec.id}', '${rec.course}', false, this)" title="إلغاء الحضور">حاضر ✔</span>`;
+                    statusHTML = `<span style="color:green; font-weight:bold; cursor:pointer;" onclick="updateAttendance('${rec.id}', '${rec.course}', false, this)" ${byStr}>حاضر ✔</span>`;
                 } else if (isPeriodPassed(rec.date, rec.time)) {
                     statusHTML = `<span style="color:red; font-weight:bold; cursor:pointer;" onclick="updateAttendance('${rec.id}', '${rec.course}', true, this)" title="تحضير متأخر">غائب ✘</span>`;
                 } else if (!isPeriodStarted(rec.date, rec.time)) {
@@ -1130,10 +1160,12 @@
         if(isWireReceived) {
             wireCheckbox.style.display = 'none';
             wireText.style.display = 'inline-block';
+            wireText.title = studentProgressData.wire_by || '';
         } else {
             wireCheckbox.style.display = 'inline-block';
             wireCheckbox.checked = false;
             wireText.style.display = 'none';
+            wireText.title = '';
         }
 
         renderNotesList(studentProgressData.notesLog || {});
@@ -1162,7 +1194,7 @@
 
     function updateAttendance(id, course, status, checkboxElem) {
         if (status) {
-            if(!course || course === 'غير محدد') { database.ref('students/' + id).update({ attended: true, tasks: null }); return; }
+            if(!course || course === 'غير محدد') { database.ref('students/' + id).update({ attended: true, tasks: null, attended_by: currentAdminName }); return; }
             pendingAttendanceId = id; pendingAttendanceCourse = course;
             
             let studentRecord = allStudents.find(s => s.id === id);
@@ -1205,14 +1237,14 @@
             document.getElementById('task-course-name').innerText = course; document.getElementById('task-modal').style.display = 'flex';
             if(checkboxElem) checkboxElem.checked = false; 
         } else {
-            database.ref('students/' + id).update({ attended: false, tasks: null });
+            database.ref('students/' + id).update({ attended: false, tasks: null, attended_by: null });
         }
     }
 
     function saveAttendanceWithTasks() {
         let selectedTasks = []; document.querySelectorAll('.task-cb:checked').forEach(cb => selectedTasks.push(cb.value));
         let tasksStr = selectedTasks.join(' | ');
-        database.ref('students/' + pendingAttendanceId).update({ attended: true, tasks: tasksStr.length > 0 ? tasksStr : null }).then(() => { document.getElementById('task-modal').style.display = 'none'; pendingAttendanceId = null; });
+        database.ref('students/' + pendingAttendanceId).update({ attended: true, tasks: tasksStr.length > 0 ? tasksStr : null, attended_by: currentAdminName }).then(() => { document.getElementById('task-modal').style.display = 'none'; pendingAttendanceId = null; });
     }
     function cancelTaskSelection() { pendingAttendanceId = null; document.getElementById('task-modal').style.display = 'none'; }
 
@@ -1273,7 +1305,7 @@
             let yearBtn = document.createElement('button'); yearBtn.className = 'nav-btn'; yearBtn.style.margin = '0'; yearBtn.style.flex = '1';
             yearBtn.innerText = `${year} (طلاب: ${uniqueYearStudents})`;
             
-            let yearDelBtn = document.createElement('button'); yearDelBtn.className = 'delete-btn'; yearDelBtn.style.margin = '0'; yearDelBtn.innerText = '🗑️';
+            let yearDelBtn = document.createElement('button'); yearDelBtn.className = 'delete-btn'; yearDelBtn.style.margin = '0'; yearDelBtn.innerText = '🗑️️';
             yearDelBtn.onclick = () => deleteAllInYear(year);
 
             yearRow.appendChild(yearBtn); yearRow.appendChild(yearDelBtn);
@@ -1329,8 +1361,11 @@
             let isCanceled = row.canceled === true; let bgStyle = isCanceled ? 'background-color: #f1f1f1; color: #a9a9a9;' : ''; 
             
             let isChecked = row.attended ? 'checked' : '';
+            let byStr = row.attended_by ? ` title="${row.attended_by}"` : '';
+
             let statusHTML = `<input type="checkbox" class="attendance-check" ${isChecked} onchange="updateAttendance('${row.id}', '${row.course}', this.checked, this)">`;
             if (isCanceled) statusHTML = '<span style="color:red; font-weight:bold;">ملغي</span>';
+            else if (row.attended) statusHTML = `<span style="color:green; font-weight:bold; cursor:pointer;" onclick="updateAttendance('${row.id}', '${row.course}', false, this)" ${byStr}>حاضر ✔</span>`;
             
             let controlsHTML = `<button class="delete-btn" onclick="deleteStudentFinal('${row.id}')">حذف</button>`; 
             if (isCanceled) controlsHTML = `<button class="add-btn" style="padding:5px; margin-bottom:5px; font-size:12px; display:block; width:100%;" onclick="restoreStudent('${row.id}')">استرجاع</button>` + controlsHTML;
