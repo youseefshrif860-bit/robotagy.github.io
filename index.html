@@ -8,8 +8,8 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <script>
-        if (window.location.href.indexOf('?v=60') === -1) {
-            window.location.replace(window.location.href.split('?')[0] + '?v=60');
+        if (window.location.href.indexOf('?v=61') === -1) {
+            window.location.replace(window.location.href.split('?')[0] + '?v=61');
         }
     </script>
 
@@ -415,7 +415,7 @@
     document.querySelector('.date-input').setAttribute('min', today);
 
     let openCoursePanels = new Set();
-    let currentAdminName = ""; // لحفظ اسم الأدمن الحالي
+    let currentAdminName = "";
 
     auth.onAuthStateChanged(user => {
         if(user) {
@@ -441,7 +441,8 @@
         full: "عفواً، هذا الموعد ممتلئ.",
         success: "تم تأكيد التسجيل بنجاح. بيان المواعيد:",
         not_found: "لا توجد بيانات متطابقة.",
-        phone_err: "الرجاء التأكد من إدخال رقم هاتف مكون من 11 رقماً."
+        phone_err: "الرجاء التأكد من إدخال رقم هاتف مكون من 11 رقماً.",
+        wa_template: ""
     };
 
     database.ref('settings/messages').on('value', snap => {
@@ -450,6 +451,21 @@
         }
         renderSystemSettingsUI();
     });
+
+    // فتح واتساب
+    window.openWhatsApp = function(phone) {
+        if (!phone) return;
+        let purePhone = extractPureNumber(phone);
+        if (purePhone.length === 11 && purePhone.startsWith('0')) {
+            purePhone = '20' + purePhone.substring(1);
+        }
+        let url = `https://wa.me/${purePhone}`;
+        let template = SYSTEM_MESSAGES.wa_template ? SYSTEM_MESSAGES.wa_template.trim() : "";
+        if (template) {
+            url += `?text=${encodeURIComponent(template)}`;
+        }
+        window.open(url, '_blank');
+    };
 
     // ==========================================
     // إعدادات الكورسات والفترات
@@ -513,6 +529,7 @@
             <div class="settings-card" style="margin-top: 20px;">
                 <h4>تخصيص رسائل النظام (واجهة الطالب)</h4>
                 <div style="display:flex; flex-direction:column; gap:10px;">
+                    <div><label style="font-size:13px; color:#fcc01a;">رسالة واتساب الافتراضية (اتركها فارغة لإلغائها):</label><input type="text" id="msg-wa-template" value="${SYSTEM_MESSAGES.wa_template || ''}" placeholder="أهلاً بك، يرجى العلم أنه..."></div>
                     <div><label style="font-size:13px; color:#fcc01a;">رسالة نجاح التسجيل:</label><input type="text" id="msg-success" value="${SYSTEM_MESSAGES.success}"></div>
                     <div><label style="font-size:13px; color:#fcc01a;">رسالة اكتمال العدد:</label><input type="text" id="msg-full" value="${SYSTEM_MESSAGES.full}"></div>
                     <div><label style="font-size:13px; color:#fcc01a;">رسالة الإغلاق الكلي لليوم (يُضاف بعدها اسم اليوم تلقائياً):</label><input type="text" id="msg-closed-day" value="${SYSTEM_MESSAGES.closed_day}"></div>
@@ -543,7 +560,8 @@
             duplicate: document.getElementById('msg-duplicate').value,
             success: document.getElementById('msg-success').value,
             not_found: document.getElementById('msg-not-found').value,
-            phone_err: document.getElementById('msg-phone-err').value
+            phone_err: document.getElementById('msg-phone-err').value,
+            wa_template: document.getElementById('msg-wa-template').value
         };
         database.ref('settings/messages').update(msgs).then(() => alert('تم حفظ إعدادات النظام وتحديث الرسائل بنجاح.'));
     }
@@ -897,7 +915,7 @@
             let cProg = calculateProgressDynamic('classic_control', cTasks, stProg); let pProg = calculateProgressDynamic('plc', cTasks, stProg); let dProg = calculateProgressDynamic('motor_drive', cTasks, stProg);
             let cText = cProg.percentage === 100 && cProg.totalItems > 0 ? '✅' : `${cProg.completed}/${cProg.totalItems}`; let pText = pProg.percentage === 100 && pProg.totalItems > 0 ? '✅' : `${pProg.completed}/${pProg.totalItems}`; let dText = dProg.percentage === 100 && dProg.totalItems > 0 ? '✅' : `${dProg.completed}/${dProg.totalItems}`;
             
-            tbody.innerHTML += `<tr><td><span onclick="selectStudent('${st.phone}')" style="cursor: pointer;">${st.name || ''}</span></td><td>${st.phone || ''}</td><td style="font-weight: bold; color: #3b1e5a;">${pureGrp}</td><td style="font-size: 13px; font-weight: bold; color:#cc0000;">${cText}</td><td style="font-size: 13px; font-weight: bold; color:#cc0000;">${pText}</td><td style="font-size: 13px; font-weight: bold; color:#cc0000;">${dText}</td><td><button class="delete-btn" onclick="deleteStudentFinal('${st.id}')">حذف</button></td></tr>`; 
+            tbody.innerHTML += `<tr><td><span onclick="selectStudent('${st.phone}')" style="cursor: pointer;">${st.name || ''}</span></td><td onclick="openWhatsApp('${st.phone}')" style="cursor: pointer;" title="مراسلة عبر واتساب">${st.phone || ''}</td><td style="font-weight: bold; color: #3b1e5a;">${pureGrp}</td><td style="font-size: 13px; font-weight: bold; color:#cc0000;">${cText}</td><td style="font-size: 13px; font-weight: bold; color:#cc0000;">${pText}</td><td style="font-size: 13px; font-weight: bold; color:#cc0000;">${dText}</td><td><button class="delete-btn" onclick="deleteStudentFinal('${st.id}')">حذف</button></td></tr>`; 
         });
         document.getElementById('groupDataTable').style.display = 'table';
     }
@@ -1106,7 +1124,13 @@
         let absent = validRecords.filter(s => !s.attended && isPeriodPassed(s.date, s.time)).length;
 
         document.getElementById('report-name').innerText = 'السجل الأكاديمي: ' + latestName; 
-        document.getElementById('report-phone').innerText = studentPhone; 
+        
+        let phoneEl = document.getElementById('report-phone');
+        phoneEl.innerText = studentPhone; 
+        phoneEl.onclick = () => openWhatsApp(studentPhone);
+        phoneEl.style.cursor = 'pointer';
+        phoneEl.title = 'مراسلة عبر واتساب';
+
         document.getElementById('report-last').innerText = lastAttended;
         document.getElementById('report-total').innerText = validRecords.length;
         document.getElementById('report-absent').innerText = absent;
@@ -1305,7 +1329,7 @@
             let yearBtn = document.createElement('button'); yearBtn.className = 'nav-btn'; yearBtn.style.margin = '0'; yearBtn.style.flex = '1';
             yearBtn.innerText = `${year} (طلاب: ${uniqueYearStudents})`;
             
-            let yearDelBtn = document.createElement('button'); yearDelBtn.className = 'delete-btn'; yearDelBtn.style.margin = '0'; yearDelBtn.innerText = '🗑️️';
+            let yearDelBtn = document.createElement('button'); yearDelBtn.className = 'delete-btn'; yearDelBtn.style.margin = '0'; yearDelBtn.innerText = '🗑';
             yearDelBtn.onclick = () => deleteAllInYear(year);
 
             yearRow.appendChild(yearBtn); yearRow.appendChild(yearDelBtn);
@@ -1370,7 +1394,7 @@
             let controlsHTML = `<button class="delete-btn" onclick="deleteStudentFinal('${row.id}')">حذف</button>`; 
             if (isCanceled) controlsHTML = `<button class="add-btn" style="padding:5px; margin-bottom:5px; font-size:12px; display:block; width:100%;" onclick="restoreStudent('${row.id}')">استرجاع</button>` + controlsHTML;
             
-            tbody.innerHTML += `<tr style="${bgStyle}"><td><span onclick="selectStudent('${row.phone}')" style="cursor: pointer;">${row.name || ''}</span></td><td>${row.phone || ''}</td><td style="font-weight:bold;">${extractPureNumber(row.group)}</td><td style="font-weight: bold; color: #3b1e5a;">${row.course || ''}</td><td>${row.date || ''}</td><td>${row.time || ''}</td><td>${statusHTML}</td><td>${controlsHTML}</td></tr>`;
+            tbody.innerHTML += `<tr style="${bgStyle}"><td><span onclick="selectStudent('${row.phone}')" style="cursor: pointer;">${row.name || ''}</span></td><td onclick="openWhatsApp('${row.phone}')" style="cursor: pointer;" title="مراسلة عبر واتساب">${row.phone || ''}</td><td style="font-weight:bold;">${extractPureNumber(row.group)}</td><td style="font-weight: bold; color: #3b1e5a;">${row.course || ''}</td><td>${row.date || ''}</td><td>${row.time || ''}</td><td>${statusHTML}</td><td>${controlsHTML}</td></tr>`;
         });
     }
 
