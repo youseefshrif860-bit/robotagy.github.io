@@ -8,8 +8,8 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <script>
-        if (window.location.href.indexOf('?v=Robotagy_Scan') === -1) {
-            window.location.replace(window.location.href.split('?')[0] + '?v=Robotagy_Scan');
+        if (window.location.href.indexOf('?v=Robotagy_Lab2') === -1) {
+            window.location.replace(window.location.href.split('?')[0] + '?v=Robotagy_Lab2');
         }
     </script>
 
@@ -298,10 +298,11 @@
 
             <!-- قسم الطلاب المقيدين -->
             <div id="view-blocked" class="view-section">
-                <h3 style="color: white; border-bottom: 2px solid #fcc01a; padding-bottom: 10px; margin-top: 0;">الطلاب المقيدين (المحظورين)</h3>
-                
-                <!-- زر الرادار الاستباقي للفحص الآلي -->
-                <button class="add-btn" style="background-color: #fcc01a; color: #3b1e5a; font-size: 16px;" onclick="runAutoSweep()" id="sweep-btn">فحص النظام وتحديث القائمة آلياً 🔍</button>
+                <!-- الرأس وفيه العدسة -->
+                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #fcc01a; padding-bottom: 10px; margin-bottom: 15px; margin-top: 0;">
+                    <h3 style="color: white; margin: 0;">الطلاب المقيدين (المحظورين)</h3>
+                    <button id="sweep-btn" onclick="runAutoSweep()" style="background: none; border: none; font-size: 26px; cursor: pointer; transition: transform 0.2s;" title="فحص النظام وتحديث القائمة آلياً">🔍</button>
+                </div>
 
                 <div style="overflow-x: auto;">
                     <table id="blockedTable">
@@ -796,19 +797,25 @@
 
             const snapshot = await database.ref('students').get(); let dbData = []; if (snapshot.exists()) { const data = snapshot.val(); Object.keys(data).forEach(key => dbData.push(data[key])); }
             
+            // سحب تاريخ العفو (unblock_date) من بروفايل الطالب
             const progSnap = await database.ref('student_progress/' + normalizedInputPhone).get();
             let unblockDate = progSnap.exists() ? (progSnap.val().unblock_date || null) : null;
             
+            // --- عمليات الفحص الصارمة بمشرط جراح ---
+            
+            // 1. فحص حظر مدة المجموعة
             let pureTargetGroup = extractPureNumber(group);
             let groupRecordsForTenureCheck = dbData.filter(d => extractPureNumber(d.group) === pureTargetGroup && d.date && d.date !== "بدون موعد" && !d.canceled);
             if (groupRecordsForTenureCheck.length > 0) {
                 groupRecordsForTenureCheck.sort((a,b) => new Date(a.date+"T00:00:00") - new Date(b.date+"T00:00:00"));
                 let oldestDate = groupRecordsForTenureCheck[0].date;
+                // تطبيق مفعول العفو
                 if (unblockDate && unblockDate > oldestDate) oldestDate = unblockDate;
                 
                 let diffDaysGroup = diffDaysSafely(oldestDate, todayStr);
                 if (diffDaysGroup >= 90) {
-                    await database.ref('blocked_phones').push({ phone: phone, name: name, reason: 'محاولة تسجيل في مجموعة قديمة' });
+                    let newBanRef = database.ref('blocked_phones').push();
+                    await newBanRef.set({ phone: phone, name: name, reason: 'محاولة تسجيل في مجموعة قديمة' });
                     showErrorModal(SYSTEM_MESSAGES.blocked);
                     resetBtn(); return;
                 }
@@ -819,17 +826,22 @@
                 studentPastRecordsAll.sort((a,b) => new Date(b.date+"T00:00:00") - new Date(a.date+"T00:00:00"));
                 let latestDate = studentPastRecordsAll[0].date;
                 
+                // 2. فحص الانقطاع أكثر من 14 يوم
+                // تطبيق مفعول العفو
                 if (unblockDate && unblockDate > latestDate) latestDate = unblockDate;
                 
                 let inactivityDays = diffDaysSafely(latestDate, todayStr);
                 if (inactivityDays > 14) {
-                    await database.ref('blocked_phones').push({ phone: phone, name: name, reason: 'انقطاع عن التسجيل (أكثر من 14 يوم)' });
+                    let newBanRef = database.ref('blocked_phones').push();
+                    await newBanRef.set({ phone: phone, name: name, reason: 'انقطاع عن التسجيل (أكثر من 14 يوم)' });
                     showErrorModal(SYSTEM_MESSAGES.blocked);
                     resetBtn(); return;
                 }
 
+                // 3. فحص حظر 3 غيابات في آخر 14 يوم
                 let absencesCount = 0;
                 studentPastRecordsAll.forEach(rec => {
+                    // تجاهل الغيابات اللي حصلت قبل تاريخ العفو
                     if (unblockDate && rec.date < unblockDate) return; 
                     
                     if (!rec.attended && isPeriodPassed(rec.date, rec.time)) {
@@ -841,11 +853,13 @@
                 });
 
                 if (absencesCount >= 3) {
-                    await database.ref('blocked_phones').push({ phone: phone, name: name, reason: 'تجاوز حد الغياب (3 مرات)' });
+                    let newBanRef = database.ref('blocked_phones').push();
+                    await newBanRef.set({ phone: phone, name: name, reason: 'تجاوز حد الغياب (3 مرات)' });
                     showErrorModal(SYSTEM_MESSAGES.blocked);
                     resetBtn(); return;
                 }
             }
+            // --- نهاية عمليات الفحص الصارمة ---
 
             for (let i = 0; i < appointments.length; i++) {
                 const app = appointments[i];
@@ -868,7 +882,7 @@
     // دالة الفحص الآلي الاستباقي (الرادار)
     window.runAutoSweep = async function() {
         const btn = document.getElementById('sweep-btn');
-        btn.innerText = 'جاري فحص النظام...';
+        btn.style.transform = 'scale(1.2)';
         btn.disabled = true;
 
         let todayStr = getLocalDateString();
@@ -901,7 +915,7 @@
                 let oldestDate = groupRecords[0].date;
                 if (unblockDate && unblockDate > oldestDate) oldestDate = unblockDate;
                 if (diffDaysSafely(oldestDate, todayStr) >= 90) {
-                    isBanned = true; reason = 'تجاوز مدة المجموعة (3 أشهر)';
+                    isBanned = true; reason = 'محاولة تسجيل في مجموعة قديمة (تجاوزت 3 أشهر)';
                 }
             }
 
@@ -935,14 +949,16 @@
         }
 
         if(updatesToPush.length > 0) {
-            let promises = updatesToPush.map(info => database.ref('blocked_phones').push(info));
-            await Promise.all(promises);
+            for(let info of updatesToPush) {
+                let newBan = database.ref('blocked_phones').push();
+                await newBan.set(info);
+            }
             alert(`تم الانتهاء! تم رصد وتقييد ${updatesToPush.length} طالب آلياً.`);
         } else {
             alert('فحص سليم! لا يوجد أي طلاب يستحقون القيد حالياً.');
         }
 
-        btn.innerText = 'فحص النظام وتحديث القائمة آلياً 🔍';
+        btn.style.transform = 'scale(1)';
         btn.disabled = false;
     };
 
@@ -1458,7 +1474,7 @@
                 selectStudent(phone); 
             }
         } else {
-            if (confirm(`تأكيد تقييد الطالب؟`)) { await database.ref('blocked_phones').push({ phone: phone, name: name, reason: 'حظر يدوي من الإدارة' }); alert('تم تقييد الطالب.'); selectStudent(phone); }
+            if (confirm(`تأكيد تقييد الطالب؟`)) { await database.ref('blocked_phones').push().set({ phone: phone, name: name, reason: 'حظر يدوي من الإدارة' }); alert('تم تقييد الطالب.'); selectStudent(phone); }
         }
     }
     function closeReportModal() { 
