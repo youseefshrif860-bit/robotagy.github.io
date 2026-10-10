@@ -95,7 +95,7 @@
 <body>
 
 <div class="header">
-    <div class="logo">روبوتاجي <span class="pro-badge">FINAL</span></div>
+    <div class="logo">روبوتاجي</div>
     <button class="admin-btn" onclick="showLogin()">الإدارة</button>
 </div>
 
@@ -783,6 +783,36 @@
             if (isBlocked) { showErrorModal(SYSTEM_MESSAGES.blocked); resetBtn(); return; }
 
             const snapshot = await database.ref('students').get(); let dbData = []; if (snapshot.exists()) { const data = snapshot.val(); Object.keys(data).forEach(key => dbData.push(data[key])); }
+            
+            let pureTargetGroup = extractPureNumber(group);
+            let groupRecordsForTenureCheck = dbData.filter(d => extractPureNumber(d.group) === pureTargetGroup && d.date && d.date !== "بدون موعد" && !d.canceled);
+            if (groupRecordsForTenureCheck.length > 0) {
+                groupRecordsForTenureCheck.sort((a,b) => new Date(a.date) - new Date(b.date));
+                let oldestDate = new Date(groupRecordsForTenureCheck[0].date);
+                let todayDate = new Date(getLocalDateString());
+                let diffDays = Math.floor(Math.abs(todayDate - oldestDate) / (1000 * 60 * 60 * 24));
+                if (diffDays >= 90) {
+                    await database.ref('blocked_phones').push({ phone: phone, name: name });
+                    showErrorModal(SYSTEM_MESSAGES.blocked);
+                    resetBtn(); return;
+                }
+            }
+
+            let studentPastRecords = dbData.filter(d => normalizePhone(d.phone) === normalizedInputPhone);
+            let nowMs = new Date(getLocalDateString()).getTime();
+            let fourteenDaysMs = 14 * 24 * 60 * 60 * 1000;
+            let recentAbsences = studentPastRecords.filter(d => {
+                if (d.canceled || d.attended || !d.date || d.date === "بدون موعد") return false;
+                if (!isPeriodPassed(d.date, d.time)) return false;
+                let recDateMs = new Date(d.date).getTime();
+                return (nowMs - recDateMs) <= fourteenDaysMs;
+            });
+            if (recentAbsences.length >= 3) {
+                await database.ref('blocked_phones').push({ phone: phone, name: name });
+                showErrorModal(SYSTEM_MESSAGES.blocked);
+                resetBtn(); return;
+            }
+
             for (let i = 0; i < appointments.length; i++) {
                 const app = appointments[i];
                 let currentCountInDB = dbData.filter(d => normalizeText(d.date) === normalizeText(app.date) && normalizeText(d.time) === normalizeText(app.time) && normalizeText(d.course) === normalizeText(course) && d.canceled !== true).length;
