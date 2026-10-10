@@ -8,8 +8,8 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <script>
-        if (window.location.href.indexOf('?v=Robotagy_FinalFix') === -1) {
-            window.location.replace(window.location.href.split('?')[0] + '?v=Robotagy_FinalFix');
+        if (window.location.href.indexOf('?v=Robotagy_Academy') === -1) {
+            window.location.replace(window.location.href.split('?')[0] + '?v=Robotagy_Academy');
         }
     </script>
 
@@ -368,6 +368,7 @@
                     <div>مرات الغياب: <b id="report-absent" style="color: red;"></b></div>
                     <div>تاريخ آخر حضور: <b id="report-last" style="color: green;"></b></div>
                     <div style="margin-top:5px; padding-top:5px; border-top:1px dashed #ddd; font-size: 13px;">عمر المجموعة: <b id="report-group-tenure" style="color: #28a745;"></b></div>
+                    <div id="report-vip-status" style="margin-top:5px; font-size: 13px; font-weight:bold; color:#fcc01a; display:none;">⭐ خريج (VIP Immunity)</div>
                 </div>
             </div>
             
@@ -682,6 +683,27 @@
         document.getElementById('manage-view').style.display = 'block';
     }
 
+    // دالة فحص الـ VIP (إتمام 100% في كافة الكورسات)
+    function checkIfStudentIsVIP(normalizedPhone, recordsArr, progressDataObj) {
+        let cTasks = { classic_control: new Set(), plc: new Set(), motor_drive: new Set() };
+        let studentRecords = recordsArr.filter(s => normalizePhone(s.phone) === normalizedPhone && !s.canceled && s.attended && s.tasks);
+        
+        studentRecords.forEach(r => {
+            let cKey = r.course === 'Classic Control' ? 'classic_control' : (r.course === 'PLC' ? 'plc' : 'motor_drive');
+            r.tasks.split('|').forEach(t => { if(t.trim()) cTasks[cKey].add(t.trim()); });
+        });
+
+        let isAllCompleted = true;
+        Object.keys(LMS_COURSES).forEach(courseKey => {
+            let prog = calculateProgressDynamic(courseKey, cTasks, progressDataObj);
+            // لو أي كورس لم يكتمل 100% أو الكورس ده ملوش مهام أصلاً عند الطالب، يبقى مش VIP
+            if (prog.percentage < 100 || prog.totalItems === 0) {
+                isAllCompleted = false;
+            }
+        });
+        return isAllCompleted;
+    }
+
     async function searchMyVisits() {
         const rawPhone = document.getElementById('manage-phone').value;
         const mPhone = extractPureNumber(rawPhone);
@@ -791,27 +813,36 @@
         if (hasDuplicate) { showErrorModal(SYSTEM_MESSAGES.duplicate); resetBtn(); return; }
 
         try {
+            // منع تكرار القيد: فحص هل الطالب في قائمة المحظورين حالياً
             const blockedSnap = await database.ref('blocked_phones').get(); let isBlocked = false;
             if (blockedSnap.exists()) { const blockedData = blockedSnap.val(); Object.keys(blockedData).forEach(key => { if (normalizePhone(blockedData[key].phone) === normalizedInputPhone) isBlocked = true; }); }
             if (isBlocked) { showErrorModal(SYSTEM_MESSAGES.blocked); resetBtn(); return; }
 
             const snapshot = await database.ref('students').get(); let dbData = []; if (snapshot.exists()) { const data = snapshot.val(); Object.keys(data).forEach(key => dbData.push(data[key])); }
-            
             const progSnap = await database.ref('student_progress/' + normalizedInputPhone).get();
-            let unblockDate = progSnap.exists() ? (progSnap.val().unblock_date || null) : null;
+            let progressDataObj = progSnap.exists() ? progSnap.val() : {};
+            let unblockDate = progressDataObj.unblock_date || null;
             
-            let pureTargetGroup = extractPureNumber(group || '');
-            let groupRecordsForTenureCheck = dbData.filter(d => extractPureNumber(d.group || '') === pureTargetGroup && d.date && d.date !== "بدون موعد" && !d.canceled);
-            if (groupRecordsForTenureCheck.length > 0) {
-                groupRecordsForTenureCheck.sort((a,b) => new Date(a.date+"T00:00:00") - new Date(b.date+"T00:00:00"));
-                let oldestDate = groupRecordsForTenureCheck[0].date;
-                if (unblockDate && unblockDate > oldestDate) oldestDate = unblockDate;
-                
-                let diffDaysGroup = diffDaysSafely(oldestDate, todayStr);
-                if (diffDaysGroup >= 90) {
-                    try { await database.ref('blocked_phones').push({ phone: phone, name: name || 'بدون اسم', reason: 'محاولة تسجيل في مجموعة قديمة' }); } catch(err) { console.error(err); }
-                    showErrorModal(SYSTEM_MESSAGES.blocked);
-                    resetBtn(); return;
+            let isVIP = checkIfStudentIsVIP(normalizedInputPhone, dbData, progressDataObj);
+            
+            // --- عمليات الفحص الصارمة بمشرط جراح ---
+            
+            // 1. فحص حظر مدة المجموعة (إعفاء للـ VIP)
+            if (!isVIP) {
+                let pureTargetGroup = extractPureNumber(group || '');
+                let groupRecordsForTenureCheck = dbData.filter(d => extractPureNumber(d.group || '') === pureTargetGroup && d.date && d.date !== "بدون موعد" && !d.canceled);
+                if (groupRecordsForTenureCheck.length > 0) {
+                    groupRecordsForTenureCheck.sort((a,b) => new Date(a.date+"T00:00:00") - new Date(b.date+"T00:00:00"));
+                    let oldestDate = groupRecordsForTenureCheck[0].date;
+                    // تطبيق مفعول العفو
+                    if (unblockDate && unblockDate > oldestDate) oldestDate = unblockDate;
+                    
+                    let diffDaysGroup = diffDaysSafely(oldestDate, todayStr);
+                    if (diffDaysGroup >= 90) {
+                        try { await database.ref('blocked_phones').push().set({ phone: phone, name: name || 'بدون اسم', reason: 'محاولة تسجيل في مجموعة قديمة' }); } catch(err) { console.error(err); }
+                        showErrorModal(SYSTEM_MESSAGES.blocked);
+                        resetBtn(); return;
+                    }
                 }
             }
 
@@ -820,19 +851,21 @@
                 studentPastRecordsAll.sort((a,b) => new Date(b.date+"T00:00:00") - new Date(a.date+"T00:00:00"));
                 let latestDate = studentPastRecordsAll[0].date;
                 
-                if (unblockDate && unblockDate > latestDate) latestDate = unblockDate;
-                
-                let inactivityDays = diffDaysSafely(latestDate, todayStr);
-                if (inactivityDays > 14) {
-                    try { await database.ref('blocked_phones').push({ phone: phone, name: name || 'بدون اسم', reason: 'انقطاع عن التسجيل (أكثر من 14 يوم)' }); } catch(err) { console.error(err); }
-                    showErrorModal(SYSTEM_MESSAGES.blocked);
-                    resetBtn(); return;
+                // 2. فحص الانقطاع أكثر من 14 يوم (إعفاء للـ VIP)
+                if (!isVIP) {
+                    if (unblockDate && unblockDate > latestDate) latestDate = unblockDate;
+                    let inactivityDays = diffDaysSafely(latestDate, todayStr);
+                    if (inactivityDays > 14) {
+                        try { await database.ref('blocked_phones').push().set({ phone: phone, name: name || 'بدون اسم', reason: 'انقطاع عن التسجيل (أكثر من 14 يوم)' }); } catch(err) { console.error(err); }
+                        showErrorModal(SYSTEM_MESSAGES.blocked);
+                        resetBtn(); return;
+                    }
                 }
 
+                // 3. فحص حظر 3 غيابات في آخر 14 يوم (يطبق على الجميع حتى الـ VIP)
                 let absencesCount = 0;
                 studentPastRecordsAll.forEach(rec => {
                     if (unblockDate && rec.date < unblockDate) return; 
-                    
                     if (!rec.attended && isPeriodPassed(rec.date, rec.time)) {
                         let dPassed = diffDaysSafely(rec.date, todayStr);
                         if (dPassed >= 0 && dPassed <= 14) {
@@ -842,11 +875,12 @@
                 });
 
                 if (absencesCount >= 3) {
-                    try { await database.ref('blocked_phones').push({ phone: phone, name: name || 'بدون اسم', reason: 'تجاوز حد الغياب (3 مرات)' }); } catch(err) { console.error(err); }
+                    try { await database.ref('blocked_phones').push().set({ phone: phone, name: name || 'بدون اسم', reason: 'تجاوز حد الغياب (3 مرات)' }); } catch(err) { console.error(err); }
                     showErrorModal(SYSTEM_MESSAGES.blocked);
                     resetBtn(); return;
                 }
             }
+            // --- نهاية عمليات الفحص الصارمة ---
 
             for (let i = 0; i < appointments.length; i++) {
                 const app = appointments[i];
@@ -884,29 +918,37 @@
         });
 
         for (let [phone, records] of phoneMap.entries()) {
+            // منع التكرار لو كان الطالب محظور بالفعل
             if (blockedPhonesList.some(b => normalizePhone(b.phone) === phone)) continue;
 
             records.sort((a,b) => new Date(b.date+"T00:00:00") - new Date(a.date+"T00:00:00"));
             let latestRec = records[0];
             let name = latestRec.name || 'بدون اسم';
             let group = latestRec.group || '';
-            let unblockDate = allProgress[phone] ? allProgress[phone].unblock_date : null;
+            let progressDataObj = allProgress[phone] || {};
+            let unblockDate = progressDataObj.unblock_date || null;
+            
+            let isVIP = checkIfStudentIsVIP(phone, allStudents, progressDataObj);
 
             let isBanned = false;
             let reason = '';
 
-            let pureTargetGroup = extractPureNumber(group);
-            let groupRecords = allStudents.filter(d => extractPureNumber(d.group || '') === pureTargetGroup && d.date && d.date !== "بدون موعد" && !d.canceled);
-            if (groupRecords.length > 0) {
-                groupRecords.sort((a,b) => new Date(a.date+"T00:00:00") - new Date(b.date+"T00:00:00"));
-                let oldestDate = groupRecords[0].date;
-                if (unblockDate && unblockDate > oldestDate) oldestDate = unblockDate;
-                if (diffDaysSafely(oldestDate, todayStr) >= 90) {
-                    isBanned = true; reason = 'محاولة تسجيل في مجموعة قديمة (تجاوزت 3 أشهر)';
+            // 1. Group Tenure Check (إعفاء للـ VIP)
+            if(!isVIP) {
+                let pureTargetGroup = extractPureNumber(group);
+                let groupRecords = allStudents.filter(d => extractPureNumber(d.group || '') === pureTargetGroup && d.date && d.date !== "بدون موعد" && !d.canceled);
+                if (groupRecords.length > 0) {
+                    groupRecords.sort((a,b) => new Date(a.date+"T00:00:00") - new Date(b.date+"T00:00:00"));
+                    let oldestDate = groupRecords[0].date;
+                    if (unblockDate && unblockDate > oldestDate) oldestDate = unblockDate;
+                    if (diffDaysSafely(oldestDate, todayStr) >= 90) {
+                        isBanned = true; reason = 'محاولة تسجيل في مجموعة قديمة (تجاوزت 3 أشهر)';
+                    }
                 }
             }
 
-            if(!isBanned) {
+            // 2. Inactivity Check (إعفاء للـ VIP)
+            if(!isBanned && !isVIP) {
                 let latestDate = latestRec.date;
                 if (unblockDate && unblockDate > latestDate) latestDate = unblockDate;
                 if (diffDaysSafely(latestDate, todayStr) > 14) {
@@ -914,6 +956,7 @@
                 }
             }
 
+            // 3. Absences Check (للجميع)
             if(!isBanned) {
                 let absencesCount = 0;
                 records.forEach(rec => {
@@ -1004,7 +1047,8 @@
             tbody.innerHTML = '<tr><td colspan="4" style="color: #aaa;">لا يوجد طلاب مقيدين حالياً</td></tr>'; return;
         }
         blockedPhonesList.forEach(b => {
-            tbody.innerHTML += `<tr><td>${b.name || '-'}</td><td style="font-family:Tahoma;">${b.phone}</td><td style="font-size:12px; color:#ff4d4d; font-weight:bold;">${b.reason}</td><td><button class="add-btn" style="margin:0; padding:5px 15px;" onclick="unblockFromList('${b.id}', '${b.phone}')">رفع القيد ✔</button></td></tr>`;
+            // جعل الاسم قابل للضغط بنفس الشكل الطبيعي لقوائم الإدارة
+            tbody.innerHTML += `<tr><td><span onclick="selectStudent('${b.phone}')" style="cursor: pointer;" title="فتح تقرير الطالب">${b.name || '-'}</span></td><td style="font-family:Tahoma;">${b.phone}</td><td style="font-size:12px; color:#ff4d4d; font-weight:bold;">${b.reason}</td><td><button class="add-btn" style="margin:0; padding:5px 15px;" onclick="unblockFromList('${b.id}', '${b.phone}')">رفع القيد ✔</button></td></tr>`;
         });
     }
 
@@ -1457,6 +1501,16 @@
         renderNotesList(studentProgressData.notesLog || {});
 
         buildLMSUI(normalizePhone(studentPhone), cTasks, studentProgressData); 
+        
+        // التحقق من حالة الـ VIP وإظهار الشارة لو اكتمل
+        let isVIP = checkIfStudentIsVIP(normalizePhone(studentPhone), allStudents, studentProgressData);
+        let vipBadge = document.getElementById('report-vip-status');
+        if (isVIP) {
+            vipBadge.style.display = 'block';
+        } else {
+            vipBadge.style.display = 'none';
+        }
+
         document.getElementById('report-modal').style.display = 'flex';
     }
 
