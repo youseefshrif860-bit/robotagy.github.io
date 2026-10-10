@@ -8,8 +8,8 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <script>
-        if (window.location.href.indexOf('?v=RA_V5') === -1) {
-            window.location.replace(window.location.href.split('?')[0] + '?v=RA_V5');
+        if (window.location.href.indexOf('?v=RA_V6') === -1) {
+            window.location.replace(window.location.href.split('?')[0] + '?v=RA_V6');
         }
     </script>
 
@@ -288,7 +288,7 @@
                                 <th>Classic</th>
                                 <th>PLC</th>
                                 <th>Drive</th>
-                                <th>إزالة</th>
+                                <th>إجراء</th>
                             </tr>
                         </thead>
                         <tbody></tbody>
@@ -298,15 +298,25 @@
 
             <!-- قسم الطلاب المقيدين -->
             <div id="view-blocked" class="view-section">
-                <!-- الرأس وفيه العدسة على الشمال -->
-                <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #fcc01a; padding-bottom: 10px; margin-bottom: 15px; margin-top: 0;">
-                    <h3 style="color: white; margin: 0;">الطلاب المقيدين (المحظورين)</h3>
-                    <button id="sweep-btn" onclick="runAutoSweep()" style="background: none; border: none; font-size: 26px; cursor: pointer; transition: transform 0.2s;" title="فحص النظام وتحديث القائمة آلياً">🔍</button>
+                <!-- الرأس وفيه العدسة والسجل -->
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #fcc01a; padding-bottom: 10px; margin-bottom: 15px; margin-top: 0;">
+                    <h3 id="blocked-view-title" style="color: white; margin: 0; padding-top: 5px;">الطلاب المقيدين (المحظورين)</h3>
+                    <div style="display: flex; flex-direction: column; gap: 8px;">
+                        <button id="sweep-btn" onclick="runAutoSweep(false)" style="background: none; border: none; font-size: 26px; cursor: pointer; transition: transform 0.2s;" title="فحص النظام وتحديث القائمة آلياً">🔍</button>
+                        <button id="history-toggle-btn" onclick="toggleBlockedHistory()" style="background: none; border: none; font-size: 26px; cursor: pointer; transition: transform 0.2s;" title="سجل المفرج عنهم">📜</button>
+                    </div>
                 </div>
 
-                <div style="overflow-x: auto;">
+                <div id="blocked-table-container" style="overflow-x: auto;">
                     <table id="blockedTable">
                         <thead><tr><th>الاسم</th><th>رقم الهاتف</th><th>سبب القيد</th><th>إجراء</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+
+                <div id="history-table-container" style="display: none; overflow-x: auto;">
+                    <table id="historyTable">
+                        <thead><tr><th>الاسم</th><th>رقم الهاتف</th><th>تاريخ العفو</th><th>مرات القيد</th></tr></thead>
                         <tbody></tbody>
                     </table>
                 </div>
@@ -689,10 +699,12 @@
         sortedAll.forEach(s => { phoneMap.set(extractPureNumber(s.phone), s); }); let uniqueLatestRecords = Array.from(phoneMap.values());
         
         let pureQ = extractPureNumber(query);
-        let matches = uniqueLatestRecords.filter(s => 
-            (s.name && s.name.toLowerCase().includes(query.toLowerCase())) || 
-            (pureQ !== '' && s.phone && extractPureNumber(s.phone).includes(pureQ))
-        );
+        let matches = uniqueLatestRecords.filter(s => {
+            let matchName = s.name && s.name.toLowerCase().includes(query.toLowerCase());
+            let matchPhone = pureQ !== '' && s.phone && extractPureNumber(s.phone).includes(pureQ);
+            if (pureQ === '') return matchName;
+            return matchName || matchPhone;
+        });
         
         if (matches.length === 0) { container.innerHTML = '<div class="suggestion-item" style="color:red;">لا توجد نتائج</div>'; } else { container.innerHTML = matches.map(s => `<div class="suggestion-item" onclick="selectStudent('${s.phone}')">${s.name} - <span style="color:#666; font-size:12px;">${s.phone}</span></div>`).join(''); }
         container.style.display = 'block';
@@ -839,6 +851,7 @@
             const progSnap = await database.ref('student_progress/' + phone).get();
             let progressDataObj = progSnap.exists() ? progSnap.val() : {};
             let unblockDate = progressDataObj.unblock_date || null;
+            let currentBans = progressDataObj.ban_count || 0;
             
             let isVIP = checkIfStudentIsVIP(phone, dbData, progressDataObj);
             
@@ -855,6 +868,7 @@
                     if (diffDaysGroup >= 90) {
                         try { 
                             await database.ref('blocked_phones/' + phone).set({ phone: phone, name: name || 'بدون اسم', reason: 'محاولة تسجيل في مجموعة قديمة' }); 
+                            await database.ref('student_progress/' + phone).update({ ban_count: currentBans + 1 });
                         } catch(err) { console.error(err); }
                         showErrorModal(SYSTEM_MESSAGES.blocked);
                         resetBtn(); return;
@@ -873,6 +887,7 @@
                     if (inactivityDays > 14) {
                         try { 
                             await database.ref('blocked_phones/' + phone).set({ phone: phone, name: name || 'بدون اسم', reason: 'انقطاع عن التسجيل (أكثر من 14 يوم)' }); 
+                            await database.ref('student_progress/' + phone).update({ ban_count: currentBans + 1 });
                         } catch(err) { console.error(err); }
                         showErrorModal(SYSTEM_MESSAGES.blocked);
                         resetBtn(); return;
@@ -894,6 +909,7 @@
                 if (absencesCount >= 3) {
                     try { 
                         await database.ref('blocked_phones/' + phone).set({ phone: phone, name: name || 'بدون اسم', reason: 'تجاوز حد الغياب (3 مرات)' }); 
+                        await database.ref('student_progress/' + phone).update({ ban_count: currentBans + 1 });
                     } catch(err) { console.error(err); }
                     showErrorModal(SYSTEM_MESSAGES.blocked);
                     resetBtn(); return;
@@ -953,6 +969,7 @@
             
             let progressDataObj = freshProgress[phone] || {};
             let unblockDate = progressDataObj.unblock_date || null;
+            let currentBans = progressDataObj.ban_count || 0;
             
             let isVIP = checkIfStudentIsVIP(phone, allStudents, progressDataObj);
 
@@ -997,7 +1014,7 @@
             }
 
             if(isBanned) {
-                updatesToPush.push({ phone, name, reason });
+                updatesToPush.push({ phone, name, reason, currentBans });
             }
         }
 
@@ -1005,7 +1022,9 @@
             try {
                 let promises = updatesToPush.map(info => {
                     let pureP = extractPureNumber(info.phone);
-                    return database.ref('blocked_phones/' + pureP).set(info);
+                    let p1 = database.ref('blocked_phones/' + pureP).set({ phone: info.phone, name: info.name, reason: info.reason });
+                    let p2 = database.ref('student_progress/' + pureP).update({ ban_count: info.currentBans + 1 });
+                    return Promise.all([p1, p2]);
                 });
                 await Promise.all(promises);
                 if(!isSilent) alert(`تم الانتهاء! تم رصد وتقييد ${updatesToPush.length} طالب آلياً.`);
@@ -1053,6 +1072,7 @@
                 } else renderPeriodsList(currentSelectedDate);
             } else renderDatesList();
             updateGroupsDropdown();
+            if(isShowingHistory) renderUnblockedList();
         });
 
         database.ref('blocked_phones').on('value', (snapshot) => { 
@@ -1073,8 +1093,28 @@
         database.ref('student_progress').on('value', (snapshot) => {
             allProgress = snapshot.exists() ? snapshot.val() : {};
             let select = document.getElementById('group-select'); if (select && select.value) { renderGroupStudents(select.value); }
+            if(isShowingHistory) renderUnblockedList();
         });
     }
+
+    let isShowingHistory = false;
+    window.toggleBlockedHistory = function() {
+        isShowingHistory = !isShowingHistory;
+        const blockedDiv = document.getElementById('blocked-table-container');
+        const historyDiv = document.getElementById('history-table-container');
+        const title = document.getElementById('blocked-view-title');
+        
+        if (isShowingHistory) {
+            blockedDiv.style.display = 'none';
+            historyDiv.style.display = 'block';
+            title.innerText = 'سجل رفع القيد (أصحاب السوابق)';
+            renderUnblockedList();
+        } else {
+            blockedDiv.style.display = 'block';
+            historyDiv.style.display = 'none';
+            title.innerText = 'الطلاب المقيدين (المحظورين)';
+        }
+    };
 
     function renderBlockedList() {
         const tbody = document.querySelector('#blockedTable tbody');
@@ -1084,9 +1124,42 @@
         }
         let htmlStr = '';
         blockedPhonesList.forEach(b => {
-            htmlStr += `<tr><td><span onclick="selectStudent('${b.phone}')" style="cursor: pointer;" title="فتح تقرير الطالب">${b.name || '-'}</span></td><td style="font-family:Tahoma;">${b.phone}</td><td style="font-size:12px; color:#ff4d4d; font-weight:bold;">${b.reason}</td><td><button class="add-btn" style="margin:0; padding:5px 15px;" onclick="unblockFromList('${b.id}', '${b.phone}')">رفع القيد ✔</button></td></tr>`;
+            htmlStr += `<tr><td><span onclick="selectStudent('${b.phone}')" style="cursor: pointer; color: black;" title="فتح تقرير الطالب">${b.name || '-'}</span></td><td style="font-family:Tahoma;">${b.phone}</td><td style="font-size:12px; color:#ff4d4d; font-weight:bold;">${b.reason}</td><td><button class="add-btn" style="margin:0; padding:5px 15px;" onclick="unblockFromList('${b.id}', '${b.phone}')">رفع القيد ✔</button></td></tr>`;
         });
         tbody.innerHTML = htmlStr;
+    }
+
+    function renderUnblockedList() {
+        const tbody = document.querySelector('#historyTable tbody');
+        tbody.innerHTML = '';
+        
+        let historyList = [];
+        let phoneMap = new Map();
+        allStudents.forEach(s => {
+            let p = extractPureNumber(s.phone);
+            if(!phoneMap.has(p)) { phoneMap.set(p, s); }
+        });
+
+        Object.keys(allProgress).forEach(phone => {
+            let prog = allProgress[phone];
+            if (prog.unblock_date || prog.ban_count) {
+                let st = phoneMap.get(phone) || { name: 'غير معروف', phone: phone };
+                historyList.push({ phone: phone, name: st.name, unblock_date: prog.unblock_date || '-', ban_count: prog.ban_count || 0 });
+            }
+        });
+
+        historyList.sort((a,b) => b.ban_count - a.ban_count);
+
+        if(historyList.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" style="color: #aaa;">لا يوجد سجلات سابقة</td></tr>'; return;
+        }
+
+        let htmlStr = '';
+        historyList.forEach(u => {
+            if (u.ban_count === 0 && u.unblock_date === '-') return; 
+            htmlStr += `<tr><td><span onclick="selectStudent('${u.phone}')" style="cursor: pointer; color: black;" title="فتح تقرير الطالب">${u.name}</span></td><td style="font-family:Tahoma;">${u.phone}</td><td style="font-size:12px; color:#28a745; font-weight:bold;">${u.unblock_date}</td><td style="font-weight:bold; color:#cc0000;">${u.ban_count}</td></tr>`;
+        });
+        tbody.innerHTML = htmlStr || '<tr><td colspan="4" style="color: #aaa;">لا يوجد سجلات سابقة</td></tr>';
     }
 
     async function unblockFromList(id, phone) {
@@ -1141,700 +1214,4 @@
             try {
                 await database.ref('students').update(updates);
                 await database.ref('student_progress/' + pureP).remove();
-            } catch (error) {
-                alert('خطأ: ' + error.message);
-            }
-        }
-    };
-
-    window.deleteEntireGroup = async function() {
-        let groupSelect = document.getElementById('group-select').value;
-        if (!groupSelect) return;
-
-        if(confirm(`تحذير خطير: هل أنت متأكد من حذف المجموعة (${groupSelect}) بجميع طلابها وسجلاتها نهائياً؟ هذا الإجراء لا يمكن التراجع عنه!`)) {
-            let studentsInGroup = allStudents.filter(s => { return isStrictlyNumber(s.group) && extractPureNumber(s.group) === groupSelect; });
-            
-            let updates = {};
-            let progressUpdates = {};
-            
-            studentsInGroup.forEach(st => {
-                updates[st.id] = null;
-                progressUpdates[extractPureNumber(st.phone)] = null;
-            });
-
-            try {
-                await database.ref('students').update(updates);
-                await database.ref('student_progress').update(progressUpdates);
-                alert('تم حذف المجموعة وكل تفاصيلها بنجاح.');
-                document.getElementById('group-select').value = '';
-                document.getElementById('groupDataTable').style.display = 'none';
-                document.getElementById('export-excel-btn').style.display = 'none';
-                document.getElementById('delete-group-btn').style.display = 'none';
-                document.getElementById('group-total-count').style.display = 'none';
-            } catch(err) {
-                alert('خطأ: ' + err.message);
-            }
-        }
-    };
-
-    function updateGroupsDropdown() {
-        let uniqueGroups = new Set(); allStudents.forEach(s => { if (isStrictlyNumber(s.group) && !s.canceled) { uniqueGroups.add(extractPureNumber(s.group)); } });
-        let select = document.getElementById('group-select'); let currentVal = select.value; select.innerHTML = '<option value="" disabled selected>اختر المجموعة</option>';
-        Array.from(uniqueGroups).sort((a, b) => parseInt(a) - parseInt(b)).forEach(num => { let o = document.createElement('option'); o.value = num; o.text = num; select.appendChild(o); });
-        if (currentVal && uniqueGroups.has(currentVal)) { select.value = currentVal; renderGroupStudents(currentVal); }
-    }
-
-    function calculateProgressDynamic(courseKey, completedTasksSet, studentProgressData) {
-        let limits = LMS_COURSES[courseKey] || { tasks: 0, exam: false };
-        let totalItems = limits.tasks + (limits.exam ? 1 : 0);
-        let completed = 0;
-
-        for (let i = 1; i <= limits.tasks; i++) {
-            let tName = `Task ${i}`;
-            let inSession = completedTasksSet[courseKey] && completedTasksSet[courseKey].has(tName);
-            let inManual = studentProgressData && studentProgressData[courseKey] && studentProgressData[courseKey][`task_${i}`];
-            if (inSession || inManual) completed++;
-        }
-
-        let examInSession = completedTasksSet[courseKey] && completedTasksSet[courseKey].has("Final Exam");
-        let examInManual = studentProgressData && studentProgressData[courseKey] && studentProgressData[courseKey]['exam'];
-        if (limits.exam && (examInManual || examInSession)) completed++;
-
-        return { completed, totalItems, percentage: totalItems === 0 ? 0 : (completed / totalItems) * 100 };
-    }
-
-    function renderGroupStudents(selectedGroupNumber) {
-        let studentsInGroup = allStudents.filter(s => { return isStrictlyNumber(s.group) && extractPureNumber(s.group) === selectedGroupNumber && !s.canceled; });
-        let phoneMap = new Map(); studentsInGroup.sort((a,b) => new Date(a.date || 0) - new Date(b.date || 0));
-        studentsInGroup.forEach(s => { phoneMap.set(extractPureNumber(s.phone), s); }); 
-        let uniqueStudents = Array.from(phoneMap.values());
-        
-        let excelBtn = document.getElementById('export-excel-btn');
-        let deleteGrpBtn = document.getElementById('delete-group-btn');
-
-        if (uniqueStudents.length > 0) { 
-            excelBtn.style.display = 'block'; 
-            deleteGrpBtn.style.display = 'block';
-            document.getElementById('group-total-count').style.display = 'block'; 
-            document.getElementById('group-total-count').innerText = `إجمالي عدد الطلاب: ${uniqueStudents.length}`; 
-        } 
-        else { 
-            excelBtn.style.display = 'none'; 
-            deleteGrpBtn.style.display = 'none';
-            document.getElementById('group-total-count').style.display = 'none'; 
-        }
-        
-        let tbody = document.querySelector('#groupDataTable tbody'); tbody.innerHTML = '';
-        uniqueStudents.forEach(st => { 
-            let pureGrp = extractPureNumber(st.group); let purePhone = extractPureNumber(st.phone); let stProg = allProgress[purePhone] || {};
-            let studentRecords = allStudents.filter(s => extractPureNumber(s.phone) === purePhone && !s.canceled && s.attended && s.tasks);
-            let cTasks = { classic_control: new Set(), plc: new Set(), motor_drive: new Set() };
-            studentRecords.forEach(r => { let cKey = r.course === 'Classic Control' ? 'classic_control' : (r.course === 'PLC' ? 'plc' : 'motor_drive'); r.tasks.split('|').forEach(t => { if(t.trim()) cTasks[cKey].add(t.trim()); }); });
-
-            let cProg = calculateProgressDynamic('classic_control', cTasks, stProg); let pProg = calculateProgressDynamic('plc', cTasks, stProg); let dProg = calculateProgressDynamic('motor_drive', cTasks, stProg);
-            let cText = cProg.percentage === 100 && cProg.totalItems > 0 ? '✅' : `${cProg.completed}/${cProg.totalItems}`; let pText = pProg.percentage === 100 && pProg.totalItems > 0 ? '✅' : `${pProg.completed}/${pProg.totalItems}`; let dText = dProg.percentage === 100 && dProg.totalItems > 0 ? '✅' : `${dProg.completed}/${dProg.totalItems}`;
-            
-            let blockedRec = blockedPhonesList.find(b => extractPureNumber(b.phone) === purePhone);
-            let banIcon = blockedRec ? ` <span style="cursor:help;" title="مُقيد: ${blockedRec.reason}">⛔</span>` : '';
-
-            tbody.innerHTML += `<tr><td><span onclick="selectStudent('${st.phone}')" style="cursor: pointer;">${st.name || ''}${banIcon}</span></td><td onclick="openWhatsApp('${st.phone}')" style="cursor: pointer;" title="مراسلة عبر واتساب">${st.phone || ''}</td><td style="font-weight: bold; color: #3b1e5a;">${pureGrp}</td><td style="font-size: 13px; font-weight: bold; color:#cc0000;">${cText}</td><td style="font-size: 13px; font-weight: bold; color:#cc0000;">${pText}</td><td style="font-size: 13px; font-weight: bold; color:#cc0000;">${dText}</td><td><button class="delete-btn" onclick="deleteStudentCompletely('${st.phone}')">حذف</button></td></tr>`; 
-        });
-        document.getElementById('groupDataTable').style.display = 'table';
-    }
-
-    function exportGroupToExcel() {
-        let groupSelect = document.getElementById('group-select').value; if (!groupSelect) return;
-        let cloneTable = document.getElementById("groupDataTable").cloneNode(true); cloneTable.setAttribute('border', '1'); cloneTable.style.borderCollapse = 'collapse'; cloneTable.style.textAlign = 'center'; cloneTable.style.direction = 'rtl';
-        cloneTable.querySelectorAll('th').forEach(th => { th.style.backgroundColor = '#fcc01a'; th.style.color = '#3b1e5a'; th.style.padding = '10px'; }); cloneTable.querySelectorAll('td').forEach(td => { td.style.padding = '8px'; });
-        cloneTable.querySelectorAll('tr').forEach(tr => tr.removeChild(tr.lastElementChild));
-        let blob = new Blob(['\ufeff', `<html dir="rtl" lang="ar"><head><meta charset="UTF-8"></head><body><h2 style="text-align: center; color: #3b1e5a; font-family: Tahoma;">بيانات مجموعة: ${groupSelect} - معمل روبوتاجي</h2>${cloneTable.outerHTML}</body></html>`], { type: 'application/vnd.ms-excel' });
-        let url = URL.createObjectURL(blob); let a = document.createElement('a'); a.href = url; a.download = `مجموعة_${groupSelect}_روبوتاجي.xls`; document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    }
-
-    function toggleAccordion(btnId, panelId) {
-        let btn = document.getElementById(btnId); let panel = document.getElementById(panelId);
-        let courseKey = btnId.replace('btn-', '');
-        if (panel.style.display === "block") { 
-            panel.style.display = "none"; btn.classList.remove('active'); 
-            openCoursePanels.delete(courseKey);
-        } else { 
-            panel.style.display = "block"; btn.classList.add('active'); 
-            openCoursePanels.add(courseKey);
-        }
-    }
-
-    function toggleExtraSettings() {
-        let panel = document.getElementById('extra-settings-panel');
-        panel.style.display = panel.style.display === 'block' ? 'none' : 'block';
-    }
-
-    window.toggleLegacyTask = async function(phone, courseKey, taskKey, currentState) {
-        let newState = !currentState;
-        try {
-            await database.ref(`student_progress/${extractPureNumber(phone)}/${courseKey}/${taskKey}`).set(newState);
-            selectStudent(phone);
-        } catch (err) { alert('خطأ في التحديث: ' + err.message); }
-    };
-
-    window.toggleAllTasks = async function(phone, courseKey, isChecked) {
-        let limits = LMS_COURSES[courseKey];
-        if(!limits) return;
-        let updates = {};
-        for(let i=1; i<=limits.tasks; i++) { updates[`task_${i}`] = isChecked; }
-        if(limits.exam) updates['exam'] = isChecked;
-        
-        try {
-            await database.ref(`student_progress/${extractPureNumber(phone)}/${courseKey}`).update(updates);
-            selectStudent(phone);
-        } catch(e) { alert('خطأ: ' + e.message); }
-    };
-
-    window.handleWireChange = async function(isChecked) {
-        if(!currentSelectedStudent) return;
-        try {
-            await database.ref(`student_progress/${extractPureNumber(currentSelectedStudent)}`).update({
-                wire_received: isChecked,
-                wire_by: isChecked ? currentAdminName : null
-            });
-            document.getElementById('wire-checkbox').style.display = 'none';
-            let wireText = document.getElementById('wire-status-text');
-            wireText.style.display = 'inline-block';
-            wireText.title = currentAdminName;
-        } catch (err) { alert('خطأ: ' + err.message); }
-    };
-
-    window.promptWireRevert = async function() {
-        if(!currentSelectedStudent) return;
-        if(confirm("تأكيد التراجع؟ سيتم إرجاع الحالة إلى (لم يتم التسليم).")) {
-            try {
-                await database.ref(`student_progress/${extractPureNumber(currentSelectedStudent)}`).update({
-                    wire_received: false,
-                    wire_by: null
-                });
-                let wireText = document.getElementById('wire-status-text');
-                wireText.style.display = 'none';
-                wireText.title = '';
-                let cb = document.getElementById('wire-checkbox');
-                cb.style.display = 'inline-block';
-                cb.checked = false;
-            } catch (err) { alert('خطأ: ' + err.message); }
-        }
-    };
-
-    window.saveNewNote = async function() {
-        let input = document.getElementById('new-note-input');
-        let text = input.value.trim();
-        if(!text || !currentSelectedStudent) return;
-        
-        let dateStr = getLocalDateString();
-        
-        try {
-            await database.ref(`student_progress/${extractPureNumber(currentSelectedStudent)}/notesLog`).push({ text: text, date: dateStr, by: currentAdminName });
-            input.value = '';
-            const progSnap = await database.ref('student_progress/' + extractPureNumber(currentSelectedStudent)).get();
-            renderNotesList(progSnap.exists() ? progSnap.val().notesLog || {} : {});
-        } catch(e) { alert('خطأ: ' + e.message); }
-    };
-
-    window.deleteNote = async function(noteId) {
-        if(!confirm('حذف الملاحظة؟') || !currentSelectedStudent) return;
-        try {
-            await database.ref(`student_progress/${extractPureNumber(currentSelectedStudent)}/notesLog/${noteId}`).remove();
-            const progSnap = await database.ref('student_progress/' + extractPureNumber(currentSelectedStudent)).get();
-            renderNotesList(progSnap.exists() ? progSnap.val().notesLog || {} : {});
-        } catch(e) { alert(e.message); }
-    };
-
-    function renderNotesList(notesObj) {
-        let container = document.getElementById('notes-list-container');
-        container.innerHTML = '';
-        let keys = Object.keys(notesObj);
-        if(keys.length === 0) {
-            container.innerHTML = '<div style="color:#aaa; font-size:11px; text-align:center;">لا توجد ملاحظات سابقة</div>';
-            return;
-        }
-        keys.forEach(key => {
-            let note = notesObj[key];
-            let byText = note.by ? ` title="${note.by}"` : '';
-            container.innerHTML += `
-                <div style="background:#f4f4f4; padding:8px; border-radius:5px; margin-bottom:5px; position:relative; font-size:12px; color:black; border: 1px solid #ddd; padding-left: 20px;">
-                    <button onclick="deleteNote('${key}')" style="position:absolute; top:4px; left:4px; background:none; border:none; color:#cc0000; cursor:pointer; font-size:12px;" title="حذف الملاحظة">✖</button>
-                    <div style="word-wrap:break-word; font-family: Tahoma; line-height: 1.5;">${note.text}</div>
-                    <div style="font-size:10px; color:#aaa; text-align:left; margin-top:4px; width:fit-content; cursor:help;" ${byText}>${note.date}</div>
-                </div>
-            `;
-        });
-        container.scrollTop = container.scrollHeight;
-    }
-
-    function buildLMSUI(phone, completedTasksSet, studentProgressData) {
-        let container = document.getElementById('lms-container'); container.innerHTML = '';
-        Object.keys(LMS_COURSES).forEach(courseKey => {
-            const courseInfo = LMS_COURSES[courseKey]; const progress = calculateProgressDynamic(courseKey, completedTasksSet, studentProgressData); 
-            const isCompleted = progress.percentage === 100 && progress.totalItems > 0;
-            const checkMark = isCompleted ? '<span style="color: #28a745; font-size: 18px;">✅</span>' : '';
-            
-            let selectAllHtml = `<input type="checkbox" style="margin-left: 10px; cursor: pointer; accent-color: #28a745; width: 16px; height: 16px;" ${isCompleted ? 'checked' : ''} onclick="event.stopPropagation()" onchange="toggleAllTasks('${phone}', '${courseKey}', this.checked)" title="تحديد/إلغاء كل الـ Tasks">`;
-
-            let isOpen = openCoursePanels.has(courseKey);
-            let btnClass = isOpen ? 'course-accordion active' : 'course-accordion';
-            let panelDisplay = isOpen ? 'block' : 'none';
-
-            let accBtn = document.createElement('div'); accBtn.className = btnClass; accBtn.id = `btn-${courseKey}`; accBtn.onclick = () => toggleAccordion(`btn-${courseKey}`, `panel-${courseKey}`);
-            
-            accBtn.innerHTML = `
-                <div class="course-title-area">
-                    <div style="display:flex; justify-content:space-between; align-items:center;">
-                        <div style="display:flex; align-items:center;">
-                            ${selectAllHtml}
-                            <span style="margin-right:5px;">${courseInfo.title} ${checkMark}</span>
-                        </div>
-                        <span style="font-size:12px; color:#666;" id="text-prog-${courseKey}">${progress.completed} / ${progress.totalItems}</span>
-                    </div>
-                    <div class="progress-container"><div class="progress-bar" id="bar-prog-${courseKey}" style="width: ${progress.percentage}%;"></div></div>
-                </div>
-            `;
-            
-            let panel = document.createElement('div'); panel.className = 'course-panel'; panel.id = `panel-${courseKey}`; panel.style.display = panelDisplay;
-            let tasksGrid = document.createElement('div'); tasksGrid.className = 'tasks-grid';
-            
-            for (let i = 1; i <= courseInfo.tasks; i++) {
-                let taskName = `Task ${i}`;
-                let inSession = completedTasksSet[courseKey] && completedTasksSet[courseKey].has(taskName);
-                let inManual = studentProgressData && studentProgressData[courseKey] && studentProgressData[courseKey][`task_${i}`];
-                let isTaskCompleted = inSession || inManual;
-                
-                let icon = isTaskCompleted ? '✅' : '⏳'; let color = isTaskCompleted ? '#28a745' : '#999';
-                tasksGrid.innerHTML += `<div class="task-item" style="color:${color}; cursor:pointer;" onclick="toggleLegacyTask('${phone}', '${courseKey}', 'task_${i}', ${!!isTaskCompleted})" title="تعديل يدوي"><span style="font-size:12px;">${icon}</span> ${taskName}</div>`;
-            }
-            panel.appendChild(tasksGrid);
-
-            if (courseInfo.exam) {
-                let examInSession = completedTasksSet[courseKey] && completedTasksSet[courseKey].has("Final Exam");
-                let examInManual = studentProgressData && studentProgressData[courseKey] && studentProgressData[courseKey]['exam'];
-                let isExamCompleted = examInSession || examInManual;
-                
-                let eIcon = isExamCompleted ? '✅' : '⏳'; let eColor = isExamCompleted ? '#cc0000' : '#999';
-                panel.innerHTML += `<div class="exam-item" style="cursor:pointer; color:${eColor};" onclick="toggleLegacyTask('${phone}', '${courseKey}', 'exam', ${!!isExamCompleted})" title="تعديل يدوي"><span style="font-size:12px;">${eIcon}</span> Final Exam</div>`;
-            }
-            container.appendChild(accBtn); container.appendChild(panel);
-        });
-    }
-
-    function handleSearch(query) {
-        const container = document.getElementById('search-suggestions'); if (!query.trim()) { container.style.display = 'none'; return; }
-        let phoneMap = new Map(); let sortedAll = [...allStudents].sort((a,b) => new Date(a.date || 0) - new Date(b.date || 0));
-        sortedAll.forEach(s => { phoneMap.set(extractPureNumber(s.phone), s); }); let uniqueLatestRecords = Array.from(phoneMap.values());
-        
-        let pureQ = extractPureNumber(query);
-        let matches = uniqueLatestRecords.filter(s => 
-            (s.name && s.name.toLowerCase().includes(query.toLowerCase())) || 
-            (pureQ !== '' && s.phone && extractPureNumber(s.phone).includes(pureQ))
-        );
-        
-        if (matches.length === 0) { container.innerHTML = '<div class="suggestion-item" style="color:red;">لا توجد نتائج</div>'; } else { container.innerHTML = matches.map(s => `<div class="suggestion-item" onclick="selectStudent('${s.phone}')">${s.name} - <span style="color:#666; font-size:12px;">${s.phone}</span></div>`).join(''); }
-        container.style.display = 'block';
-    }
-
-    async function selectStudent(studentPhoneParam) {
-        document.getElementById('extra-settings-panel').style.display = 'none';
-        let targetPhone = extractPureNumber(studentPhoneParam); currentSelectedStudent = targetPhone; document.getElementById('search-student').value = ''; document.getElementById('search-suggestions').style.display = 'none';
-        let allStudentRecords = allStudents.filter(s => extractPureNumber(s.phone) === targetPhone);
-        if(allStudentRecords.length === 0) { closeReportModal(); return; }
-        allStudentRecords.sort((a,b) => new Date(b.date || 0) - new Date(a.date || 0));
-        let latestName = allStudentRecords[allStudentRecords.length - 1].name; let studentPhone = allStudentRecords[allStudentRecords.length - 1].phone; 
-        
-        let validRecords = allStudentRecords.filter(s => !s.canceled && s.date && s.date !== "بدون موعد");
-        
-        let lastAttended = 'لا يوجد حضور'; let attendedRecords = validRecords.filter(s => s.attended); 
-        if(attendedRecords.length > 0) { attendedRecords.sort((a,b) => new Date(b.date || 0) - new Date(a.date || 0)); lastAttended = attendedRecords[0].date; }
-        
-        let absent = validRecords.filter(s => !s.attended && isPeriodPassed(s.date, s.time)).length;
-
-        document.getElementById('report-name').innerText = 'السجل الأكاديمي: ' + latestName; 
-        
-        let phoneEl = document.getElementById('report-phone');
-        phoneEl.innerText = studentPhone; 
-        phoneEl.onclick = () => openWhatsApp(studentPhone);
-        phoneEl.style.cursor = 'pointer';
-        phoneEl.title = 'مراسلة عبر واتساب';
-
-        let pureGroupNum = extractPureNumber(allStudentRecords[allStudentRecords.length - 1].group);
-        document.getElementById('report-group').innerText = pureGroupNum;
-
-        document.getElementById('report-last').innerText = lastAttended;
-        document.getElementById('report-total').innerText = validRecords.length;
-        document.getElementById('report-absent').innerText = absent;
-
-        let groupRecordsForTenure = allStudents.filter(s => extractPureNumber(s.group) === pureGroupNum && s.date && s.date !== "بدون موعد" && !s.canceled);
-        let tenureText = "غير متوفر";
-        
-        if(groupRecordsForTenure.length > 0) {
-            groupRecordsForTenure.sort((a,b) => new Date(a.date) - new Date(b.date));
-            let oldestDate = new Date(groupRecordsForTenure[0].date);
-            let todayDate = new Date(getLocalDateString());
-            let diffTime = Math.abs(todayDate - oldestDate);
-            let diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-            
-            if(diffDays === 0) tenureText = "اليوم أول يوم للمجموعة";
-            else if(diffDays < 30) tenureText = diffDays + " أيام";
-            else {
-                let months = Math.floor(diffDays / 30);
-                let remainingDays = diffDays % 30;
-                let mStr = months === 1 ? "شهر" : months === 2 ? "شهران" : months + " شهور";
-                let dStr = remainingDays === 0 ? "" : remainingDays === 1 ? " ويوم" : remainingDays === 2 ? " ويومان" : " و" + remainingDays + " أيام";
-                if(months >= 12) {
-                    let years = Math.floor(months / 12);
-                    let remMonths = months % 12;
-                    let yStr = years === 1 ? "سنة" : years === 2 ? "سنتان" : years + " سنين";
-                    let remMStr = remMonths > 0 ? (remMonths === 1 ? " وشهر" : remMonths === 2 ? " وشهران" : " و" + remMonths + " شهور") : "";
-                    tenureText = yStr + remMStr + dStr;
-                } else {
-                    tenureText = mStr + dStr;
-                }
-            }
-        }
-        document.getElementById('report-group-tenure').innerText = tenureText;
-        
-        let isBlocked = blockedPhonesList.some(b => extractPureNumber(b.phone) === extractPureNumber(studentPhone));
-        let blockBtn = document.getElementById('block-btn');
-        if (isBlocked) { 
-            blockBtn.innerText = "رفع القيد ✔"; 
-            blockBtn.style.backgroundColor = "#28a745"; 
-            blockBtn.onclick = () => toggleBlockStudent(studentPhone, latestName, true); 
-        } else { 
-            blockBtn.innerText = "تقييد الطالب (منع تسجيل)"; 
-            blockBtn.style.backgroundColor = "#ff4d4d"; 
-            blockBtn.onclick = () => toggleBlockStudent(studentPhone, latestName, false); 
-        }
-
-        let tbody = document.getElementById('report-tbody'); tbody.innerHTML = '';
-        
-        let cTasks = { classic_control: new Set(), plc: new Set(), motor_drive: new Set() };
-
-        if (validRecords.length === 0) { 
-            tbody.innerHTML = `<tr><td colspan="5" style="padding: 10px; color: red; text-align: center; font-weight: bold;">لا توجد مواعيد مسجلة</td></tr>`; 
-        } else {
-            validRecords.sort((a,b) => new Date(a.date || 0) - new Date(b.date || 0));
-            validRecords.forEach(rec => {
-                if (rec.attended && rec.tasks) {
-                    let cKey = rec.course === 'Classic Control' ? 'classic_control' : (rec.course === 'PLC' ? 'plc' : 'motor_drive');
-                    rec.tasks.split('|').forEach(t => { if(t.trim()) cTasks[cKey].add(t.trim()); });
-                }
-
-                let statusHTML = ''; let tasksStr = rec.tasks ? rec.tasks.split('|').join(' , ') : '-';
-                let byStr = rec.attended_by ? ` title="${rec.attended_by}"` : '';
-
-                if (rec.canceled) {
-                    statusHTML = '<span style="color:#999; font-weight:bold;">ملغي</span>';
-                } else if (rec.attended) {
-                    statusHTML = `<span style="color:green; font-weight:bold; cursor:pointer;" onclick="updateAttendance('${rec.id}', '${rec.course}', false, this)" ${byStr}>حاضر ✔</span>`;
-                } else if (isPeriodPassed(rec.date, rec.time)) {
-                    statusHTML = `<span style="color:red; font-weight:bold; cursor:pointer;" onclick="updateAttendance('${rec.id}', '${rec.course}', true, this)" title="تحضير متأخر">غائب ✘</span>`;
-                } else if (!isPeriodStarted(rec.date, rec.time)) {
-                    statusHTML = '<span style="color:#fcc01a; font-weight:bold;">قادم ⏳</span>';
-                } else {
-                    statusHTML = `<input type="checkbox" class="attendance-check" onchange="updateAttendance('${rec.id}', '${rec.course}', this.checked, this)">`;
-                }
-                
-                let bgStyle = rec.canceled ? "background-color: #f9f9f9; color:#999;" : "";
-                tbody.innerHTML += `<tr style="${bgStyle}"><td style="padding: 8px;">${rec.course || ''}</td><td style="padding: 8px;">${rec.date || ''}</td><td style="padding: 8px;">${rec.time || ''}</td><td style="padding: 8px; font-weight:bold; color:#3b1e5a; font-size:12px;">${tasksStr}</td><td style="padding: 8px;">${statusHTML}</td></tr>`;
-            });
-        }
-
-        const progSnap = await database.ref('student_progress/' + extractPureNumber(studentPhone)).get(); 
-        const studentProgressData = progSnap.exists() ? progSnap.val() : {};
-
-        let isWireReceived = studentProgressData.wire_received || false;
-        let wireCheckbox = document.getElementById('wire-checkbox');
-        let wireText = document.getElementById('wire-status-text');
-        
-        if(isWireReceived) {
-            wireCheckbox.style.display = 'none';
-            wireText.style.display = 'inline-block';
-            wireText.title = studentProgressData.wire_by || '';
-        } else {
-            wireCheckbox.style.display = 'inline-block';
-            wireCheckbox.checked = false;
-            wireText.style.display = 'none';
-            wireText.title = '';
-        }
-
-        renderNotesList(studentProgressData.notesLog || {});
-
-        buildLMSUI(extractPureNumber(studentPhone), cTasks, studentProgressData); 
-        
-        let isVIP = checkIfStudentIsVIP(extractPureNumber(studentPhone), allStudents, studentProgressData);
-        let vipBadge = document.getElementById('report-vip-status');
-        if (isVIP) {
-            vipBadge.style.display = 'block';
-        } else {
-            vipBadge.style.display = 'none';
-        }
-
-        document.getElementById('report-modal').style.display = 'flex';
-    }
-
-    async function toggleBlockStudent(phone, name, currentlyBlocked) {
-        let blockBtn = document.getElementById('block-btn');
-        blockBtn.innerText = 'جاري التحديث...';
-        blockBtn.disabled = true;
-
-        try {
-            let pureP = extractPureNumber(phone);
-            if (currentlyBlocked) {
-                let record = blockedPhonesList.find(b => extractPureNumber(b.phone) === pureP);
-                if (record) {
-                    await database.ref('blocked_phones/' + record.id).remove();
-                } else {
-                    await database.ref('blocked_phones/' + pureP).remove();
-                }
-                await database.ref('student_progress/' + pureP).update({ unblock_date: getLocalDateString() });
-                alert('تم رفع القيد، وتصفير عداد الحظر له من تاريخ اليوم.');
-            } else {
-                if (confirm(`تأكيد تقييد الطالب؟`)) {
-                    await database.ref('blocked_phones/' + pureP).set({ phone: phone, name: name || 'بدون اسم', reason: 'حظر يدوي من الإدارة' });
-                    alert('تم تقييد الطالب بنجاح.');
-                } else {
-                    blockBtn.innerText = 'تقييد الطالب (منع تسجيل)';
-                    blockBtn.disabled = false;
-                    return;
-                }
-            }
-            
-            const progSnap = await database.ref('student_progress/' + pureP).get();
-            if (progSnap.exists()) {
-                allProgress[pureP] = progSnap.val();
-            }
-            const blockedSnap = await database.ref('blocked_phones').get();
-            blockedPhonesList = [];
-            if (blockedSnap.exists()) {
-                blockedSnap.forEach(child => {
-                    blockedPhonesList.push({ id: child.key, phone: child.val().phone || child.key, name: child.val().name, reason: child.val().reason || 'حظر يدوي من الإدارة' });
-                });
-            }
-
-            selectStudent(phone);
-            blockBtn.disabled = false;
-
-        } catch (error) {
-            alert('حدث خطأ: ' + error.message);
-            blockBtn.disabled = false;
-            selectStudent(phone);
-        }
-    }
-    
-    function closeReportModal() { 
-        currentSelectedStudent = null; 
-        document.getElementById('report-modal').style.display = 'none'; 
-        document.getElementById('extra-settings-panel').style.display = 'none';
-    }
-    document.addEventListener('click', function(e) { if(e.target.id !== 'search-student') document.getElementById('search-suggestions').style.display = 'none'; });
-
-    let pendingAttendanceId = null; let pendingAttendanceCourse = null;
-
-    function updateAttendance(id, course, status, checkboxElem) {
-        if (status) {
-            if(!course || course === 'غير محدد') { database.ref('students/' + id).update({ attended: true, tasks: null, attended_by: currentAdminName }); return; }
-            pendingAttendanceId = id; pendingAttendanceCourse = course;
-            
-            let studentRecord = allStudents.find(s => s.id === id);
-            let phone = studentRecord ? extractPureNumber(studentRecord.phone) : null;
-            let courseKey = course === 'Classic Control' ? 'classic_control' : (course === 'PLC' ? 'plc' : 'motor_drive');
-            let limits = LMS_COURSES[courseKey] || {tasks: 0, exam: false};
-            
-            let completedSet = new Set();
-            let stProg = {};
-            if (phone) {
-                stProg = allProgress[phone] || {};
-                let sRecs = allStudents.filter(s => extractPureNumber(s.phone) === phone && !s.canceled && s.attended && s.tasks && s.course === course);
-                sRecs.forEach(r => { r.tasks.split('|').forEach(t => { if(t.trim()) completedSet.add(t.trim()); }); });
-            }
-
-            let container = document.getElementById('task-checkboxes'); container.innerHTML = '';
-            let hasTasks = false;
-            
-            for(let i=1; i<=limits.tasks; i++) {
-                let tName = `Task ${i}`;
-                let inManual = stProg[courseKey] && stProg[courseKey][`task_${i}`];
-                if (!completedSet.has(tName) && !inManual) {
-                    container.innerHTML += `<label style="background:#f4f4f4; padding:5px 10px; border-radius:5px; border:1px solid #ddd; display:flex; align-items:center; gap:5px; cursor:pointer;"><input type="checkbox" value="Task ${i}" class="task-cb" style="margin:0;"> Task ${i}</label>`;
-                    hasTasks = true;
-                }
-            }
-
-            if (limits.exam) {
-                let inManual = stProg[courseKey] && stProg[courseKey]['exam'];
-                if (!completedSet.has("Final Exam") && !inManual) {
-                    container.innerHTML += `<label style="background:#ffe6e6; padding:5px 10px; border-radius:5px; border:1px solid #ff4d4d; display:flex; align-items:center; gap:5px; cursor:pointer; color:#cc0000; font-weight:bold;"><input type="checkbox" value="Final Exam" class="task-cb" style="margin:0;"> Final Exam</label>`;
-                    hasTasks = true;
-                }
-            }
-
-            if(!hasTasks) {
-                container.innerHTML = `<div style="text-align:center; width:100%; color:#28a745; font-weight:bold; padding:10px;">(الطالب أتم جميع مهام هذا الكورس ✅)</div>`;
-            }
-
-            document.getElementById('task-course-name').innerText = course; document.getElementById('task-modal').style.display = 'flex';
-            if(checkboxElem) checkboxElem.checked = false; 
-        } else {
-            database.ref('students/' + id).update({ attended: false, tasks: null, attended_by: null });
-        }
-    }
-
-    function saveAttendanceWithTasks() {
-        let selectedTasks = []; document.querySelectorAll('.task-cb:checked').forEach(cb => selectedTasks.push(cb.value));
-        let tasksStr = selectedTasks.join(' | ');
-        database.ref('students/' + pendingAttendanceId).update({ attended: true, tasks: tasksStr.length > 0 ? tasksStr : null, attended_by: currentAdminName }).then(() => { document.getElementById('task-modal').style.display = 'none'; pendingAttendanceId = null; });
-    }
-    function cancelTaskSelection() { pendingAttendanceId = null; document.getElementById('task-modal').style.display = 'none'; }
-
-    function renderScheduleDay(dayVal) {
-        const container = document.getElementById('schedule-slots-container'); if (!dayVal) { container.innerHTML = ''; return; }
-        let daySettings = globalSchedule[dayVal] || defaultSchedule[dayVal] || {}; container.innerHTML = '';
-        globalPeriods.forEach(p => {
-            let period = p.name; let isActive = daySettings[period]; if(isActive === undefined) isActive = true;
-            let btnClass = isActive ? 'btn-enable' : 'btn-inactive'; let btnText = isActive ? 'مفعل' : 'موقوف'; let actionBtnClass = isActive ? 'btn-disable' : 'btn-enable'; let actionBtnText = isActive ? 'إيقاف' : 'تفعيل';
-            container.innerHTML += `<div class="toggle-row"><span style="color:white; font-size: 15px;">${period}</span><div style="display:flex; gap:10px;"><span class="toggle-btn ${btnClass}" style="text-align:center;">${btnText}</span><button class="toggle-btn ${actionBtnClass}" onclick="toggleSchedulePeriod(${dayVal}, '${period}', ${!isActive})">${actionBtnText}</button></div></div>`;
-        });
-    }
-
-    function toggleSchedulePeriod(day, period, newState) { if(confirm(`تعديل حالة الفترة؟`)) database.ref(`settings/schedule/${day}/${period}`).set(newState).then(() => { renderScheduleDay(day); }); }
-    
-    window.deleteAllInYear = function(year) {
-        if (confirm(`حذف كافة سجلات سنة ${year}؟`)) {
-            let updates = {};
-            allStudents.filter(s => s.date && s.date.startsWith(year)).forEach(student => updates[student.id] = null);
-            database.ref('students').update(updates);
-        }
-    };
-
-    window.deleteAllInMonth = function(year, month) {
-        if (confirm(`حذف كافة سجلات شهر ${month} لسنة ${year}؟`)) {
-            let updates = {};
-            let prefix = `${year}-${month}`;
-            allStudents.filter(s => s.date && s.date.startsWith(prefix)).forEach(student => updates[student.id] = null);
-            database.ref('students').update(updates);
-        }
-    };
-
-    function renderDatesList() {
-        document.getElementById('dates-list').style.display = 'block'; document.getElementById('periods-list').style.display = 'none'; document.getElementById('period-details').style.display = 'none';
-        const container = document.getElementById('dates-container'); container.innerHTML = '';
-        
-        let validStudents = allStudents.filter(s => s.date && s.date !== "بدون موعد");
-        if (validStudents.length === 0) { container.innerHTML = `<p style="text-align: center; color: white;">لا توجد سجلات</p>`; return; }
-
-        let tree = {};
-        validStudents.forEach(s => {
-            let [year, month, day] = s.date.split('-');
-            if(!tree[year]) tree[year] = { records: [], months: {} };
-            tree[year].records.push(s);
-            if(!tree[year].months[month]) tree[year].months[month] = { records: [], days: {} };
-            tree[year].months[month].records.push(s);
-            if(!tree[year].months[month].days[day]) tree[year].months[month].days[day] = [];
-            tree[year].months[month].days[day].push(s);
-        });
-
-        Object.keys(tree).sort((a, b) => b - a).forEach(year => {
-            let yearData = tree[year];
-            let uniqueYearStudents = new Set(yearData.records.map(s => extractPureNumber(s.phone))).size;
-            
-            let yearRow = document.createElement('div'); yearRow.style = 'display: flex; gap: 5px; margin-bottom: 5px;';
-            let yearBtn = document.createElement('button'); yearBtn.className = 'nav-btn'; yearBtn.style.margin = '0'; yearBtn.style.flex = '1';
-            yearBtn.innerText = `${year} (طلاب: ${uniqueYearStudents})`;
-            
-            let yearDelBtn = document.createElement('button'); yearDelBtn.className = 'delete-btn'; yearDelBtn.style.margin = '0'; yearDelBtn.innerText = '🗑';
-            yearDelBtn.onclick = () => deleteAllInYear(year);
-
-            yearRow.appendChild(yearBtn); yearRow.appendChild(yearDelBtn);
-
-            let yearPanel = document.createElement('div'); 
-            yearPanel.style.display = expandedYears.has(year) ? 'block' : 'none'; 
-            yearPanel.style.paddingRight = '10px'; yearPanel.style.borderRight = '2px solid #fcc01a'; yearPanel.style.marginBottom = '10px';
-            yearBtn.onclick = () => {
-                if(yearPanel.style.display === 'block') {
-                    yearPanel.style.display = 'none'; expandedYears.delete(year);
-                } else {
-                    yearPanel.style.display = 'block'; expandedYears.add(year);
-                }
-            };
-
-            Object.keys(yearData.months).sort((a, b) => b - a).forEach(month => {
-                let monthData = yearData.months[month];
-                let uniqueMonthStudents = new Set(monthData.records.map(s => extractPureNumber(s.phone))).size;
-
-                let monthRow = document.createElement('div'); monthRow.style = 'display: flex; gap: 5px; margin-bottom: 5px;';
-                let monthBtn = document.createElement('button'); monthBtn.className = 'nav-btn'; monthBtn.style.backgroundColor = '#ddd'; monthBtn.style.color = '#3b1e5a'; monthBtn.style.padding = '10px'; monthBtn.style.fontSize = '16px'; monthBtn.style.margin = '0'; monthBtn.style.flex = '1';
-                monthBtn.innerText = `${month} (طلاب: ${uniqueMonthStudents})`;
-                
-                let monthDelBtn = document.createElement('button'); monthDelBtn.className = 'delete-btn'; monthDelBtn.style.margin = '0'; monthDelBtn.innerText = '🗑️';
-                monthDelBtn.onclick = () => deleteAllInMonth(year, month);
-
-                monthRow.appendChild(monthBtn); monthRow.appendChild(monthDelBtn);
-
-                let monthKey = `${year}-${month}`;
-                let monthPanel = document.createElement('div'); 
-                monthPanel.style.display = expandedMonths.has(monthKey) ? 'block' : 'none'; 
-                monthPanel.style.paddingRight = '10px'; monthPanel.style.borderRight = '2px solid #ddd'; monthPanel.style.marginBottom = '10px';
-                monthBtn.onclick = () => {
-                    if(monthPanel.style.display === 'block') {
-                        monthPanel.style.display = 'none'; expandedMonths.delete(monthKey);
-                    } else {
-                        monthPanel.style.display = 'block'; expandedMonths.add(monthKey);
-                    }
-                };
-
-                Object.keys(monthData.days).sort((a, b) => b - a).forEach(day => {
-                    let dayRecords = monthData.days[day];
-                    let uniqueDayStudents = new Set(dayRecords.map(s => extractPureNumber(s.phone))).size;
-                    let fullDate = `${year}-${month}-${day}`;
-
-                    const btn = document.createElement('button'); btn.className = 'nav-btn'; btn.style.backgroundColor = 'white'; btn.style.color = '#3b1e5a'; btn.style.border = '1px solid #fcc01a'; btn.style.padding = '10px'; btn.style.fontSize = '15px'; btn.style.marginBottom = '5px';
-                    btn.innerText = `${fullDate} (طلاب: ${uniqueDayStudents})`;
-                    btn.onclick = () => renderPeriodsList(fullDate);
-                    monthPanel.appendChild(btn);
-                });
-                yearPanel.appendChild(monthRow); yearPanel.appendChild(monthPanel);
-            });
-            container.appendChild(yearRow); container.appendChild(yearPanel);
-        });
-    }
-    
-    function renderPeriodsList(date) {
-        currentSelectedDate = date; currentSelectedPeriod = null; document.getElementById('dates-list').style.display = 'none'; document.getElementById('period-details').style.display = 'none'; document.getElementById('periods-list').style.display = 'block'; document.getElementById('selected-date-title').innerText = `جدول يوم: ${date}`;
-        const container = document.getElementById('periods-container'); container.innerHTML = ''; let studentsInDay = allStudents.filter(s => s.date === date); const uniquePeriods = [...new Set(studentsInDay.map(s => s.time))];
-        uniquePeriods.sort((a, b) => { let pA = getPeriodInfo(a).start; let pB = getPeriodInfo(b).start; return pA - pB; });
-        uniquePeriods.forEach(period => { const studentsInPeriod = studentsInDay.filter(s => s.time === period).length; const btn = document.createElement('button'); btn.className = 'nav-btn'; btn.innerText = `فترة: ${period} (الطلاب: ${studentsInPeriod})`; btn.onclick = () => showPeriodDetails(date, period); container.appendChild(btn); });
-    }
-    
-    function showPeriodDetails(date, period) {
-        currentSelectedPeriod = period; document.getElementById('periods-list').style.display = 'none'; document.getElementById('period-details').style.display = 'block'; document.getElementById('selected-period-title').innerText = `تفاصيل (${period}) - ${date}`;
-        const tbody = document.querySelector('#dataTable tbody'); tbody.innerHTML = ''; let filteredStudents = allStudents.filter(s => s.date === date && s.time === period);
-        const courseOrder = { 'Classic Control': 1, 'PLC': 2, 'Motor Drive': 3 }; filteredStudents.sort((a, b) => (courseOrder[a.course] || 99) - (courseOrder[b.course] || 99));
-        
-        filteredStudents.forEach(row => {
-            let isCanceled = row.canceled === true; let bgStyle = isCanceled ? 'background-color: #f1f1f1; color: #a9a9a9;' : ''; 
-            
-            let isChecked = row.attended ? 'checked' : '';
-            let byStr = row.attended_by ? ` title="${row.attended_by}"` : '';
-
-            let statusHTML = `<input type="checkbox" class="attendance-check" ${isChecked} onchange="updateAttendance('${row.id}', '${row.course}', this.checked, this)">`;
-            if (isCanceled) statusHTML = '<span style="color:red; font-weight:bold;">ملغي</span>';
-            else if (row.attended) statusHTML = `<span style="color:green; font-weight:bold; cursor:pointer;" onclick="updateAttendance('${row.id}', '${row.course}', false, this)" ${byStr}>حاضر ✔</span>`;
-            
-            let controlsHTML = `<button class="delete-btn" onclick="deleteStudentFinal('${row.id}')">حذف</button>`; 
-            if (isCanceled) controlsHTML = `<button class="add-btn" style="padding:5px; margin-bottom:5px; font-size:12px; display:block; width:100%;" onclick="restoreStudent('${row.id}')">استرجاع</button>` + controlsHTML;
-            
-            tbody.innerHTML += `<tr style="${bgStyle}"><td><span onclick="selectStudent('${row.phone}')" style="cursor: pointer;">${row.name || ''}</span></td><td onclick="openWhatsApp('${row.phone}')" style="cursor: pointer;" title="مراسلة عبر واتساب">${row.phone || ''}</td><td style="font-weight:bold;">${extractPureNumber(row.group)}</td><td style="font-weight: bold; color: #3b1e5a;">${row.course || ''}</td><td>${row.date || ''}</td><td>${row.time || ''}</td><td>${statusHTML}</td><td>${controlsHTML}</td></tr>`;
-        });
-    }
-
-    function restoreStudent(id) { if(confirm('تأكيد الاسترجاع؟')) database.ref('students/' + id).update({ canceled: null }); }
-    function backToDates() { currentSelectedDate = null; currentSelectedPeriod = null; renderDatesList(); }
-    function backToPeriods() { currentSelectedPeriod = null; renderPeriodsList(currentSelectedDate); }
-    function deleteAllInPeriod() { if (confirm(`حذف؟`)) { let updates = {}; allStudents.filter(s => s.date === currentSelectedDate && s.time === currentSelectedPeriod).forEach(student => updates[student.id] = null); database.ref('students').update(updates).then(backToPeriods); } }
-    function deleteAllInDay() { if (confirm(`حذف؟`)) { let updates = {}; allStudents.filter(s => s.date === currentSelectedDate).forEach(student => updates[student.id] = null); database.ref('students').update(updates).then(backToDates); } }
-</script>
-</body>
-</html>
+            } catch
