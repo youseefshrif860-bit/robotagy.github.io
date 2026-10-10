@@ -8,8 +8,8 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <script>
-        if (window.location.href.indexOf('?v=RA_V7') === -1) {
-            window.location.replace(window.location.href.split('?')[0] + '?v=RA_V7');
+        if (window.location.href.indexOf('?v=RA_V8') === -1) {
+            window.location.replace(window.location.href.split('?')[0] + '?v=RA_V8');
         }
     </script>
 
@@ -40,7 +40,7 @@
 
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background-color: rgba(0, 0, 0, 0.7); z-index: 1000; justify-content: center; align-items: center; }
         .modal-content { background-color: white; padding: 20px; border-radius: 10px; border: 3px solid #fcc01a; width: 90%; max-width: 500px; text-align: right; color: black; box-shadow: 0 4px 15px rgba(0,0,0,0.3); max-height: 90vh; overflow-y: auto; }
-        .modal-close-btn { background-color: #28a745; color: white; border: none; padding: 10px; width: 100%; font-size: 16px; font-weight: bold; border-radius: 5px; cursor: margin-top: 20px; }
+        .modal-close-btn { background-color: #28a745; color: white; border: none; padding: 10px; width: 100%; font-size: 16px; font-weight: bold; border-radius: 5px; cursor: pointer; margin-top: 20px; }
         
         #search-suggestions { position: absolute; width: 100%; background: white; color: black; z-index: 1001; max-height: 200px; overflow-y: auto; border-radius: 5px; box-shadow: 0 4px 8px rgba(0,0,0,0.2); display: none; top: 100%; left: 0; }
         .suggestion-item { padding: 10px; cursor: pointer; border-bottom: 1px solid #ddd; font-size: 14px; }
@@ -303,8 +303,16 @@
                     <h3 id="blocked-view-title" style="color: white; margin: 0; padding-top: 5px;">الطلاب المقيدين (المحظورين)</h3>
                     <div style="display: flex; flex-direction: column; gap: 8px;">
                         <button id="sweep-btn" onclick="runAutoSweep(false)" style="background: none; border: none; font-size: 26px; cursor: pointer; transition: transform 0.2s;" title="فحص النظام وتحديث القائمة آلياً">🔍</button>
-                        <button id="history-toggle-btn" onclick="toggleBlockedHistory()" style="background: none; border: none; font-size: 26px; cursor: pointer; transition: transform 0.2s;" title="سجل المفرج عنهم">📜</button>
+                        <button id="history-toggle-btn" onclick="toggleBlockedHistory()" style="background: none; border: none; font-size: 26px; cursor: pointer; transition: transform 0.2s;" title="سجل رفع القيد">📜</button>
                     </div>
+                </div>
+
+                <div id="blocked-actions" style="margin-bottom: 10px; display: flex; justify-content: flex-end;">
+                    <button class="delete-btn" style="margin: 0; padding: 8px 15px;" onclick="unblockAll()">رفع القيد عن الجميع ✔</button>
+                </div>
+                
+                <div id="history-actions" style="margin-bottom: 10px; display: none; justify-content: flex-end;">
+                    <button class="delete-all-btn" style="margin: 0; padding: 8px 15px;" onclick="clearAllBanHistory()">حذف سجل الجميع 🗑️</button>
                 </div>
 
                 <div id="blocked-table-container" style="overflow-x: auto;">
@@ -316,7 +324,7 @@
 
                 <div id="history-table-container" style="display: none; overflow-x: auto;">
                     <table id="historyTable">
-                        <thead><tr><th>الاسم</th><th>رقم الهاتف</th><th>تاريخ العفو</th><th>مرات القيد</th></tr></thead>
+                        <thead><tr><th>الاسم</th><th>رقم الهاتف</th><th>تاريخ العفو</th><th>مرات القيد</th><th>إجراء</th></tr></thead>
                         <tbody></tbody>
                     </table>
                 </div>
@@ -1142,16 +1150,22 @@
         isShowingHistory = !isShowingHistory;
         const blockedDiv = document.getElementById('blocked-table-container');
         const historyDiv = document.getElementById('history-table-container');
+        const blockedActions = document.getElementById('blocked-actions');
+        const historyActions = document.getElementById('history-actions');
         const title = document.getElementById('blocked-view-title');
         
         if (isShowingHistory) {
             blockedDiv.style.display = 'none';
+            blockedActions.style.display = 'none';
             historyDiv.style.display = 'block';
-            title.innerText = 'سجل رفع القيد (أصحاب السوابق)';
+            historyActions.style.display = 'flex';
+            title.innerText = 'سجل رفع القيد';
             renderUnblockedList();
         } else {
             blockedDiv.style.display = 'block';
+            blockedActions.style.display = 'flex';
             historyDiv.style.display = 'none';
+            historyActions.style.display = 'none';
             title.innerText = 'الطلاب المقيدين (المحظورين)';
         }
     };
@@ -1164,7 +1178,7 @@
         }
         let htmlStr = '';
         blockedPhonesList.forEach(b => {
-            htmlStr += `<tr><td><span onclick="selectStudent('${b.phone}')" style="cursor: pointer; color: black;" title="فتح تقرير الطالب">${b.name || '-'}</span></td><td style="font-family:Tahoma;">${b.phone}</td><td style="font-size:12px; color:#ff4d4d; font-weight:bold;">${b.reason}</td><td><button class="add-btn" style="margin:0; padding:5px 15px;" onclick="unblockFromList('${b.id}', '${b.phone}')">رفع القيد ✔</button></td></tr>`;
+            htmlStr += `<tr><td><span onclick="selectStudent('${b.phone}')" style="cursor: pointer;" title="فتح تقرير الطالب">${b.name || '-'}</span></td><td style="font-family:Tahoma;">${b.phone}</td><td style="font-size:12px; color:#ff4d4d; font-weight:bold;">${b.reason}</td><td><button class="add-btn" style="margin:0; padding:5px 15px;" onclick="unblockFromList('${b.id}', '${b.phone}')">رفع القيد ✔</button></td></tr>`;
         });
         tbody.innerHTML = htmlStr;
     }
@@ -1183,7 +1197,7 @@
         Object.keys(allProgress).forEach(phone => {
             let prog = allProgress[phone];
             if (prog.unblock_date || prog.ban_count) {
-                let st = phoneMap.get(phone) || { name: 'غير معروف', phone: phone };
+                let st = phoneMap.get(phone) || { name: 'طالب محذوف', phone: phone };
                 historyList.push({ phone: phone, name: st.name, unblock_date: prog.unblock_date || '-', ban_count: prog.ban_count || 0 });
             }
         });
@@ -1191,16 +1205,69 @@
         historyList.sort((a,b) => b.ban_count - a.ban_count);
 
         if(historyList.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="4" style="color: #aaa;">لا يوجد سجلات سابقة</td></tr>'; return;
+            tbody.innerHTML = '<tr><td colspan="5" style="color: #aaa;">لا توجد سجلات سابقة</td></tr>'; return;
         }
 
         let htmlStr = '';
         historyList.forEach(u => {
             if (u.ban_count === 0 && u.unblock_date === '-') return; 
-            htmlStr += `<tr><td><span onclick="selectStudent('${u.phone}')" style="cursor: pointer; color: black;" title="فتح تقرير الطالب">${u.name}</span></td><td style="font-family:Tahoma;">${u.phone}</td><td style="font-size:12px; color:#28a745; font-weight:bold;">${u.unblock_date}</td><td style="font-weight:bold; color:#cc0000;">${u.ban_count}</td></tr>`;
+            htmlStr += `<tr><td><span onclick="selectStudent('${u.phone}')" style="cursor: pointer;" title="فتح تقرير الطالب">${u.name}</span></td><td style="font-family:Tahoma;">${u.phone}</td><td style="font-size:12px; color:#28a745; font-weight:bold;">${u.unblock_date}</td><td style="font-weight:bold; color:#cc0000;">${u.ban_count}</td><td><button class="delete-btn" style="margin:0; padding:5px 10px; font-size: 12px;" onclick="clearBanHistory('${u.phone}')">حذف السجل 🗑️</button></td></tr>`;
         });
-        tbody.innerHTML = htmlStr || '<tr><td colspan="4" style="color: #aaa;">لا يوجد سجلات سابقة</td></tr>';
+        tbody.innerHTML = htmlStr || '<tr><td colspan="5" style="color: #aaa;">لا توجد سجلات سابقة</td></tr>';
     }
+
+    window.unblockAll = async function() {
+        if(blockedPhonesList.length === 0) return;
+        if(confirm('هل أنت متأكد من رفع القيد عن جميع الطلاب في القائمة؟ (سيبدأ حساب انقطاعهم وغيابهم من تاريخ اليوم)')) {
+            let blockedUpdates = {};
+            let progressUpdates = {};
+            let todayStr = getLocalDateString();
+            
+            blockedPhonesList.forEach(b => {
+                let pureP = extractPureNumber(b.phone);
+                blockedUpdates[pureP] = null;
+                if (b.id !== pureP) blockedUpdates[b.id] = null;
+                progressUpdates[pureP + '/unblock_date'] = todayStr;
+            });
+            
+            try {
+                await database.ref('blocked_phones').update(blockedUpdates);
+                await database.ref('student_progress').update(progressUpdates);
+                alert('تم رفع القيد عن الجميع بنجاح.');
+            } catch(e) {
+                alert('خطأ: ' + e.message);
+            }
+        }
+    };
+
+    window.clearAllBanHistory = async function() {
+        if(confirm('هل أنت متأكد من مسح تاريخ العفو وعداد السوابق لجميع الطلاب بشكل نهائي؟ هذا الإجراء لا يمكن التراجع عنه!')) {
+            let updates = {};
+            Object.keys(allProgress).forEach(phone => {
+                if (allProgress[phone].unblock_date || allProgress[phone].ban_count) {
+                    updates[phone + '/unblock_date'] = null;
+                    updates[phone + '/ban_count'] = 0;
+                }
+            });
+            try {
+                await database.ref('student_progress').update(updates);
+                alert('تم مسح جميع السجلات بنجاح.');
+            } catch(e) {
+                alert('خطأ: ' + e.message);
+            }
+        }
+    };
+
+    window.clearBanHistory = async function(phone) {
+        if(confirm('تأكيد مسح سجل السوابق وتاريخ العفو لهذا الطالب؟')) {
+            let pureP = extractPureNumber(phone);
+            try {
+                await database.ref('student_progress/' + pureP).update({ unblock_date: null, ban_count: 0 });
+            } catch(e) {
+                alert('خطأ: ' + e.message);
+            }
+        }
+    };
 
     async function unblockFromList(id, phone) {
         if(confirm('هل أنت متأكد من رفع القيد؟ سيبدأ حساب الغياب والانقطاع من تاريخ اليوم.')) {
@@ -1350,7 +1417,7 @@
             let blockedRec = blockedPhonesList.find(b => extractPureNumber(b.phone) === purePhone);
             let banIcon = blockedRec ? ` <span style="cursor:help;" title="مُقيد: ${blockedRec.reason}">⛔</span>` : '';
 
-            tbody.innerHTML += `<tr><td><span onclick="selectStudent('${st.phone}')" style="cursor: pointer; color: black;">${st.name || ''}</span>${banIcon}</td><td onclick="openWhatsApp('${st.phone}')" style="cursor: pointer;" title="مراسلة عبر واتساب">${st.phone || ''}</td><td style="font-weight: bold; color: #3b1e5a;">${pureGrp}</td><td style="font-size: 13px; font-weight: bold; color:#cc0000;">${cText}</td><td style="font-size: 13px; font-weight: bold; color:#cc0000;">${pText}</td><td style="font-size: 13px; font-weight: bold; color:#cc0000;">${dText}</td><td><button class="delete-btn" onclick="deleteStudentCompletely('${st.phone}')">حذف</button></td></tr>`; 
+            tbody.innerHTML += `<tr><td><span onclick="selectStudent('${st.phone}')" style="cursor: pointer;">${st.name || ''}</span>${banIcon}</td><td onclick="openWhatsApp('${st.phone}')" style="cursor: pointer;" title="مراسلة عبر واتساب">${st.phone || ''}</td><td style="font-weight: bold; color: #3b1e5a;">${pureGrp}</td><td style="font-size: 13px; font-weight: bold; color:#cc0000;">${cText}</td><td style="font-size: 13px; font-weight: bold; color:#cc0000;">${pText}</td><td style="font-size: 13px; font-weight: bold; color:#cc0000;">${dText}</td><td><button class="delete-btn" onclick="deleteStudentCompletely('${st.phone}')">حذف</button></td></tr>`; 
         });
         document.getElementById('groupDataTable').style.display = 'table';
     }
@@ -1536,13 +1603,30 @@
 
     async function selectStudent(studentPhoneParam) {
         document.getElementById('extra-settings-panel').style.display = 'none';
-        let targetPhone = extractPureNumber(studentPhoneParam); currentSelectedStudent = targetPhone; document.getElementById('search-student').value = ''; document.getElementById('search-suggestions').style.display = 'none';
-        let allStudentRecords = allStudents.filter(s => extractPureNumber(s.phone) === targetPhone);
-        if(allStudentRecords.length === 0) { closeReportModal(); return; }
-        allStudentRecords.sort((a,b) => new Date(b.date || 0) - new Date(a.date || 0));
-        let latestName = allStudentRecords[allStudentRecords.length - 1].name; let studentPhone = allStudentRecords[allStudentRecords.length - 1].phone; 
+        let targetPhone = extractPureNumber(studentPhoneParam); currentSelectedStudent = targetPhone; 
+        document.getElementById('search-student').value = ''; document.getElementById('search-suggestions').style.display = 'none';
         
-        let validRecords = allStudentRecords.filter(s => !s.canceled && s.date && s.date !== "بدون موعد");
+        let allStudentRecords = allStudents.filter(s => extractPureNumber(s.phone) === targetPhone);
+        
+        let latestName = "طالب محذوف";
+        let studentPhone = targetPhone; 
+        let pureGroupNum = "غير متوفر";
+        let validRecords = [];
+        
+        if(allStudentRecords.length > 0) {
+            allStudentRecords.sort((a,b) => new Date(b.date || 0) - new Date(a.date || 0));
+            latestName = allStudentRecords[allStudentRecords.length - 1].name; 
+            studentPhone = allStudentRecords[allStudentRecords.length - 1].phone;
+            pureGroupNum = extractPureNumber(allStudentRecords[allStudentRecords.length - 1].group);
+            validRecords = allStudentRecords.filter(s => !s.canceled && s.date && s.date !== "بدون موعد");
+        } else {
+            let bRec = blockedPhonesList.find(b => extractPureNumber(b.phone) === targetPhone);
+            if(bRec && bRec.name) latestName = bRec.name + " (طالب محذوف)";
+        }
+        
+        let lastAttended = 'لا يوجد حضور'; let attendedRecords = validRecords.filter(s => s.attended); 
+        if(attendedRecords.length > 0) { attendedRecords.sort((a,b) => new Date(b.date || 0) - new Date(a.date || 0)); lastAttended = attendedRecords[0].date; }
+        
         let absent = validRecords.filter(s => !s.attended && isPeriodPassed(s.date, s.time)).length;
 
         document.getElementById('report-name').innerText = 'السجل الأكاديمي: ' + latestName; 
@@ -1553,7 +1637,6 @@
         phoneEl.style.cursor = 'pointer';
         phoneEl.title = 'مراسلة عبر واتساب';
 
-        let pureGroupNum = extractPureNumber(allStudentRecords[allStudentRecords.length - 1].group);
         document.getElementById('report-group').innerText = pureGroupNum;
         document.getElementById('report-total').innerText = validRecords.length;
         document.getElementById('report-absent').innerText = absent;
