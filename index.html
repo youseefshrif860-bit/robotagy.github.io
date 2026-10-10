@@ -8,8 +8,8 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <script>
-        if (window.location.href.indexOf('?v=RA_V8') === -1) {
-            window.location.replace(window.location.href.split('?')[0] + '?v=RA_V8');
+        if (window.location.href.indexOf('?v=RA_V9') === -1) {
+            window.location.replace(window.location.href.split('?')[0] + '?v=RA_V9');
         }
     </script>
 
@@ -303,7 +303,7 @@
                     <h3 id="blocked-view-title" style="color: white; margin: 0; padding-top: 5px;">الطلاب المقيدين (المحظورين)</h3>
                     <div style="display: flex; flex-direction: column; gap: 8px;">
                         <button id="sweep-btn" onclick="runAutoSweep(false)" style="background: none; border: none; font-size: 26px; cursor: pointer; transition: transform 0.2s;" title="فحص النظام وتحديث القائمة آلياً">🔍</button>
-                        <button id="history-toggle-btn" onclick="toggleBlockedHistory()" style="background: none; border: none; font-size: 26px; cursor: pointer; transition: transform 0.2s;" title="سجل رفع القيد">📜</button>
+                        <button id="history-toggle-btn" onclick="toggleBlockedHistory()" style="background: none; border: none; font-size: 26px; cursor: pointer; transition: transform 0.2s;" title="سجل المفرج عنهم">📜</button>
                     </div>
                 </div>
 
@@ -469,7 +469,6 @@
         return Math.floor((d2 - d1) / (1000 * 60 * 60 * 24));
     }
 
-    // --- حساب الانقطاع بصرامة ---
     function checkInactivity(records, unblockDate, todayStr) {
         let validRecs = records.filter(r => !r.canceled && r.date && r.date !== "بدون موعد");
         if (validRecs.length === 0) return { inactive: false, days: 0, lastAttendedReal: "لا يوجد حضور" };
@@ -496,7 +495,6 @@
         return { inactive: diff >= 14, days: diff, baseDate: baseDate, lastAttendedReal: lastAttendedReal };
     }
 
-    // --- حساب دورة الغياب بصرامة ---
     function getAbsenceCycle(records, unblockDate, todayStr) {
         let validRecs = records.filter(r => !r.canceled && r.date && r.date !== "بدون موعد");
         validRecs.sort((a,b) => new Date(a.date+"T00:00:00") - new Date(b.date+"T00:00:00"));
@@ -1417,7 +1415,7 @@
             let blockedRec = blockedPhonesList.find(b => extractPureNumber(b.phone) === purePhone);
             let banIcon = blockedRec ? ` <span style="cursor:help;" title="مُقيد: ${blockedRec.reason}">⛔</span>` : '';
 
-            tbody.innerHTML += `<tr><td><span onclick="selectStudent('${st.phone}')" style="cursor: pointer;">${st.name || ''}</span>${banIcon}</td><td onclick="openWhatsApp('${st.phone}')" style="cursor: pointer;" title="مراسلة عبر واتساب">${st.phone || ''}</td><td style="font-weight: bold; color: #3b1e5a;">${pureGrp}</td><td style="font-size: 13px; font-weight: bold; color:#cc0000;">${cText}</td><td style="font-size: 13px; font-weight: bold; color:#cc0000;">${pText}</td><td style="font-size: 13px; font-weight: bold; color:#cc0000;">${dText}</td><td><button class="delete-btn" onclick="deleteStudentCompletely('${st.phone}')">حذف</button></td></tr>`; 
+            tbody.innerHTML += `<tr><td><span onclick="selectStudent('${st.phone}')" style="cursor: pointer; color: black;">${st.name || ''}</span>${banIcon}</td><td onclick="openWhatsApp('${st.phone}')" style="cursor: pointer;" title="مراسلة عبر واتساب">${st.phone || ''}</td><td style="font-weight: bold; color: #3b1e5a;">${pureGrp}</td><td style="font-size: 13px; font-weight: bold; color:#cc0000;">${cText}</td><td style="font-size: 13px; font-weight: bold; color:#cc0000;">${pText}</td><td style="font-size: 13px; font-weight: bold; color:#cc0000;">${dText}</td><td><button class="delete-btn" onclick="deleteStudentCompletely('${st.phone}')">حذف</button></td></tr>`; 
         });
         document.getElementById('groupDataTable').style.display = 'table';
     }
@@ -1602,6 +1600,7 @@
     }
 
     async function selectStudent(studentPhoneParam) {
+        let todayStr = getLocalDateString();
         document.getElementById('extra-settings-panel').style.display = 'none';
         let targetPhone = extractPureNumber(studentPhoneParam); currentSelectedStudent = targetPhone; 
         document.getElementById('search-student').value = ''; document.getElementById('search-suggestions').style.display = 'none';
