@@ -438,6 +438,13 @@
     const today = getLocalDateString();
     document.querySelector('.date-input').setAttribute('min', today);
 
+    // دالة صارمة لحساب فرق الأيام رياضياً بدون تأثير الـ Timezones
+    function diffDaysSafely(date1Str, date2Str) {
+        let d1 = new Date(date1Str + "T00:00:00").getTime();
+        let d2 = new Date(date2Str + "T00:00:00").getTime();
+        return Math.floor((d2 - d1) / (1000 * 60 * 60 * 24));
+    }
+
     let openCoursePanels = new Set();
     let expandedYears = new Set();
     let expandedMonths = new Set();
@@ -766,6 +773,7 @@
         const purePhoneCheck = extractPureNumber(phoneInput); if (purePhoneCheck.length !== 11) { showErrorModal(SYSTEM_MESSAGES.phone_err); resetBtn(); return; }
         const phone = purePhoneCheck; const courseKey = course === 'Classic Control' ? 'classic_control' : (course === 'PLC' ? 'plc' : 'motor_drive'); const maxLimit = LMS_COURSES[courseKey].limit || 8;
         
+        let todayStr = getLocalDateString();
         const appointmentRows = document.querySelectorAll('.appointment-row'); let appointments = []; let hasDuplicate = false; let tempSet = new Set(); let hasLateBooking = false;
         appointmentRows.forEach(row => { 
             const d = row.querySelector('.date-input').value; const t = row.querySelector('.time-input').value; 
@@ -783,51 +791,54 @@
 
             const snapshot = await database.ref('students').get(); let dbData = []; if (snapshot.exists()) { const data = snapshot.val(); Object.keys(data).forEach(key => dbData.push(data[key])); }
             
-            // تحقق حظر مدة المجموعة
+            // --- عمليات الفحص الصارمة بالمشرط ---
+            
+            // 1. فحص حظر مدة المجموعة
             let pureTargetGroup = extractPureNumber(group);
             let groupRecordsForTenureCheck = dbData.filter(d => extractPureNumber(d.group) === pureTargetGroup && d.date && d.date !== "بدون موعد" && !d.canceled);
             if (groupRecordsForTenureCheck.length > 0) {
-                groupRecordsForTenureCheck.sort((a,b) => new Date(a.date) - new Date(b.date));
-                let oldestDate = new Date(groupRecordsForTenureCheck[0].date);
-                let todayDate = new Date(getLocalDateString());
-                let diffDays = Math.floor(Math.abs(todayDate - oldestDate) / (1000 * 60 * 60 * 24));
-                if (diffDays >= 90) {
-                    await database.ref('blocked_phones').push({ phone: phone, name: name, reason: 'محاولة تسجيل في مجموعة قديمة' });
+                groupRecordsForTenureCheck.sort((a,b) => new Date(a.date+"T00:00:00") - new Date(b.date+"T00:00:00"));
+                let oldestDate = groupRecordsForTenureCheck[0].date;
+                let diffDaysGroup = diffDaysSafely(oldestDate, todayStr);
+                
+                if (diffDaysGroup >= 90) {
+                    await database.ref('blocked_phones').push({ phone: phone, name: name, reason: 'محاولة تسجيل في مجموعة قديمة (تجاوزت 3 أشهر)' });
                     showErrorModal(SYSTEM_MESSAGES.blocked);
                     resetBtn(); return;
                 }
             }
 
             let studentPastRecordsAll = dbData.filter(d => normalizePhone(d.phone) === normalizedInputPhone && !d.canceled && d.date && d.date !== "بدون موعد");
-            
-            // تحقق الانقطاع أكثر من 14 يوم
             if (studentPastRecordsAll.length > 0) {
-                studentPastRecordsAll.sort((a,b) => new Date(b.date) - new Date(a.date));
-                let latestRecordDate = new Date(studentPastRecordsAll[0].date).getTime();
-                let nowMs = new Date(getLocalDateString()).getTime();
-                let diffDaysInactivity = Math.floor((nowMs - latestRecordDate) / (1000 * 60 * 60 * 24));
+                studentPastRecordsAll.sort((a,b) => new Date(b.date+"T00:00:00") - new Date(a.date+"T00:00:00"));
+                let latestDate = studentPastRecordsAll[0].date;
                 
-                if (diffDaysInactivity > 14) {
+                // 2. فحص الانقطاع أكثر من 14 يوم
+                let inactivityDays = diffDaysSafely(latestDate, todayStr);
+                if (inactivityDays > 14) {
                     await database.ref('blocked_phones').push({ phone: phone, name: name, reason: 'انقطاع عن التسجيل (أكثر من 14 يوم)' });
                     showErrorModal(SYSTEM_MESSAGES.blocked);
                     resetBtn(); return;
                 }
-            }
 
-            // تحقق حظر 3 غيابات في آخر 14 يوم
-            let nowMs = new Date(getLocalDateString()).getTime();
-            let fourteenDaysMs = 14 * 24 * 60 * 60 * 1000;
-            let recentAbsences = studentPastRecordsAll.filter(d => {
-                if (d.attended) return false;
-                if (!isPeriodPassed(d.date, d.time)) return false;
-                let recDateMs = new Date(d.date).getTime();
-                return (nowMs - recDateMs) <= fourteenDaysMs;
-            });
-            if (recentAbsences.length >= 3) {
-                await database.ref('blocked_phones').push({ phone: phone, name: name, reason: 'تجاوز حد الغياب (3 مرات)' });
-                showErrorModal(SYSTEM_MESSAGES.blocked);
-                resetBtn(); return;
+                // 3. فحص حظر 3 غيابات في آخر 14 يوم
+                let absencesCount = 0;
+                studentPastRecordsAll.forEach(rec => {
+                    if (!rec.attended && isPeriodPassed(rec.date, rec.time)) {
+                        let dPassed = diffDaysSafely(rec.date, todayStr);
+                        if (dPassed >= 0 && dPassed <= 14) {
+                            absencesCount++;
+                        }
+                    }
+                });
+
+                if (absencesCount >= 3) {
+                    await database.ref('blocked_phones').push({ phone: phone, name: name, reason: 'تجاوز حد الغياب (3 مرات في آخر 14 يوم)' });
+                    showErrorModal(SYSTEM_MESSAGES.blocked);
+                    resetBtn(); return;
+                }
             }
+            // --- نهاية عمليات الفحص الصارمة ---
 
             for (let i = 0; i < appointments.length; i++) {
                 const app = appointments[i];
