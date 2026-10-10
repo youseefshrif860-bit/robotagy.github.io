@@ -8,8 +8,8 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <script>
-        if (window.location.href.indexOf('?v=Robotagy_SystemV6') === -1) {
-            window.location.replace(window.location.href.split('?')[0] + '?v=Robotagy_SystemV6');
+        if (window.location.href.indexOf('?v=RA') === -1) {
+            window.location.replace(window.location.href.split('?')[0] + '?v=RA');
         }
     </script>
 
@@ -368,7 +368,7 @@
                     <div>مرات الغياب: <b id="report-absent" style="color: red;"></b></div>
                     <div>تاريخ آخر حضور: <b id="report-last" style="color: green;"></b></div>
                     <div style="margin-top:5px; padding-top:5px; border-top:1px dashed #ddd; font-size: 13px;">عمر المجموعة: <b id="report-group-tenure" style="color: #28a745;"></b></div>
-                    <div id="report-vip-status" style="margin-top:5px; font-size: 13px; font-weight:bold; color:#fcc01a; display:none;">⭐ خريج (VIP Immunity)</div>
+                    <div id="report-vip-status" style="margin-top:5px; font-size: 18px; display:none;" title="خريج (VIP)">⭐</div>
                 </div>
             </div>
             
@@ -1063,7 +1063,7 @@
         let htmlStr = '';
         blockedPhonesList.forEach(b => {
             // عرض الاسم بشكل طبيعي مثل باقي القوائم، ولكنه قابل للضغط
-            htmlStr += `<tr><td><span onclick="selectStudent('${b.phone}')" style="cursor: pointer; font-weight: bold; color: #3b1e5a; text-decoration: underline;" title="فتح تقرير الطالب">${b.name || '-'}</span></td><td style="font-family:Tahoma;">${b.phone}</td><td style="font-size:12px; color:#ff4d4d; font-weight:bold;">${b.reason}</td><td><button class="add-btn" style="margin:0; padding:5px 15px;" onclick="unblockFromList('${b.id}', '${b.phone}')">رفع القيد ✔</button></td></tr>`;
+            htmlStr += `<tr><td><span onclick="selectStudent('${b.phone}')" style="cursor: pointer;" title="فتح تقرير الطالب">${b.name || '-'}</span></td><td style="font-family:Tahoma;">${b.phone}</td><td style="font-size:12px; color:#ff4d4d; font-weight:bold;">${b.reason}</td><td><button class="add-btn" style="margin:0; padding:5px 15px;" onclick="unblockFromList('${b.id}', '${b.phone}')">رفع القيد ✔</button></td></tr>`;
         });
         tbody.innerHTML = htmlStr;
     }
