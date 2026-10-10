@@ -8,8 +8,8 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <script>
-        if (window.location.href.indexOf('?v=Robotagy_SystemV5') === -1) {
-            window.location.replace(window.location.href.split('?')[0] + '?v=Robotagy_SystemV5');
+        if (window.location.href.indexOf('?v=Robotagy_SystemV6') === -1) {
+            window.location.replace(window.location.href.split('?')[0] + '?v=Robotagy_SystemV6');
         }
     </script>
 
@@ -429,10 +429,10 @@
     const database = firebase.database();
     const auth = firebase.auth();
 
-    const normalizeText = (str) => String(str || '').replace(/[\s\u200B-\u200D\uFEFF]/g, '').trim();
     const normalizePhone = (str) => String(str || '').replace(/[\s\u200B-\u200D\uFEFF]/g, '').trim().replace(/[٠-٩]/g, d => "٠١٢٣٤٥٦٧٨٩".indexOf(d));
     const extractPureNumber = (str) => normalizePhone(str).replace(/\D/g, '');
     const isStrictlyNumber = (str) => { let s = extractPureNumber(str); return s.length > 0; };
+    const normalizeText = (str) => String(str || '').replace(/[\s\u200B-\u200D\uFEFF]/g, '').trim();
 
     function getLocalDateString() {
         const now = new Date();
@@ -684,9 +684,9 @@
     }
 
     // دالة فحص الـ VIP (إتمام 100% في كافة الكورسات)
-    function checkIfStudentIsVIP(normalizedPhone, recordsArr, progressDataObj) {
+    function checkIfStudentIsVIP(purePhoneParam, recordsArr, progressDataObj) {
         let cTasks = { classic_control: new Set(), plc: new Set(), motor_drive: new Set() };
-        let studentRecords = recordsArr.filter(s => normalizePhone(s.phone) === normalizedPhone && !s.canceled && s.attended && s.tasks);
+        let studentRecords = recordsArr.filter(s => extractPureNumber(s.phone) === purePhoneParam && !s.canceled && s.attended && s.tasks);
         
         studentRecords.forEach(r => {
             let cKey = r.course === 'Classic Control' ? 'classic_control' : (r.course === 'PLC' ? 'plc' : 'motor_drive');
@@ -718,7 +718,7 @@
             if (snap.exists()) {
                 let data = snap.val(); let studentAllRecords = [];
                 Object.keys(data).forEach(key => {
-                    let s = data[key]; if (normalizePhone(s.phone) === mPhone && extractPureNumber(s.group) === mGroup) studentAllRecords.push({id: key, ...s});
+                    let s = data[key]; if (extractPureNumber(s.phone) === mPhone && extractPureNumber(s.group) === mGroup) studentAllRecords.push({id: key, ...s});
                 });
 
                 if (studentAllRecords.length > 0) {
@@ -798,7 +798,7 @@
 
         const name = document.getElementById('name').value; const phoneInput = document.getElementById('phone').value; const group = document.getElementById('group').value; const course = document.getElementById('course').value;
         const purePhoneCheck = extractPureNumber(phoneInput); if (purePhoneCheck.length !== 11) { showErrorModal(SYSTEM_MESSAGES.phone_err); resetBtn(); return; }
-        const phone = purePhoneCheck; const normalizedInputPhone = normalizePhone(phone);
+        const phone = purePhoneCheck; 
         const courseKey = course === 'Classic Control' ? 'classic_control' : (course === 'PLC' ? 'plc' : 'motor_drive'); const maxLimit = LMS_COURSES[courseKey].limit || 8;
         
         let todayStr = getLocalDateString();
@@ -814,15 +814,15 @@
 
         try {
             // منع التكرار: فحص القائمة المحلية للتحقق من وجود الحظر
-            let isBlocked = blockedPhonesList.some(b => normalizePhone(b.phone) === normalizedInputPhone);
+            let isBlocked = blockedPhonesList.some(b => extractPureNumber(b.phone) === phone);
             if (isBlocked) { showErrorModal(SYSTEM_MESSAGES.blocked); resetBtn(); return; }
 
             const snapshot = await database.ref('students').get(); let dbData = []; if (snapshot.exists()) { const data = snapshot.val(); Object.keys(data).forEach(key => dbData.push(data[key])); }
-            const progSnap = await database.ref('student_progress/' + normalizedInputPhone).get();
+            const progSnap = await database.ref('student_progress/' + phone).get();
             let progressDataObj = progSnap.exists() ? progSnap.val() : {};
             let unblockDate = progressDataObj.unblock_date || null;
             
-            let isVIP = checkIfStudentIsVIP(normalizedInputPhone, dbData, progressDataObj);
+            let isVIP = checkIfStudentIsVIP(phone, dbData, progressDataObj);
             
             // --- عمليات الفحص الصارمة بمشرط جراح ---
             
@@ -839,8 +839,7 @@
                     let diffDaysGroup = diffDaysSafely(oldestDate, todayStr);
                     if (diffDaysGroup >= 90) {
                         try { 
-                            let pureP = extractPureNumber(phone);
-                            await database.ref('blocked_phones/' + pureP).set({ phone: phone, name: name || 'بدون اسم', reason: 'محاولة تسجيل في مجموعة قديمة' }); 
+                            await database.ref('blocked_phones/' + phone).set({ phone: phone, name: name || 'بدون اسم', reason: 'محاولة تسجيل في مجموعة قديمة' }); 
                         } catch(err) { console.error(err); }
                         showErrorModal(SYSTEM_MESSAGES.blocked);
                         resetBtn(); return;
@@ -848,7 +847,7 @@
                 }
             }
 
-            let studentPastRecordsAll = dbData.filter(d => normalizePhone(d.phone) === normalizedInputPhone && !d.canceled && d.date && d.date !== "بدون موعد");
+            let studentPastRecordsAll = dbData.filter(d => extractPureNumber(d.phone) === phone && !d.canceled && d.date && d.date !== "بدون موعد");
             if (studentPastRecordsAll.length > 0) {
                 studentPastRecordsAll.sort((a,b) => new Date(b.date+"T00:00:00") - new Date(a.date+"T00:00:00"));
                 let latestDate = studentPastRecordsAll[0].date;
@@ -859,8 +858,7 @@
                     let inactivityDays = diffDaysSafely(latestDate, todayStr);
                     if (inactivityDays > 14) {
                         try { 
-                            let pureP = extractPureNumber(phone);
-                            await database.ref('blocked_phones/' + pureP).set({ phone: phone, name: name || 'بدون اسم', reason: 'انقطاع عن التسجيل (أكثر من 14 يوم)' }); 
+                            await database.ref('blocked_phones/' + phone).set({ phone: phone, name: name || 'بدون اسم', reason: 'انقطاع عن التسجيل (أكثر من 14 يوم)' }); 
                         } catch(err) { console.error(err); }
                         showErrorModal(SYSTEM_MESSAGES.blocked);
                         resetBtn(); return;
@@ -881,8 +879,7 @@
 
                 if (absencesCount >= 3) {
                     try { 
-                        let pureP = extractPureNumber(phone);
-                        await database.ref('blocked_phones/' + pureP).set({ phone: phone, name: name || 'بدون اسم', reason: 'تجاوز حد الغياب (3 مرات)' }); 
+                        await database.ref('blocked_phones/' + phone).set({ phone: phone, name: name || 'بدون اسم', reason: 'تجاوز حد الغياب (3 مرات)' }); 
                     } catch(err) { console.error(err); }
                     showErrorModal(SYSTEM_MESSAGES.blocked);
                     resetBtn(); return;
@@ -920,14 +917,14 @@
 
         allStudents.forEach(s => {
             if(s.canceled || !s.date || s.date === "بدون موعد") return;
-            let p = normalizePhone(s.phone);
+            let p = extractPureNumber(s.phone);
             if(!phoneMap.has(p)) phoneMap.set(p, []);
             phoneMap.get(p).push(s);
         });
 
         for (let [phone, records] of phoneMap.entries()) {
             // منع التكرار لو كان الطالب محظور بالفعل
-            if (blockedPhonesList.some(b => normalizePhone(b.phone) === phone)) continue;
+            if (blockedPhonesList.some(b => extractPureNumber(b.phone) === phone)) continue;
 
             records.sort((a,b) => new Date(b.date+"T00:00:00") - new Date(a.date+"T00:00:00"));
             let latestRec = records[0];
@@ -1066,7 +1063,7 @@
         let htmlStr = '';
         blockedPhonesList.forEach(b => {
             // عرض الاسم بشكل طبيعي مثل باقي القوائم، ولكنه قابل للضغط
-            htmlStr += `<tr><td><span onclick="selectStudent('${b.phone}')" style="cursor: pointer;" title="فتح تقرير الطالب">${b.name || '-'}</span></td><td style="font-family:Tahoma;">${b.phone}</td><td style="font-size:12px; color:#ff4d4d; font-weight:bold;">${b.reason}</td><td><button class="add-btn" style="margin:0; padding:5px 15px;" onclick="unblockFromList('${b.id}', '${b.phone}')">رفع القيد ✔</button></td></tr>`;
+            htmlStr += `<tr><td><span onclick="selectStudent('${b.phone}')" style="cursor: pointer; font-weight: bold; color: #3b1e5a; text-decoration: underline;" title="فتح تقرير الطالب">${b.name || '-'}</span></td><td style="font-family:Tahoma;">${b.phone}</td><td style="font-size:12px; color:#ff4d4d; font-weight:bold;">${b.reason}</td><td><button class="add-btn" style="margin:0; padding:5px 15px;" onclick="unblockFromList('${b.id}', '${b.phone}')">رفع القيد ✔</button></td></tr>`;
         });
         tbody.innerHTML = htmlStr;
     }
@@ -1076,7 +1073,7 @@
             let pureP = extractPureNumber(phone);
             await database.ref('blocked_phones/' + pureP).remove();
             await database.ref('student_progress/' + pureP).update({ unblock_date: getLocalDateString() });
-            if(currentSelectedStudent === normalizePhone(phone)) selectStudent(phone);
+            if(extractPureNumber(currentSelectedStudent) === pureP) selectStudent(phone);
         }
     }
 
@@ -1125,7 +1122,7 @@
             
             studentsInGroup.forEach(st => {
                 updates[st.id] = null;
-                progressUpdates[normalizePhone(st.phone)] = null;
+                progressUpdates[extractPureNumber(st.phone)] = null;
             });
 
             try {
@@ -1172,7 +1169,7 @@
     function renderGroupStudents(selectedGroupNumber) {
         let studentsInGroup = allStudents.filter(s => { return isStrictlyNumber(s.group) && extractPureNumber(s.group) === selectedGroupNumber && !s.canceled; });
         let phoneMap = new Map(); studentsInGroup.sort((a,b) => new Date(a.date || 0) - new Date(b.date || 0));
-        studentsInGroup.forEach(s => { phoneMap.set(normalizePhone(s.phone), s); }); 
+        studentsInGroup.forEach(s => { phoneMap.set(extractPureNumber(s.phone), s); }); 
         let uniqueStudents = Array.from(phoneMap.values());
         
         let excelBtn = document.getElementById('export-excel-btn');
@@ -1192,8 +1189,8 @@
         
         let tbody = document.querySelector('#groupDataTable tbody'); tbody.innerHTML = '';
         uniqueStudents.forEach(st => { 
-            let pureGrp = extractPureNumber(st.group); let normPhone = normalizePhone(st.phone); let stProg = allProgress[normPhone] || {};
-            let studentRecords = allStudents.filter(s => normalizePhone(s.phone) === normPhone && !s.canceled && s.attended && s.tasks);
+            let pureGrp = extractPureNumber(st.group); let purePhone = extractPureNumber(st.phone); let stProg = allProgress[purePhone] || {};
+            let studentRecords = allStudents.filter(s => extractPureNumber(s.phone) === purePhone && !s.canceled && s.attended && s.tasks);
             let cTasks = { classic_control: new Set(), plc: new Set(), motor_drive: new Set() };
             studentRecords.forEach(r => { let cKey = r.course === 'Classic Control' ? 'classic_control' : (r.course === 'PLC' ? 'plc' : 'motor_drive'); r.tasks.split('|').forEach(t => { if(t.trim()) cTasks[cKey].add(t.trim()); }); });
 
@@ -1234,7 +1231,7 @@
     window.toggleLegacyTask = async function(phone, courseKey, taskKey, currentState) {
         let newState = !currentState;
         try {
-            await database.ref(`student_progress/${phone}/${courseKey}/${taskKey}`).set(newState);
+            await database.ref(`student_progress/${extractPureNumber(phone)}/${courseKey}/${taskKey}`).set(newState);
             selectStudent(phone);
         } catch (err) { alert('خطأ في التحديث: ' + err.message); }
     };
@@ -1247,7 +1244,7 @@
         if(limits.exam) updates['exam'] = isChecked;
         
         try {
-            await database.ref(`student_progress/${phone}/${courseKey}`).update(updates);
+            await database.ref(`student_progress/${extractPureNumber(phone)}/${courseKey}`).update(updates);
             selectStudent(phone);
         } catch(e) { alert('خطأ: ' + e.message); }
     };
@@ -1255,7 +1252,7 @@
     window.handleWireChange = async function(isChecked) {
         if(!currentSelectedStudent) return;
         try {
-            await database.ref(`student_progress/${currentSelectedStudent}`).update({
+            await database.ref(`student_progress/${extractPureNumber(currentSelectedStudent)}`).update({
                 wire_received: isChecked,
                 wire_by: isChecked ? currentAdminName : null
             });
@@ -1270,7 +1267,7 @@
         if(!currentSelectedStudent) return;
         if(confirm("تأكيد التراجع؟ سيتم إرجاع الحالة إلى (لم يتم التسليم).")) {
             try {
-                await database.ref(`student_progress/${currentSelectedStudent}`).update({
+                await database.ref(`student_progress/${extractPureNumber(currentSelectedStudent)}`).update({
                     wire_received: false,
                     wire_by: null
                 });
@@ -1292,9 +1289,9 @@
         let dateStr = getLocalDateString();
         
         try {
-            await database.ref(`student_progress/${currentSelectedStudent}/notesLog`).push({ text: text, date: dateStr, by: currentAdminName });
+            await database.ref(`student_progress/${extractPureNumber(currentSelectedStudent)}/notesLog`).push({ text: text, date: dateStr, by: currentAdminName });
             input.value = '';
-            const progSnap = await database.ref('student_progress/' + currentSelectedStudent).get();
+            const progSnap = await database.ref('student_progress/' + extractPureNumber(currentSelectedStudent)).get();
             renderNotesList(progSnap.exists() ? progSnap.val().notesLog || {} : {});
         } catch(e) { alert('خطأ: ' + e.message); }
     };
@@ -1302,8 +1299,8 @@
     window.deleteNote = async function(noteId) {
         if(!confirm('حذف الملاحظة؟') || !currentSelectedStudent) return;
         try {
-            await database.ref(`student_progress/${currentSelectedStudent}/notesLog/${noteId}`).remove();
-            const progSnap = await database.ref('student_progress/' + currentSelectedStudent).get();
+            await database.ref(`student_progress/${extractPureNumber(currentSelectedStudent)}/notesLog/${noteId}`).remove();
+            const progSnap = await database.ref('student_progress/' + extractPureNumber(currentSelectedStudent)).get();
             renderNotesList(progSnap.exists() ? progSnap.val().notesLog || {} : {});
         } catch(e) { alert(e.message); }
     };
@@ -1387,16 +1384,16 @@
     function handleSearch(query) {
         const container = document.getElementById('search-suggestions'); if (!query.trim()) { container.style.display = 'none'; return; }
         let phoneMap = new Map(); let sortedAll = [...allStudents].sort((a,b) => new Date(a.date || 0) - new Date(b.date || 0));
-        sortedAll.forEach(s => { phoneMap.set(normalizePhone(s.phone), s); }); let uniqueLatestRecords = Array.from(phoneMap.values());
-        let matches = uniqueLatestRecords.filter(s => (s.name && s.name.toLowerCase().includes(query.toLowerCase())) || (s.phone && normalizePhone(s.phone).includes(normalizePhone(query))));
+        sortedAll.forEach(s => { phoneMap.set(extractPureNumber(s.phone), s); }); let uniqueLatestRecords = Array.from(phoneMap.values());
+        let matches = uniqueLatestRecords.filter(s => (s.name && s.name.toLowerCase().includes(query.toLowerCase())) || (s.phone && extractPureNumber(s.phone).includes(extractPureNumber(query))));
         if (matches.length === 0) { container.innerHTML = '<div class="suggestion-item" style="color:red;">لا توجد نتائج</div>'; } else { container.innerHTML = matches.map(s => `<div class="suggestion-item" onclick="selectStudent('${s.phone}')">${s.name} - <span style="color:#666; font-size:12px;">${s.phone}</span></div>`).join(''); }
         container.style.display = 'block';
     }
 
     async function selectStudent(studentPhoneParam) {
         document.getElementById('extra-settings-panel').style.display = 'none';
-        let targetPhone = normalizePhone(studentPhoneParam); currentSelectedStudent = targetPhone; document.getElementById('search-student').value = ''; document.getElementById('search-suggestions').style.display = 'none';
-        let allStudentRecords = allStudents.filter(s => normalizePhone(s.phone) === targetPhone);
+        let targetPhone = extractPureNumber(studentPhoneParam); currentSelectedStudent = targetPhone; document.getElementById('search-student').value = ''; document.getElementById('search-suggestions').style.display = 'none';
+        let allStudentRecords = allStudents.filter(s => extractPureNumber(s.phone) === targetPhone);
         if(allStudentRecords.length === 0) { closeReportModal(); return; }
         allStudentRecords.sort((a,b) => new Date(b.date || 0) - new Date(a.date || 0));
         let latestName = allStudentRecords[allStudentRecords.length - 1].name; let studentPhone = allStudentRecords[allStudentRecords.length - 1].phone; 
@@ -1454,7 +1451,7 @@
         }
         document.getElementById('report-group-tenure').innerText = tenureText;
         
-        let isBlocked = blockedPhonesList.some(b => normalizePhone(b.phone) === normalizePhone(studentPhone));
+        let isBlocked = blockedPhonesList.some(b => extractPureNumber(b.phone) === extractPureNumber(studentPhone));
         let blockBtn = document.getElementById('block-btn');
         if (isBlocked) { 
             blockBtn.innerText = "رفع القيد ✔"; 
@@ -1500,7 +1497,7 @@
             });
         }
 
-        const progSnap = await database.ref('student_progress/' + normalizePhone(studentPhone)).get(); 
+        const progSnap = await database.ref('student_progress/' + extractPureNumber(studentPhone)).get(); 
         const studentProgressData = progSnap.exists() ? progSnap.val() : {};
 
         let isWireReceived = studentProgressData.wire_received || false;
@@ -1520,10 +1517,10 @@
 
         renderNotesList(studentProgressData.notesLog || {});
 
-        buildLMSUI(normalizePhone(studentPhone), cTasks, studentProgressData); 
+        buildLMSUI(extractPureNumber(studentPhone), cTasks, studentProgressData); 
         
         // التحقق من حالة الـ VIP وإظهار الشارة لو اكتمل
-        let isVIP = checkIfStudentIsVIP(normalizePhone(studentPhone), allStudents, studentProgressData);
+        let isVIP = checkIfStudentIsVIP(extractPureNumber(studentPhone), allStudents, studentProgressData);
         let vipBadge = document.getElementById('report-vip-status');
         if (isVIP) {
             vipBadge.style.display = 'block';
@@ -1543,7 +1540,7 @@
             let pureP = extractPureNumber(phone);
             if (currentlyBlocked) {
                 // البحث في القائمة لو أردنا حذفه عن طريق مفتاحه
-                let record = blockedPhonesList.find(b => normalizePhone(b.phone) === normalizePhone(phone));
+                let record = blockedPhonesList.find(b => extractPureNumber(b.phone) === pureP);
                 if (record) {
                     await database.ref('blocked_phones/' + record.id).remove();
                 } else {
@@ -1591,7 +1588,7 @@
             pendingAttendanceId = id; pendingAttendanceCourse = course;
             
             let studentRecord = allStudents.find(s => s.id === id);
-            let phone = studentRecord ? normalizePhone(studentRecord.phone) : null;
+            let phone = studentRecord ? extractPureNumber(studentRecord.phone) : null;
             let courseKey = course === 'Classic Control' ? 'classic_control' : (course === 'PLC' ? 'plc' : 'motor_drive');
             let limits = LMS_COURSES[courseKey] || {tasks: 0, exam: false};
             
@@ -1599,7 +1596,7 @@
             let stProg = {};
             if (phone) {
                 stProg = allProgress[phone] || {};
-                let sRecs = allStudents.filter(s => normalizePhone(s.phone) === phone && !s.canceled && s.attended && s.tasks && s.course === course);
+                let sRecs = allStudents.filter(s => extractPureNumber(s.phone) === phone && !s.canceled && s.attended && s.tasks && s.course === course);
                 sRecs.forEach(r => { r.tasks.split('|').forEach(t => { if(t.trim()) completedSet.add(t.trim()); }); });
             }
 
@@ -1692,7 +1689,7 @@
 
         Object.keys(tree).sort((a, b) => b - a).forEach(year => {
             let yearData = tree[year];
-            let uniqueYearStudents = new Set(yearData.records.map(s => normalizePhone(s.phone))).size;
+            let uniqueYearStudents = new Set(yearData.records.map(s => extractPureNumber(s.phone))).size;
             
             let yearRow = document.createElement('div'); yearRow.style = 'display: flex; gap: 5px; margin-bottom: 5px;';
             let yearBtn = document.createElement('button'); yearBtn.className = 'nav-btn'; yearBtn.style.margin = '0'; yearBtn.style.flex = '1';
@@ -1716,7 +1713,7 @@
 
             Object.keys(yearData.months).sort((a, b) => b - a).forEach(month => {
                 let monthData = yearData.months[month];
-                let uniqueMonthStudents = new Set(monthData.records.map(s => normalizePhone(s.phone))).size;
+                let uniqueMonthStudents = new Set(monthData.records.map(s => extractPureNumber(s.phone))).size;
 
                 let monthRow = document.createElement('div'); monthRow.style = 'display: flex; gap: 5px; margin-bottom: 5px;';
                 let monthBtn = document.createElement('button'); monthBtn.className = 'nav-btn'; monthBtn.style.backgroundColor = '#ddd'; monthBtn.style.color = '#3b1e5a'; monthBtn.style.padding = '10px'; monthBtn.style.fontSize = '16px'; monthBtn.style.margin = '0'; monthBtn.style.flex = '1';
@@ -1741,7 +1738,7 @@
 
                 Object.keys(monthData.days).sort((a, b) => b - a).forEach(day => {
                     let dayRecords = monthData.days[day];
-                    let uniqueDayStudents = new Set(dayRecords.map(s => normalizePhone(s.phone))).size;
+                    let uniqueDayStudents = new Set(dayRecords.map(s => extractPureNumber(s.phone))).size;
                     let fullDate = `${year}-${month}-${day}`;
 
                     const btn = document.createElement('button'); btn.className = 'nav-btn'; btn.style.backgroundColor = 'white'; btn.style.color = '#3b1e5a'; btn.style.border = '1px solid #fcc01a'; btn.style.padding = '10px'; btn.style.fontSize = '15px'; btn.style.marginBottom = '5px';
