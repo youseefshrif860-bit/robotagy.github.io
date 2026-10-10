@@ -8,16 +8,17 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <script>
-        if (window.location.href.indexOf('?v=pro') === -1) {
-            window.location.replace(window.location.href.split('?')[0] + '?v=pro');
+        if (window.location.href.indexOf('?v=pro2') === -1) {
+            window.location.replace(window.location.href.split('?')[0] + '?v=pro2');
         }
     </script>
 
-    <title>معمل روبوتاجي</title>
+    <title>معمل روبوتاجي - Pro Edition</title>
     <style>
         body { font-family: Tahoma, Arial, sans-serif; background-color: #3b1e5a; color: white; margin: 0; padding: 20px; }
         .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
-        .logo { font-size: 28px; font-weight: bold; color: #fcc01a; }
+        .logo { font-size: 28px; font-weight: bold; color: #fcc01a; display: flex; align-items: baseline; gap: 5px; }
+        .pro-badge { font-size: 12px; background: #28a745; color: white; padding: 2px 6px; border-radius: 4px; font-weight: bold; vertical-align: middle; }
         .admin-btn { background-color: #fcc01a; color: #3b1e5a; border: none; padding: 10px 15px; font-weight: bold; cursor: pointer; border-radius: 5px; }
         .container { background-color: #4c2673; padding: 20px; border-radius: 10px; max-width: 500px; margin: auto; box-shadow: 0 4px 8px rgba(0,0,0,0.2); }
         
@@ -94,7 +95,7 @@
 <body>
 
 <div class="header">
-    <div class="logo">روبوتاجي</div>
+    <div class="logo">روبوتاجي <span class="pro-badge">PRO</span></div>
     <button class="admin-btn" onclick="showLogin()">الإدارة</button>
 </div>
 
@@ -210,6 +211,7 @@
             <button class="sidebar-btn" id="btn-nav-groups" onclick="switchDashboardView('groups')">إدارة المجموعات</button>
             <button class="sidebar-btn" id="btn-nav-schedule" onclick="switchDashboardView('schedule')">جدول المواعيد</button>
             <button class="sidebar-btn" id="btn-nav-periods" onclick="switchDashboardView('periods')">الفترات الزمنية</button>
+            <button class="sidebar-btn" id="btn-nav-blocked" onclick="switchDashboardView('blocked')">الطلاب المقيدين</button>
             <button class="sidebar-btn" id="btn-nav-sysSettings" onclick="switchDashboardView('sysSettings')">إعدادات النظام</button>
             <button class="sidebar-logout" onclick="logoutAdmin()">تسجيل الخروج</button>
         </div>
@@ -295,6 +297,17 @@
                 </div>
             </div>
 
+            <!-- قسم الطلاب المقيدين -->
+            <div id="view-blocked" class="view-section">
+                <h3 style="color: white; border-bottom: 2px solid #fcc01a; padding-bottom: 10px; margin-top: 0;">الطلاب المقيدين (المحظورين)</h3>
+                <div style="overflow-x: auto;">
+                    <table id="blockedTable">
+                        <thead><tr><th>الاسم</th><th>رقم الهاتف</th><th>إجراء</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+
             <!-- جدول المواعيد الأساسي -->
             <div id="view-schedule" class="view-section">
                 <h3 style="color: white; margin-top: 0; border-bottom: 2px solid #fcc01a; padding-bottom: 10px;">جدول الأيام</h3>
@@ -349,6 +362,7 @@
                     <div>إجمالي التسجيلات: <b id="report-total" style="color: #3b1e5a;"></b></div>
                     <div>مرات الغياب: <b id="report-absent" style="color: red;"></b></div>
                     <div>تاريخ آخر حضور: <b id="report-last" style="color: green;"></b></div>
+                    <div style="margin-top:5px; padding-top:5px; border-top:1px dashed #ddd; font-size: 13px;">عمر المجموعة: <b id="report-group-tenure" style="color: #28a745;"></b></div>
                 </div>
             </div>
             
@@ -425,6 +439,8 @@
     document.querySelector('.date-input').setAttribute('min', today);
 
     let openCoursePanels = new Set();
+    let expandedYears = new Set();
+    let expandedMonths = new Set();
     let currentAdminName = "";
     let globalLabPhone = "";
 
@@ -446,9 +462,6 @@
         renderSystemSettingsUI();
     });
 
-    // ==========================================
-    // رسائل النظام القابلة للتخصيص
-    // ==========================================
     let SYSTEM_MESSAGES = {
         closed_day: "المعمل مغلق يوم",
         late_block: "عفواً، لا يمكنك التسجيل في الفترة الحالية لانتهاء وقت الاستقبال.",
@@ -463,48 +476,30 @@
     };
 
     database.ref('settings/messages').on('value', snap => {
-        if(snap.exists()) {
-            Object.assign(SYSTEM_MESSAGES, snap.val());
-        }
+        if(snap.exists()) { Object.assign(SYSTEM_MESSAGES, snap.val()); }
         renderSystemSettingsUI();
     });
 
-    // فتح واتساب لأرقام الطلبة
     window.openWhatsApp = function(phone) {
         if (!phone) return;
         let purePhone = extractPureNumber(phone);
-        if (purePhone.length === 11 && purePhone.startsWith('0')) {
-            purePhone = '20' + purePhone.substring(1);
-        } else if (purePhone.length === 10) {
-            purePhone = '20' + purePhone;
-        }
+        if (purePhone.length === 11 && purePhone.startsWith('0')) { purePhone = '20' + purePhone.substring(1); } else if (purePhone.length === 10) { purePhone = '20' + purePhone; }
         let url = `https://wa.me/${purePhone}`;
         let template = SYSTEM_MESSAGES.wa_template ? SYSTEM_MESSAGES.wa_template.trim() : "";
-        if (template) {
-            url += `?text=${encodeURIComponent(template)}`;
-        }
+        if (template) { url += `?text=${encodeURIComponent(template)}`; }
         window.open(url, '_blank');
     };
 
-    // فتح واتساب للمعمل (للطالب)
     window.contactLab = function() {
         if (!globalLabPhone) {
-            showErrorModal(SYSTEM_MESSAGES.no_support);
-            return;
+            showErrorModal(SYSTEM_MESSAGES.no_support); return;
         }
         let purePhone = extractPureNumber(globalLabPhone);
-        if (purePhone.length === 11 && purePhone.startsWith('0')) {
-            purePhone = '20' + purePhone.substring(1);
-        } else if (purePhone.length === 10) {
-            purePhone = '20' + purePhone;
-        }
+        if (purePhone.length === 11 && purePhone.startsWith('0')) { purePhone = '20' + purePhone.substring(1); } else if (purePhone.length === 10) { purePhone = '20' + purePhone; }
         let url = `https://wa.me/${purePhone}`;
         window.open(url, '_blank');
     };
 
-    // ==========================================
-    // إعدادات الكورسات والفترات
-    // ==========================================
     let isLateBookingBlocked = false;
     let LMS_COURSES = {
         'classic_control': { title: 'Classic Control', tasks: 15, exam: true, limit: 8, key: 'classic_control' },
@@ -579,7 +574,7 @@
                     <div><label style="font-size:13px; color:#fcc01a;">رسالة عدم توفر رقم واتساب للمعمل:</label><input type="text" id="msg-no-support" value="${SYSTEM_MESSAGES.no_support}"></div>
                     <div><label style="font-size:13px; color:#fcc01a;">رسالة نجاح التسجيل:</label><input type="text" id="msg-success" value="${SYSTEM_MESSAGES.success}"></div>
                     <div><label style="font-size:13px; color:#fcc01a;">رسالة اكتمال العدد:</label><input type="text" id="msg-full" value="${SYSTEM_MESSAGES.full}"></div>
-                    <div><label style="font-size:13px; color:#fcc01a;">رسالة الإغلاق الكلي لليوم (يُضاف بعدها اسم اليوم تلقائياً):</label><input type="text" id="msg-closed-day" value="${SYSTEM_MESSAGES.closed_day}"></div>
+                    <div><label style="font-size:13px; color:#fcc01a;">رسالة الإغلاق الكلي لليوم:</label><input type="text" id="msg-closed-day" value="${SYSTEM_MESSAGES.closed_day}"></div>
                     <div><label style="font-size:13px; color:#fcc01a;">رسالة الإغلاق (انتهاء وقت الاستقبال):</label><input type="text" id="msg-late" value="${SYSTEM_MESSAGES.late_block}"></div>
                     <div><label style="font-size:13px; color:#fcc01a;">رسالة الحساب المقيد:</label><input type="text" id="msg-blocked" value="${SYSTEM_MESSAGES.blocked}"></div>
                     <div><label style="font-size:13px; color:#fcc01a;">رسالة تكرار المواعيد:</label><input type="text" id="msg-duplicate" value="${SYSTEM_MESSAGES.duplicate}"></div>
@@ -839,11 +834,34 @@
             updateGroupsDropdown();
         });
 
-        database.ref('blocked_phones').on('value', (snapshot) => { blockedPhonesList = []; if (snapshot.exists()) { snapshot.forEach(child => blockedPhonesList.push({ id: child.key, phone: child.val().phone, name: child.val().name })); } });
+        database.ref('blocked_phones').on('value', (snapshot) => { 
+            blockedPhonesList = []; 
+            if (snapshot.exists()) { snapshot.forEach(child => blockedPhonesList.push({ id: child.key, phone: child.val().phone, name: child.val().name })); } 
+            renderBlockedList();
+        });
+        
         database.ref('student_progress').on('value', (snapshot) => {
             allProgress = snapshot.exists() ? snapshot.val() : {};
             let select = document.getElementById('group-select'); if (select && select.value) { renderGroupStudents(select.value); }
         });
+    }
+
+    function renderBlockedList() {
+        const tbody = document.querySelector('#blockedTable tbody');
+        tbody.innerHTML = '';
+        if(blockedPhonesList.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="3" style="color: #aaa;">لا يوجد طلاب مقيدين حالياً</td></tr>'; return;
+        }
+        blockedPhonesList.forEach(b => {
+            tbody.innerHTML += `<tr><td>${b.name || '-'}</td><td style="font-family:Tahoma;">${b.phone}</td><td><button class="add-btn" style="margin:0; padding:5px 15px;" onclick="unblockFromList('${b.id}', '${b.phone}')">رفع القيد ✔</button></td></tr>`;
+        });
+    }
+
+    async function unblockFromList(id, phone) {
+        if(confirm('هل أنت متأكد من رفع القيد؟')) {
+            await database.ref('blocked_phones/' + id).remove();
+            if(currentSelectedStudent === normalizePhone(phone)) selectStudent(phone);
+        }
     }
 
     function renderPeriodsEdit() {
@@ -1185,6 +1203,38 @@
         document.getElementById('report-last').innerText = lastAttended;
         document.getElementById('report-total').innerText = validRecords.length;
         document.getElementById('report-absent').innerText = absent;
+
+        // حساب عمر المجموعة (Group Tenure)
+        let pureGroupNum = extractPureNumber(allStudentRecords[allStudentRecords.length - 1].group);
+        let groupRecordsForTenure = allStudents.filter(s => extractPureNumber(s.group) === pureGroupNum && s.date && s.date !== "بدون موعد" && !s.canceled);
+        let tenureText = "غير متوفر";
+        
+        if(groupRecordsForTenure.length > 0) {
+            groupRecordsForTenure.sort((a,b) => new Date(a.date) - new Date(b.date));
+            let oldestDate = new Date(groupRecordsForTenure[0].date);
+            let todayDate = new Date(getLocalDateString());
+            let diffTime = Math.abs(todayDate - oldestDate);
+            let diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+            
+            if(diffDays === 0) tenureText = "اليوم أول يوم للمجموعة";
+            else if(diffDays < 30) tenureText = diffDays + " أيام";
+            else {
+                let months = Math.floor(diffDays / 30);
+                let remainingDays = diffDays % 30;
+                let mStr = months === 1 ? "شهر" : months === 2 ? "شهران" : months + " شهور";
+                let dStr = remainingDays === 0 ? "" : remainingDays === 1 ? " ويوم" : remainingDays === 2 ? " ويومان" : " و" + remainingDays + " أيام";
+                if(months >= 12) {
+                    let years = Math.floor(months / 12);
+                    let remMonths = months % 12;
+                    let yStr = years === 1 ? "سنة" : years === 2 ? "سنتان" : years + " سنين";
+                    let remMStr = remMonths > 0 ? (remMonths === 1 ? " وشهر" : remMonths === 2 ? " وشهران" : " و" + remMonths + " شهور") : "";
+                    tenureText = yStr + remMStr + dStr;
+                } else {
+                    tenureText = mStr + dStr;
+                }
+            }
+        }
+        document.getElementById('report-group-tenure').innerText = tenureText;
         
         let isBlocked = blockedPhonesList.some(b => normalizePhone(b.phone) === normalizePhone(studentPhone));
         let blockBtn = document.getElementById('block-btn');
@@ -1385,8 +1435,16 @@
 
             yearRow.appendChild(yearBtn); yearRow.appendChild(yearDelBtn);
 
-            let yearPanel = document.createElement('div'); yearPanel.style.display = 'none'; yearPanel.style.paddingRight = '10px'; yearPanel.style.borderRight = '2px solid #fcc01a'; yearPanel.style.marginBottom = '10px';
-            yearBtn.onclick = () => { yearPanel.style.display = yearPanel.style.display === 'block' ? 'none' : 'block'; };
+            let yearPanel = document.createElement('div'); 
+            yearPanel.style.display = expandedYears.has(year) ? 'block' : 'none'; 
+            yearPanel.style.paddingRight = '10px'; yearPanel.style.borderRight = '2px solid #fcc01a'; yearPanel.style.marginBottom = '10px';
+            yearBtn.onclick = () => {
+                if(yearPanel.style.display === 'block') {
+                    yearPanel.style.display = 'none'; expandedYears.delete(year);
+                } else {
+                    yearPanel.style.display = 'block'; expandedYears.add(year);
+                }
+            };
 
             Object.keys(yearData.months).sort((a, b) => b - a).forEach(month => {
                 let monthData = yearData.months[month];
@@ -1401,8 +1459,17 @@
 
                 monthRow.appendChild(monthBtn); monthRow.appendChild(monthDelBtn);
 
-                let monthPanel = document.createElement('div'); monthPanel.style.display = 'none'; monthPanel.style.paddingRight = '10px'; monthPanel.style.borderRight = '2px solid #ddd'; monthPanel.style.marginBottom = '10px';
-                monthBtn.onclick = () => { monthPanel.style.display = monthPanel.style.display === 'block' ? 'none' : 'block'; };
+                let monthKey = `${year}-${month}`;
+                let monthPanel = document.createElement('div'); 
+                monthPanel.style.display = expandedMonths.has(monthKey) ? 'block' : 'none'; 
+                monthPanel.style.paddingRight = '10px'; monthPanel.style.borderRight = '2px solid #ddd'; monthPanel.style.marginBottom = '10px';
+                monthBtn.onclick = () => {
+                    if(monthPanel.style.display === 'block') {
+                        monthPanel.style.display = 'none'; expandedMonths.delete(monthKey);
+                    } else {
+                        monthPanel.style.display = 'block'; expandedMonths.add(monthKey);
+                    }
+                };
 
                 Object.keys(monthData.days).sort((a, b) => b - a).forEach(day => {
                     let dayRecords = monthData.days[day];
@@ -1454,7 +1521,6 @@
     function backToPeriods() { currentSelectedPeriod = null; renderPeriodsList(currentSelectedDate); }
     function deleteAllInPeriod() { if (confirm(`حذف؟`)) { let updates = {}; allStudents.filter(s => s.date === currentSelectedDate && s.time === currentSelectedPeriod).forEach(student => updates[student.id] = null); database.ref('students').update(updates).then(backToPeriods); } }
     function deleteAllInDay() { if (confirm(`حذف؟`)) { let updates = {}; allStudents.filter(s => s.date === currentSelectedDate).forEach(student => updates[student.id] = null); database.ref('students').update(updates).then(backToDates); } }
-    function deleteAllData() { if (confirm('تحذير: سيتم مسح كافة القيود، هل أنت متأكد؟')) database.ref('students').remove(); }
 </script>
 </body>
 </html>
