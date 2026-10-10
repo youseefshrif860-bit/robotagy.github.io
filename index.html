@@ -8,8 +8,8 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <script>
-        if (window.location.href.indexOf('?v=Robotagy_Academy') === -1) {
-            window.location.replace(window.location.href.split('?')[0] + '?v=Robotagy_Academy');
+        if (window.location.href.indexOf('?v=Robotagy_SystemV5') === -1) {
+            window.location.replace(window.location.href.split('?')[0] + '?v=Robotagy_SystemV5');
         }
     </script>
 
@@ -813,9 +813,8 @@
         if (hasDuplicate) { showErrorModal(SYSTEM_MESSAGES.duplicate); resetBtn(); return; }
 
         try {
-            // منع تكرار القيد: فحص هل الطالب في قائمة المحظورين حالياً
-            const blockedSnap = await database.ref('blocked_phones').get(); let isBlocked = false;
-            if (blockedSnap.exists()) { const blockedData = blockedSnap.val(); Object.keys(blockedData).forEach(key => { if (normalizePhone(blockedData[key].phone) === normalizedInputPhone) isBlocked = true; }); }
+            // منع التكرار: فحص القائمة المحلية للتحقق من وجود الحظر
+            let isBlocked = blockedPhonesList.some(b => normalizePhone(b.phone) === normalizedInputPhone);
             if (isBlocked) { showErrorModal(SYSTEM_MESSAGES.blocked); resetBtn(); return; }
 
             const snapshot = await database.ref('students').get(); let dbData = []; if (snapshot.exists()) { const data = snapshot.val(); Object.keys(data).forEach(key => dbData.push(data[key])); }
@@ -839,7 +838,10 @@
                     
                     let diffDaysGroup = diffDaysSafely(oldestDate, todayStr);
                     if (diffDaysGroup >= 90) {
-                        try { await database.ref('blocked_phones').push().set({ phone: phone, name: name || 'بدون اسم', reason: 'محاولة تسجيل في مجموعة قديمة' }); } catch(err) { console.error(err); }
+                        try { 
+                            let pureP = extractPureNumber(phone);
+                            await database.ref('blocked_phones/' + pureP).set({ phone: phone, name: name || 'بدون اسم', reason: 'محاولة تسجيل في مجموعة قديمة' }); 
+                        } catch(err) { console.error(err); }
                         showErrorModal(SYSTEM_MESSAGES.blocked);
                         resetBtn(); return;
                     }
@@ -856,7 +858,10 @@
                     if (unblockDate && unblockDate > latestDate) latestDate = unblockDate;
                     let inactivityDays = diffDaysSafely(latestDate, todayStr);
                     if (inactivityDays > 14) {
-                        try { await database.ref('blocked_phones').push().set({ phone: phone, name: name || 'بدون اسم', reason: 'انقطاع عن التسجيل (أكثر من 14 يوم)' }); } catch(err) { console.error(err); }
+                        try { 
+                            let pureP = extractPureNumber(phone);
+                            await database.ref('blocked_phones/' + pureP).set({ phone: phone, name: name || 'بدون اسم', reason: 'انقطاع عن التسجيل (أكثر من 14 يوم)' }); 
+                        } catch(err) { console.error(err); }
                         showErrorModal(SYSTEM_MESSAGES.blocked);
                         resetBtn(); return;
                     }
@@ -875,7 +880,10 @@
                 });
 
                 if (absencesCount >= 3) {
-                    try { await database.ref('blocked_phones').push().set({ phone: phone, name: name || 'بدون اسم', reason: 'تجاوز حد الغياب (3 مرات)' }); } catch(err) { console.error(err); }
+                    try { 
+                        let pureP = extractPureNumber(phone);
+                        await database.ref('blocked_phones/' + pureP).set({ phone: phone, name: name || 'بدون اسم', reason: 'تجاوز حد الغياب (3 مرات)' }); 
+                    } catch(err) { console.error(err); }
                     showErrorModal(SYSTEM_MESSAGES.blocked);
                     resetBtn(); return;
                 }
@@ -980,7 +988,11 @@
 
         if(updatesToPush.length > 0) {
             try {
-                let promises = updatesToPush.map(info => database.ref('blocked_phones').push(info));
+                let promises = updatesToPush.map(info => {
+                    let pureP = extractPureNumber(info.phone);
+                    // استخدام set على مسار رقم الهاتف لمنع التكرار نهائياً
+                    return database.ref('blocked_phones/' + pureP).set(info);
+                });
                 await Promise.all(promises);
                 alert(`تم الانتهاء! تم رصد وتقييد ${updatesToPush.length} طالب آلياً.`);
             } catch(e) {
@@ -1030,7 +1042,12 @@
 
         database.ref('blocked_phones').on('value', (snapshot) => { 
             blockedPhonesList = []; 
-            if (snapshot.exists()) { snapshot.forEach(child => blockedPhonesList.push({ id: child.key, phone: child.val().phone, name: child.val().name, reason: child.val().reason || 'حظر يدوي من الإدارة' })); } 
+            if (snapshot.exists()) { 
+                snapshot.forEach(child => { 
+                    // سحب البيانات من المفتاح الأساسي (رقم الهاتف)
+                    blockedPhonesList.push({ id: child.key, phone: child.val().phone || child.key, name: child.val().name, reason: child.val().reason || 'حظر يدوي من الإدارة' }); 
+                }); 
+            } 
             renderBlockedList();
         });
         
@@ -1046,16 +1063,19 @@
         if(blockedPhonesList.length === 0) {
             tbody.innerHTML = '<tr><td colspan="4" style="color: #aaa;">لا يوجد طلاب مقيدين حالياً</td></tr>'; return;
         }
+        let htmlStr = '';
         blockedPhonesList.forEach(b => {
-            // جعل الاسم قابل للضغط بنفس الشكل الطبيعي لقوائم الإدارة
-            tbody.innerHTML += `<tr><td><span onclick="selectStudent('${b.phone}')" style="cursor: pointer;" title="فتح تقرير الطالب">${b.name || '-'}</span></td><td style="font-family:Tahoma;">${b.phone}</td><td style="font-size:12px; color:#ff4d4d; font-weight:bold;">${b.reason}</td><td><button class="add-btn" style="margin:0; padding:5px 15px;" onclick="unblockFromList('${b.id}', '${b.phone}')">رفع القيد ✔</button></td></tr>`;
+            // عرض الاسم بشكل طبيعي مثل باقي القوائم، ولكنه قابل للضغط
+            htmlStr += `<tr><td><span onclick="selectStudent('${b.phone}')" style="cursor: pointer;" title="فتح تقرير الطالب">${b.name || '-'}</span></td><td style="font-family:Tahoma;">${b.phone}</td><td style="font-size:12px; color:#ff4d4d; font-weight:bold;">${b.reason}</td><td><button class="add-btn" style="margin:0; padding:5px 15px;" onclick="unblockFromList('${b.id}', '${b.phone}')">رفع القيد ✔</button></td></tr>`;
         });
+        tbody.innerHTML = htmlStr;
     }
 
     async function unblockFromList(id, phone) {
         if(confirm('هل أنت متأكد من رفع القيد؟ سيبدأ حساب الغياب والانقطاع من تاريخ اليوم.')) {
-            await database.ref('blocked_phones/' + id).remove();
-            await database.ref('student_progress/' + normalizePhone(phone)).update({ unblock_date: getLocalDateString() });
+            let pureP = extractPureNumber(phone);
+            await database.ref('blocked_phones/' + pureP).remove();
+            await database.ref('student_progress/' + pureP).update({ unblock_date: getLocalDateString() });
             if(currentSelectedStudent === normalizePhone(phone)) selectStudent(phone);
         }
     }
@@ -1520,16 +1540,22 @@
         blockBtn.disabled = true;
 
         try {
+            let pureP = extractPureNumber(phone);
             if (currentlyBlocked) {
+                // البحث في القائمة لو أردنا حذفه عن طريق مفتاحه
                 let record = blockedPhonesList.find(b => normalizePhone(b.phone) === normalizePhone(phone));
                 if (record) {
                     await database.ref('blocked_phones/' + record.id).remove();
-                    await database.ref('student_progress/' + normalizePhone(phone)).update({ unblock_date: getLocalDateString() });
-                    alert('تم رفع القيد، وتصفير عداد الحظر له من تاريخ اليوم.');
+                } else {
+                    // كإجراء احتياطي لو ملوش ID مسجل في القائمة
+                    await database.ref('blocked_phones/' + pureP).remove();
                 }
+                await database.ref('student_progress/' + pureP).update({ unblock_date: getLocalDateString() });
+                alert('تم رفع القيد، وتصفير عداد الحظر له من تاريخ اليوم.');
             } else {
                 if (confirm(`تأكيد تقييد الطالب؟`)) {
-                    await database.ref('blocked_phones').push({ phone: phone, name: name || 'بدون اسم', reason: 'حظر يدوي من الإدارة' });
+                    // الحظر صارم ولا يتكرر أبداً باستخدام رقم الهاتف كمفتاح أساسي
+                    await database.ref('blocked_phones/' + pureP).set({ phone: phone, name: name || 'بدون اسم', reason: 'حظر يدوي من الإدارة' });
                     alert('تم تقييد الطالب بنجاح.');
                 } else {
                     blockBtn.innerText = 'تقييد الطالب (منع تسجيل)';
@@ -1538,14 +1564,12 @@
                 }
             }
             
-            // تأخير بسيط لإعطاء قاعدة البيانات فرصة لتحديث المتغيرات قبل إعادة تحميل التقرير
-            setTimeout(() => {
-                selectStudent(phone);
-                blockBtn.disabled = false;
-            }, 800);
+            // تأخير زمني نصف ثانية عشان Firebase يبعت التحديث، وبعدها بنعمل Refresh لتقرير الطالب
+            await new Promise(r => setTimeout(r, 500));
+            selectStudent(phone);
 
         } catch (error) {
-            alert('خطأ في الصلاحيات! تأكد من تعديل الـ Rules: ' + error.message);
+            alert('حدث خطأ: ' + error.message);
             blockBtn.disabled = false;
             selectStudent(phone);
         }
