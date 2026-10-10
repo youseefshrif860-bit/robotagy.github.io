@@ -8,12 +8,12 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <script>
-        if (window.location.href.indexOf('?v=pro2') === -1) {
-            window.location.replace(window.location.href.split('?')[0] + '?v=pro2');
+        if (window.location.href.indexOf('?v=final') === -1) {
+            window.location.replace(window.location.href.split('?')[0] + '?v=final');
         }
     </script>
 
-    <title>معمل روبوتاجي - Pro Edition</title>
+    <title>معمل روبوتاجي - Final Edition</title>
     <style>
         body { font-family: Tahoma, Arial, sans-serif; background-color: #3b1e5a; color: white; margin: 0; padding: 20px; }
         .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
@@ -95,7 +95,7 @@
 <body>
 
 <div class="header">
-    <div class="logo">روبوتاجي <span class="pro-badge">PRO</span></div>
+    <div class="logo">روبوتاجي <span class="pro-badge">FINAL</span></div>
     <button class="admin-btn" onclick="showLogin()">الإدارة</button>
 </div>
 
@@ -359,6 +359,7 @@
                 <strong style="color: #3b1e5a; font-size: 18px;" id="report-name"></strong>
                 <div style="margin-top: 10px; font-size: 14px; color: black; line-height: 1.8;">
                     <div>رقم الهاتف: <b id="report-phone" style="color: #3b1e5a; font-family: Tahoma;"></b></div>
+                    <div>رقم المجموعة: <b id="report-group" style="color: #3b1e5a; font-family: Tahoma;"></b></div>
                     <div>إجمالي التسجيلات: <b id="report-total" style="color: #3b1e5a;"></b></div>
                     <div>مرات الغياب: <b id="report-absent" style="color: red;"></b></div>
                     <div>تاريخ آخر حضور: <b id="report-last" style="color: green;"></b></div>
@@ -574,7 +575,7 @@
                     <div><label style="font-size:13px; color:#fcc01a;">رسالة عدم توفر رقم واتساب للمعمل:</label><input type="text" id="msg-no-support" value="${SYSTEM_MESSAGES.no_support}"></div>
                     <div><label style="font-size:13px; color:#fcc01a;">رسالة نجاح التسجيل:</label><input type="text" id="msg-success" value="${SYSTEM_MESSAGES.success}"></div>
                     <div><label style="font-size:13px; color:#fcc01a;">رسالة اكتمال العدد:</label><input type="text" id="msg-full" value="${SYSTEM_MESSAGES.full}"></div>
-                    <div><label style="font-size:13px; color:#fcc01a;">رسالة الإغلاق الكلي لليوم:</label><input type="text" id="msg-closed-day" value="${SYSTEM_MESSAGES.closed_day}"></div>
+                    <div><label style="font-size:13px; color:#fcc01a;">رسالة الإغلاق الكلي لليوم (يُضاف بعدها اسم اليوم تلقائياً):</label><input type="text" id="msg-closed-day" value="${SYSTEM_MESSAGES.closed_day}"></div>
                     <div><label style="font-size:13px; color:#fcc01a;">رسالة الإغلاق (انتهاء وقت الاستقبال):</label><input type="text" id="msg-late" value="${SYSTEM_MESSAGES.late_block}"></div>
                     <div><label style="font-size:13px; color:#fcc01a;">رسالة الحساب المقيد:</label><input type="text" id="msg-blocked" value="${SYSTEM_MESSAGES.blocked}"></div>
                     <div><label style="font-size:13px; color:#fcc01a;">رسالة تكرار المواعيد:</label><input type="text" id="msg-duplicate" value="${SYSTEM_MESSAGES.duplicate}"></div>
@@ -1200,12 +1201,14 @@
         phoneEl.style.cursor = 'pointer';
         phoneEl.title = 'مراسلة عبر واتساب';
 
+        let pureGroupNum = extractPureNumber(allStudentRecords[allStudentRecords.length - 1].group);
+        document.getElementById('report-group').innerText = pureGroupNum;
+
         document.getElementById('report-last').innerText = lastAttended;
         document.getElementById('report-total').innerText = validRecords.length;
         document.getElementById('report-absent').innerText = absent;
 
         // حساب عمر المجموعة (Group Tenure)
-        let pureGroupNum = extractPureNumber(allStudentRecords[allStudentRecords.length - 1].group);
         let groupRecordsForTenure = allStudents.filter(s => extractPureNumber(s.group) === pureGroupNum && s.date && s.date !== "بدون موعد" && !s.canceled);
         let tenureText = "غير متوفر";
         
