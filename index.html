@@ -8,8 +8,8 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <script>
-        if (window.location.href.indexOf('?v=FINAL') === -1) {
-            window.location.replace(window.location.href.split('?')[0] + '?v=FINAL');
+        if (window.location.href.indexOf('?v=Robotagy') === -1) {
+            window.location.replace(window.location.href.split('?')[0] + '?v=Robotagy');
         }
     </script>
 
@@ -301,7 +301,7 @@
                 <h3 style="color: white; border-bottom: 2px solid #fcc01a; padding-bottom: 10px; margin-top: 0;">الطلاب المقيدين (المحظورين)</h3>
                 <div style="overflow-x: auto;">
                     <table id="blockedTable">
-                        <thead><tr><th>الاسم</th><th>رقم الهاتف</th><th>إجراء</th></tr></thead>
+                        <thead><tr><th>الاسم</th><th>رقم الهاتف</th><th>سبب القيد</th><th>إجراء</th></tr></thead>
                         <tbody></tbody>
                     </table>
                 </div>
@@ -783,7 +783,7 @@
 
             const snapshot = await database.ref('students').get(); let dbData = []; if (snapshot.exists()) { const data = snapshot.val(); Object.keys(data).forEach(key => dbData.push(data[key])); }
             
-            // تحقق حظر مدة المجموعة (أكثر من 3 شهور)
+            // تحقق حظر مدة المجموعة
             let pureTargetGroup = extractPureNumber(group);
             let groupRecordsForTenureCheck = dbData.filter(d => extractPureNumber(d.group) === pureTargetGroup && d.date && d.date !== "بدون موعد" && !d.canceled);
             if (groupRecordsForTenureCheck.length > 0) {
@@ -792,23 +792,39 @@
                 let todayDate = new Date(getLocalDateString());
                 let diffDays = Math.floor(Math.abs(todayDate - oldestDate) / (1000 * 60 * 60 * 24));
                 if (diffDays >= 90) {
-                    showErrorModal("عفواً، لا يمكنك التسجيل. لقد مر أكثر من 3 شهور على بدء هذه المجموعة.");
+                    await database.ref('blocked_phones').push({ phone: phone, name: name, reason: 'محاولة تسجيل في مجموعة قديمة' });
+                    showErrorModal(SYSTEM_MESSAGES.blocked);
+                    resetBtn(); return;
+                }
+            }
+
+            let studentPastRecordsAll = dbData.filter(d => normalizePhone(d.phone) === normalizedInputPhone && !d.canceled && d.date && d.date !== "بدون موعد");
+            
+            // تحقق الانقطاع أكثر من 14 يوم
+            if (studentPastRecordsAll.length > 0) {
+                studentPastRecordsAll.sort((a,b) => new Date(b.date) - new Date(a.date));
+                let latestRecordDate = new Date(studentPastRecordsAll[0].date).getTime();
+                let nowMs = new Date(getLocalDateString()).getTime();
+                let diffDaysInactivity = Math.floor((nowMs - latestRecordDate) / (1000 * 60 * 60 * 24));
+                
+                if (diffDaysInactivity > 14) {
+                    await database.ref('blocked_phones').push({ phone: phone, name: name, reason: 'انقطاع عن التسجيل (أكثر من 14 يوم)' });
+                    showErrorModal(SYSTEM_MESSAGES.blocked);
                     resetBtn(); return;
                 }
             }
 
             // تحقق حظر 3 غيابات في آخر 14 يوم
-            let studentPastRecords = dbData.filter(d => normalizePhone(d.phone) === normalizedInputPhone);
             let nowMs = new Date(getLocalDateString()).getTime();
             let fourteenDaysMs = 14 * 24 * 60 * 60 * 1000;
-            let recentAbsences = studentPastRecords.filter(d => {
-                if (d.canceled || d.attended || !d.date || d.date === "بدون موعد") return false;
+            let recentAbsences = studentPastRecordsAll.filter(d => {
+                if (d.attended) return false;
                 if (!isPeriodPassed(d.date, d.time)) return false;
                 let recDateMs = new Date(d.date).getTime();
                 return (nowMs - recDateMs) <= fourteenDaysMs;
             });
             if (recentAbsences.length >= 3) {
-                await database.ref('blocked_phones').push({ phone: phone, name: name });
+                await database.ref('blocked_phones').push({ phone: phone, name: name, reason: 'تجاوز حد الغياب (3 مرات)' });
                 showErrorModal(SYSTEM_MESSAGES.blocked);
                 resetBtn(); return;
             }
@@ -867,7 +883,7 @@
 
         database.ref('blocked_phones').on('value', (snapshot) => { 
             blockedPhonesList = []; 
-            if (snapshot.exists()) { snapshot.forEach(child => blockedPhonesList.push({ id: child.key, phone: child.val().phone, name: child.val().name })); } 
+            if (snapshot.exists()) { snapshot.forEach(child => blockedPhonesList.push({ id: child.key, phone: child.val().phone, name: child.val().name, reason: child.val().reason || 'حظر يدوي من الإدارة' })); } 
             renderBlockedList();
         });
         
@@ -881,10 +897,10 @@
         const tbody = document.querySelector('#blockedTable tbody');
         tbody.innerHTML = '';
         if(blockedPhonesList.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="3" style="color: #aaa;">لا يوجد طلاب مقيدين حالياً</td></tr>'; return;
+            tbody.innerHTML = '<tr><td colspan="4" style="color: #aaa;">لا يوجد طلاب مقيدين حالياً</td></tr>'; return;
         }
         blockedPhonesList.forEach(b => {
-            tbody.innerHTML += `<tr><td>${b.name || '-'}</td><td style="font-family:Tahoma;">${b.phone}</td><td><button class="add-btn" style="margin:0; padding:5px 15px;" onclick="unblockFromList('${b.id}', '${b.phone}')">رفع القيد ✔</button></td></tr>`;
+            tbody.innerHTML += `<tr><td>${b.name || '-'}</td><td style="font-family:Tahoma;">${b.phone}</td><td style="font-size:12px; color:#ff4d4d; font-weight:bold;">${b.reason}</td><td><button class="add-btn" style="margin:0; padding:5px 15px;" onclick="unblockFromList('${b.id}', '${b.phone}')">رفع القيد ✔</button></td></tr>`;
         });
     }
 
@@ -1337,7 +1353,7 @@
             let record = blockedPhonesList.find(b => normalizePhone(b.phone) === normalizePhone(phone));
             if (record) { await database.ref('blocked_phones/' + record.id).remove(); alert('تم رفع القيد.'); selectStudent(phone); }
         } else {
-            if (confirm(`تأكيد تقييد الطالب؟`)) { await database.ref('blocked_phones').push({ phone: phone, name: name }); alert('تم تقييد الطالب.'); selectStudent(phone); }
+            if (confirm(`تأكيد تقييد الطالب؟`)) { await database.ref('blocked_phones').push({ phone: phone, name: name, reason: 'حظر يدوي من الإدارة' }); alert('تم تقييد الطالب.'); selectStudent(phone); }
         }
     }
     function closeReportModal() { 
