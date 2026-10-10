@@ -303,7 +303,7 @@
                     <h3 id="blocked-view-title" style="color: white; margin: 0; padding-top: 5px;">الطلاب المقيدين (المحظورين)</h3>
                     <div style="display: flex; flex-direction: column; gap: 8px;">
                         <button id="sweep-btn" onclick="runAutoSweep(false)" style="background: none; border: none; font-size: 26px; cursor: pointer; transition: transform 0.2s;" title="فحص النظام وتحديث القائمة آلياً">🔍</button>
-                        <button id="history-toggle-btn" onclick="toggleBlockedHistory()" style="background: none; border: none; font-size: 26px; cursor: pointer; transition: transform 0.2s;" title="سجل المفرج عنهم">📜</button>
+                        <button id="history-toggle-btn" onclick="toggleBlockedHistory()" style="background: none; border: none; font-size: 26px; cursor: pointer; transition: transform 0.2s;" title="سجل رفع القيد">📜</button>
                     </div>
                 </div>
 
@@ -429,7 +429,10 @@
         <strong style="color: #000; display: block; margin-bottom: 10px; font-size: 14px; border-top: 2px solid #ddd; padding-top: 10px;">سجل الـ Tasks المنجزة:</strong>
         <div id="lms-container" style="margin-bottom: 15px;"></div>
         
-        <button id="block-btn" style="width: 100%; padding: 12px; margin-bottom: 10px; font-size: 15px; color: white; border: none; border-radius: 5px; font-weight: bold; cursor: pointer;"></button>
+        <div style="display: flex; gap: 10px; margin-bottom: 10px;">
+            <button id="block-btn" style="flex: 1; padding: 12px; font-size: 15px; color: white; border: none; border-radius: 5px; font-weight: bold; cursor: pointer;"></button>
+            <button id="undo-action-btn" style="display: none; padding: 12px 20px; font-size: 18px; background-color: #666; color: white; border: none; border-radius: 5px; font-weight: bold; cursor: pointer;" title="تراجع عن الإجراء"></button>
+        </div>
         <button class="modal-close-btn" style="background-color: #3b1e5a; margin-top: 0;" onclick="closeReportModal()">إغلاق التقرير</button>
     </div>
 </div>
@@ -1176,7 +1179,7 @@
         }
         let htmlStr = '';
         blockedPhonesList.forEach(b => {
-            htmlStr += `<tr><td><span onclick="selectStudent('${b.phone}')" style="cursor: pointer;" title="فتح تقرير الطالب">${b.name || '-'}</span></td><td style="font-family:Tahoma;">${b.phone}</td><td style="font-size:12px; color:#ff4d4d; font-weight:bold;">${b.reason}</td><td><button class="add-btn" style="margin:0; padding:5px 15px;" onclick="unblockFromList('${b.id}', '${b.phone}')">رفع القيد ✔</button></td></tr>`;
+            htmlStr += `<tr><td><span onclick="selectStudent('${b.phone}')" style="cursor: pointer; color: black;" title="فتح تقرير الطالب">${b.name || '-'}</span></td><td style="font-family:Tahoma;">${b.phone}</td><td style="font-size:12px; color:#ff4d4d; font-weight:bold;">${b.reason}</td><td><div style="display:flex; gap:5px; justify-content:center;"><button class="add-btn" style="margin:0; padding:5px 15px;" onclick="unblockFromList('${b.id}', '${b.phone}')">رفع القيد ✔</button><button class="delete-btn" style="margin:0; padding:5px 10px; background-color:#666;" onclick="undoBlockMistake('${b.id}', '${b.phone}')" title="تراجع عن القيد (خطأ)">↩️</button></div></td></tr>`;
         });
         tbody.innerHTML = htmlStr;
     }
@@ -1209,10 +1212,37 @@
         let htmlStr = '';
         historyList.forEach(u => {
             if (u.ban_count === 0 && u.unblock_date === '-') return; 
-            htmlStr += `<tr><td><span onclick="selectStudent('${u.phone}')" style="cursor: pointer;" title="فتح تقرير الطالب">${u.name}</span></td><td style="font-family:Tahoma;">${u.phone}</td><td style="font-size:12px; color:#28a745; font-weight:bold;">${u.unblock_date}</td><td style="font-weight:bold; color:#cc0000;">${u.ban_count}</td><td><button class="delete-btn" style="margin:0; padding:5px 10px; font-size: 12px;" onclick="clearBanHistory('${u.phone}')">حذف السجل 🗑️</button></td></tr>`;
+            htmlStr += `<tr><td><span onclick="selectStudent('${u.phone}')" style="cursor: pointer; color: black;" title="فتح تقرير الطالب">${u.name}</span></td><td style="font-family:Tahoma;">${u.phone}</td><td style="font-size:12px; color:#28a745; font-weight:bold;">${u.unblock_date}</td><td style="font-weight:bold; color:#cc0000;">${u.ban_count}</td><td><div style="display:flex; gap:5px; justify-content:center;"><button class="delete-btn" style="margin:0; padding:5px 10px; font-size: 12px;" onclick="clearBanHistory('${u.phone}')">حذف السجل 🗑️</button><button class="add-btn" style="margin:0; padding:5px 10px; background-color:#666; font-size: 12px; border: none; border-radius: 3px;" onclick="undoUnblockMistake('${u.phone}', '${u.name}')" title="تراجع عن العفو (خطأ)">↩️</button></div></td></tr>`;
         });
         tbody.innerHTML = htmlStr || '<tr><td colspan="5" style="color: #aaa;">لا توجد سجلات سابقة</td></tr>';
     }
+
+    window.undoBlockMistake = async function(id, phone) {
+        if(confirm('تأكيد التراجع ↩️؟\n(سيتم فك القيد ومسح هذه السابقة من عداد الطالب كأنها لم تكن)')) {
+            let pureP = extractPureNumber(phone);
+            try {
+                await database.ref('blocked_phones/' + pureP).remove();
+                if (id !== pureP) await database.ref('blocked_phones/' + id).remove();
+                
+                let progSnap = await database.ref('student_progress/' + pureP).get();
+                if(progSnap.exists() && progSnap.val().ban_count > 0) {
+                    await database.ref('student_progress/' + pureP).update({ ban_count: progSnap.val().ban_count - 1 });
+                }
+                if(extractPureNumber(currentSelectedStudent) === pureP) selectStudent(phone);
+            } catch(e) { alert(e.message); }
+        }
+    };
+
+    window.undoUnblockMistake = async function(phone, name) {
+        if(confirm('تأكيد التراجع ↩️؟\n(سيتم إلغاء العفو وإرجاع الطالب لقائمة المحظورين فوراً)')) {
+            let pureP = extractPureNumber(phone);
+            try {
+                await database.ref('blocked_phones/' + pureP).set({ phone: phone, name: name, reason: 'تراجع عن العفو (خطأ إداري)' });
+                await database.ref('student_progress/' + pureP).update({ unblock_date: null });
+                if(extractPureNumber(currentSelectedStudent) === pureP) selectStudent(phone);
+            } catch(e) { alert(e.message); }
+        }
+    };
 
     window.unblockAll = async function() {
         if(blockedPhonesList.length === 0) return;
@@ -1684,14 +1714,33 @@
         
         let isBlocked = blockedPhonesList.some(b => extractPureNumber(b.phone) === extractPureNumber(studentPhone));
         let blockBtn = document.getElementById('block-btn');
+        let undoBtn = document.getElementById('undo-action-btn');
+
         if (isBlocked) { 
             blockBtn.innerText = "رفع القيد ✔"; 
             blockBtn.style.backgroundColor = "#28a745"; 
             blockBtn.onclick = () => toggleBlockStudent(studentPhone, latestName, true); 
+            
+            undoBtn.style.display = 'block';
+            undoBtn.innerHTML = '↩️';
+            undoBtn.title = 'تراجع عن القيد (تم بالخطأ)';
+            undoBtn.onclick = () => {
+                let bRec = blockedPhonesList.find(b => extractPureNumber(b.phone) === extractPureNumber(studentPhone));
+                if(bRec) undoBlockMistake(bRec.id, studentPhone);
+            };
         } else { 
             blockBtn.innerText = "تقييد الطالب (منع تسجيل)"; 
             blockBtn.style.backgroundColor = "#ff4d4d"; 
             blockBtn.onclick = () => toggleBlockStudent(studentPhone, latestName, false); 
+            
+            if (unblockDate) {
+                undoBtn.style.display = 'block';
+                undoBtn.innerHTML = '↩️';
+                undoBtn.title = 'تراجع عن العفو (تم بالخطأ)';
+                undoBtn.onclick = () => undoUnblockMistake(studentPhone, latestName);
+            } else {
+                undoBtn.style.display = 'none';
+            }
         }
 
         let tbody = document.getElementById('report-tbody'); tbody.innerHTML = '';
