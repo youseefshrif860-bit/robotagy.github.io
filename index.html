@@ -8,8 +8,8 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <script>
-        if (window.location.href.indexOf('?v=RA_V3') === -1) {
-            window.location.replace(window.location.href.split('?')[0] + '?v=RA_V3');
+        if (window.location.href.indexOf('?v=RA_V5') === -1) {
+            window.location.replace(window.location.href.split('?')[0] + '?v=RA_V5');
         }
     </script>
 
@@ -462,6 +462,7 @@
             currentAdminName = "ENG:" + emailName;
             let displayElem = document.getElementById('admin-name-display');
             if(displayElem) displayElem.innerText = currentAdminName;
+            setTimeout(() => { runAutoSweep(true); }, 3000);
         } else {
             currentAdminName = "";
             let displayElem = document.getElementById('admin-name-display');
@@ -697,7 +698,6 @@
         container.style.display = 'block';
     }
 
-    // دالة فحص الـ VIP
     function checkIfStudentIsVIP(purePhoneParam, recordsArr, progressDataObj) {
         let cTasks = { classic_control: new Set(), plc: new Set(), motor_drive: new Set() };
         let studentRecords = recordsArr.filter(s => extractPureNumber(s.phone) === purePhoneParam && !s.canceled && s.attended && s.tasks);
@@ -918,11 +918,12 @@
         } catch (error) { showErrorModal('خطأ: ' + error.message); resetBtn(); }
     });
 
-    // دالة الفحص الآلي الاستباقي (الرادار)
-    window.runAutoSweep = async function() {
+    window.runAutoSweep = async function(isSilent = false) {
         const btn = document.getElementById('sweep-btn');
-        btn.style.transform = 'scale(1.2)';
-        btn.disabled = true;
+        if(!isSilent) {
+            btn.style.transform = 'scale(1.2)';
+            btn.disabled = true;
+        }
 
         let todayStr = getLocalDateString();
         let updatesToPush = [];
@@ -1007,19 +1008,20 @@
                     return database.ref('blocked_phones/' + pureP).set(info);
                 });
                 await Promise.all(promises);
-                alert(`تم الانتهاء! تم رصد وتقييد ${updatesToPush.length} طالب آلياً.`);
+                if(!isSilent) alert(`تم الانتهاء! تم رصد وتقييد ${updatesToPush.length} طالب آلياً.`);
             } catch(e) {
-                alert('حدث خطأ أثناء الفحص، راجع قواعد الحماية (Rules): ' + e.message);
+                if(!isSilent) alert('حدث خطأ أثناء الفحص، راجع قواعد الحماية (Rules): ' + e.message);
             }
         } else {
-            alert('فحص سليم! لا يوجد أي طلاب يستحقون القيد حالياً.');
+            if(!isSilent) alert('فحص سليم! لا يوجد أي طلاب يستحقون القيد حالياً.');
         }
 
-        btn.style.transform = 'scale(1)';
-        btn.disabled = false;
+        if(!isSilent) {
+            btn.style.transform = 'scale(1)';
+            btn.disabled = false;
+        }
     };
 
-    // ----------------- الإدارة -----------------
     document.getElementById('loginForm').addEventListener('submit', function(e) {
         e.preventDefault(); const email = document.getElementById('admin-email').value; const pass = document.getElementById('admin-password').value;
         auth.setPersistence(firebase.auth.Auth.Persistence.SESSION).then(() => { return auth.signInWithEmailAndPassword(email, pass); })
@@ -1600,7 +1602,6 @@
                 }
             }
             
-            // جلب البيانات الطازجة فوراً لتحديث التقرير والزرار بدون انتظار
             const progSnap = await database.ref('student_progress/' + pureP).get();
             if (progSnap.exists()) {
                 allProgress[pureP] = progSnap.val();
