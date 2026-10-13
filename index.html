@@ -8,8 +8,8 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="0" />
     <script>
-        if (window.location.href.indexOf('?v=RA_V10') === -1) {
-            window.location.replace(window.location.href.split('?')[0] + '?v=RA_V10');
+        if (window.location.href.indexOf('?v=Robotagy_Academy_Lab') === -1) {
+            window.location.replace(window.location.href.split('?')[0] + '?v=Robotagy_Academy_Lab');
         }
     </script>
 
@@ -255,12 +255,9 @@
             <!-- إدارة المجموعات وإضافة الطلاب -->
             <div id="view-groups" class="view-section">
                 <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #fcc01a; padding-bottom: 10px; margin-bottom: 15px;">
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                        <h3 style="color: white; margin: 0;">إدارة المجموعات</h3>
-                        <button style="background:none; border:none; cursor:pointer; font-size:20px; padding:0; filter: grayscale(100%) brightness(200%);" title="تصفير صلاحية الكل" onclick="resetAllGroupsTenure()">⏳</button>
-                    </div>
+                    <h3 style="color: white; margin: 0;">إدارة المجموعات</h3>
                     <div style="display: flex; gap: 10px; align-items: center;">
-                        <button id="reset-group-btn" style="background:none; border:none; cursor:pointer; font-size:20px; padding:0; display:none; filter: grayscale(100%) brightness(200%);" title="تصفير صلاحية المجموعة" onclick="resetSpecificGroupTenure()">⏳</button>
+                        <button id="reset-group-btn" style="background:none; border:none; cursor:pointer; font-size:20px; padding:0; display:none; filter: grayscale(100%) brightness(200%);" title="تصفير صلاحية المجموعة" onclick="resetSpecificGroupTenure()">🕒</button>
                         <button id="delete-group-btn" class="delete-btn" style="display: none; padding: 10px; margin: 0;" onclick="deleteEntireGroup()">حذف المجموعة 🗑️</button>
                         <button id="export-excel-btn" class="add-btn" style="width: auto; background-color: #28a745; margin: 0; display: none;" onclick="exportGroupToExcel()">تصدير إكسيل 📊</button>
                     </div>
@@ -360,6 +357,14 @@
                     <div class="toggle-row" style="background: none; padding: 0;">
                         <span>إغلاق الفترات فور بدء وقتها ومنع التسجيل بها</span>
                         <button id="btn-block-late" class="toggle-btn" onclick="toggleBlockLateBooking()"></button>
+                    </div>
+                </div>
+
+                <div class="settings-card">
+                    <h4>إدارة أعمار المجموعات</h4>
+                    <div style="display: flex; flex-direction: column; gap: 10px;">
+                        <span style="font-size: 13px;">سيقوم هذا الإجراء ببدء دورة صلاحية جديدة لجميع المجموعات من تاريخ اليوم.</span>
+                        <button class="delete-all-btn" style="margin: 0; background-color: #666; width: 100%;" onclick="resetAllGroupsTenure()">تصفير صلاحية جميع المجموعات</button>
                     </div>
                 </div>
 
@@ -1709,7 +1714,7 @@
 
     window.promptWireRevert = async function() {
         if(!currentSelectedStudent) return;
-        if(confirm("تأكيد التراجع؟")) {
+        if(confirm("تأكيد التراجع؟ سيتم إرجاع الحالة إلى (لم يتم التسليم).")) {
             try {
                 await database.ref(`student_progress/${extractPureNumber(currentSelectedStudent)}`).update({
                     wire_received: false,
