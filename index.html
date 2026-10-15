@@ -2082,7 +2082,7 @@
                 let isPast = isPeriodPassed(rec.date, rec.time);
                 let isFuture = !isPeriodStarted(rec.date, rec.time);
 
-                // الإخفاء الذكي لزرار التاسكات
+                // الإخفاء الذكي لزرار التاسكات في التقرير
                 let taskHTML = `<button style="background:none; border:none; cursor:pointer; font-size:16px;" onclick="openTaskModal('${rec.id}', '${rec.course}', '${studentPhone}')" title="تسجيل Tasks">📝</button> <span style="font-size:12px; color:#3b1e5a; font-weight:bold;">${tasksStr}</span>`;
                 if (rec.canceled || isPast || isFuture) {
                     taskHTML = tasksStr ? `<span style="font-size:12px; color:#3b1e5a; font-weight:bold;">${tasksStr}</span>` : '-';
@@ -2316,14 +2316,9 @@
             
             let tasksStr = row.tasks ? row.tasks.split('|').join(' , ') : '';
             
-            let isPast = isPeriodPassed(row.date, row.time);
-            let isFuture = !isPeriodStarted(row.date, row.time);
-
-            // الإخفاء الذكي لزرار التاسكات
+            // زرار التاسكات دايماً ظاهر في جدول الفترة حتى لو انتهى وقتها
             let taskHTML = `<button style="background:none; border:none; cursor:pointer; font-size:16px;" onclick="openTaskModal('${row.id}', '${row.course}', '${row.phone}')" title="تسجيل Tasks">📝</button> <span style="font-size:12px; color:#3b1e5a; font-weight:bold;">${tasksStr}</span>`;
-            if (isCanceled || isPast || isFuture) {
-                taskHTML = tasksStr ? `<span style="font-size:12px; color:#3b1e5a; font-weight:bold;">${tasksStr}</span>` : '-';
-            }
+            if (isCanceled) taskHTML = '-';
 
             let controlsHTML = `<button class="delete-btn" onclick="deleteStudentFinal('${row.id}')">حذف</button>`; 
             if (isCanceled) controlsHTML = `<button class="add-btn" style="padding:5px; margin-bottom:5px; font-size:12px; display:block; width:100%;" onclick="restoreStudent('${row.id}')">استرجاع</button>` + controlsHTML;
