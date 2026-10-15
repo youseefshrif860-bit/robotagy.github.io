@@ -244,7 +244,7 @@
                     <div style="overflow-x: auto;">
                         <table id="dataTable">
                             <thead>
-                                <tr><th>الاسم</th><th>الهاتف</th><th>م</th><th>الكورس</th><th>التاريخ</th><th>الوقت</th><th>تسجيل الحضور</th><th>إجراء</th></tr>
+                                <tr><th>الاسم</th><th>الهاتف</th><th>م</th><th>الكورس</th><th>التاريخ</th><th>الوقت</th><th>Tasks</th><th>تسجيل الحضور</th><th>إجراء</th></tr>
                             </thead>
                             <tbody></tbody>
                         </table>
@@ -1440,7 +1440,7 @@
     };
 
     window.clearAllBanHistory = async function() {
-        if(confirm('مسح سجل السوابق للجميع بشكل نهائي؟')) {
+        if(confirm('مسح سجل السوابق وتاريخ رفع القيد للجميع بشكل نهائي؟')) {
             let updates = {};
             Object.keys(allProgress).forEach(phone => {
                 if (allProgress[phone].unblock_date || allProgress[phone].ban_count) {
@@ -1458,7 +1458,7 @@
     };
 
     window.clearBanHistory = async function(phone) {
-        if(confirm('مسح سجل السوابق لهذا الطالب؟')) {
+        if(confirm('مسح سجل السوابق وتاريخ رفع القيد لهذا الطالب؟')) {
             let pureP = extractPureNumber(phone);
             try {
                 await database.ref('student_progress/' + pureP).update({ unblock_date: null, ban_count: 0 });
@@ -1850,6 +1850,78 @@
         });
     }
 
+    window.toggleAttendanceOnly = function(id, status, checkboxElem) {
+        if (status) {
+            database.ref('students/' + id).update({ attended: true, attended_by: currentAdminName });
+        } else {
+            database.ref('students/' + id).update({ attended: false, tasks: null, attended_by: null });
+        }
+    };
+
+    window.openTaskModal = function(id, course, phoneStr) {
+        if(!course || course === 'غير محدد') { alert('الكورس غير محدد'); return; }
+        pendingAttendanceId = id; pendingAttendanceCourse = course;
+        
+        let phone = extractPureNumber(phoneStr);
+        let courseKey = course === 'Classic Control' ? 'classic_control' : (course === 'PLC' ? 'plc' : 'motor_drive');
+        let limits = LMS_COURSES[courseKey] || {tasks: 0, exam: false};
+        
+        let stProg = allProgress[phone] || {};
+        let currentRecord = allStudents.find(s => s.id === id);
+        let sessionTasks = currentRecord && currentRecord.tasks ? currentRecord.tasks.split('|').map(t=>t.trim()) : [];
+        
+        let allCompletedSet = new Set();
+        let sRecs = allStudents.filter(s => extractPureNumber(s.phone) === phone && !s.canceled && s.attended && s.tasks && s.course === course && s.id !== id);
+        sRecs.forEach(r => { r.tasks.split('|').forEach(t => { if(t.trim()) allCompletedSet.add(t.trim()); }); });
+
+        let container = document.getElementById('task-checkboxes'); container.innerHTML = '';
+        let hasTasks = false;
+        
+        for(let i=1; i<=limits.tasks; i++) {
+            let tName = `Task ${i}`;
+            let inManual = stProg[courseKey] && stProg[courseKey][`task_${i}`];
+            let inThisSession = sessionTasks.includes(tName);
+            
+            if (inThisSession || (!allCompletedSet.has(tName) && !inManual)) {
+                let checkedAttr = inThisSession ? "checked" : "";
+                container.innerHTML += `<label style="background:#f4f4f4; padding:5px 10px; border-radius:5px; border:1px solid #ddd; display:flex; align-items:center; gap:5px; cursor:pointer;"><input type="checkbox" value="Task ${i}" class="task-cb" style="margin:0;" ${checkedAttr}> Task ${i}</label>`;
+                hasTasks = true;
+            }
+        }
+
+        if (limits.exam) {
+            let inManual = stProg[courseKey] && stProg[courseKey]['exam'];
+            let inThisSession = sessionTasks.includes("Final Exam");
+            if (inThisSession || (!allCompletedSet.has("Final Exam") && !inManual)) {
+                let checkedAttr = inThisSession ? "checked" : "";
+                container.innerHTML += `<label style="background:#ffe6e6; padding:5px 10px; border-radius:5px; border:1px solid #ff4d4d; display:flex; align-items:center; gap:5px; cursor:pointer; color:#cc0000; font-weight:bold;"><input type="checkbox" value="Final Exam" class="task-cb" style="margin:0;" ${checkedAttr}> Final Exam</label>`;
+                hasTasks = true;
+            }
+        }
+
+        if(!hasTasks) {
+            container.innerHTML = `<div style="text-align:center; width:100%; color:#28a745; font-weight:bold; padding:10px;">(الطالب أتم جميع مهام هذا الكورس ✅)</div>`;
+        }
+
+        document.getElementById('task-course-name').innerText = course; document.getElementById('task-modal').style.display = 'flex';
+    };
+
+    window.saveAttendanceWithTasks = function() {
+        let selectedTasks = []; document.querySelectorAll('.task-cb:checked').forEach(cb => selectedTasks.push(cb.value));
+        let tasksStr = selectedTasks.join(' | ');
+        
+        database.ref('students/' + pendingAttendanceId).update({ 
+            attended: true, 
+            tasks: tasksStr.length > 0 ? tasksStr : null, 
+            attended_by: currentAdminName 
+        }).then(() => { 
+            document.getElementById('task-modal').style.display = 'none'; 
+            pendingAttendanceId = null; 
+        });
+    };
+
+    function cancelTaskSelection() { pendingAttendanceId = null; document.getElementById('task-modal').style.display = 'none'; }
+
     async function selectStudent(studentPhoneParam) {
         let todayStr = getLocalDateString();
         document.getElementById('extra-settings-panel').style.display = 'none';
@@ -1951,23 +2023,27 @@
                     rec.tasks.split('|').forEach(t => { if(t.trim()) cTasks[cKey].add(t.trim()); });
                 }
 
-                let statusHTML = ''; let tasksStr = rec.tasks ? rec.tasks.split('|').join(' , ') : '-';
+                let statusHTML = ''; 
+                let tasksStr = rec.tasks ? rec.tasks.split('|').join(' , ') : '';
                 let byStr = rec.attended_by ? ` title="${rec.attended_by}"` : '';
+
+                let taskHTML = `<button style="background:none; border:none; cursor:pointer; font-size:16px;" onclick="openTaskModal('${rec.id}', '${rec.course}', '${studentPhone}')" title="تسجيل Tasks">📝</button> <span style="font-size:12px; color:#3b1e5a; font-weight:bold;">${tasksStr}</span>`;
+                if (rec.canceled) taskHTML = '-';
 
                 if (rec.canceled) {
                     statusHTML = '<span style="color:#999; font-weight:bold;">ملغي</span>';
                 } else if (rec.attended) {
-                    statusHTML = `<span style="color:green; font-weight:bold; cursor:pointer;" onclick="updateAttendance('${rec.id}', '${rec.course}', false, this)" ${byStr}>حاضر ✔</span>`;
+                    statusHTML = `<span style="color:green; font-weight:bold; cursor:pointer;" onclick="toggleAttendanceOnly('${rec.id}', false, this)" ${byStr}>حاضر ✔</span>`;
                 } else if (isPeriodPassed(rec.date, rec.time)) {
-                    statusHTML = `<span style="color:red; font-weight:bold; cursor:pointer;" onclick="updateAttendance('${rec.id}', '${rec.course}', true, this)" title="تحضير متأخر">غائب ✘</span>`;
+                    statusHTML = `<span style="color:red; font-weight:bold; cursor:pointer;" onclick="toggleAttendanceOnly('${rec.id}', true, this)" title="تحضير متأخر">غائب ✘</span>`;
                 } else if (!isPeriodStarted(rec.date, rec.time)) {
                     statusHTML = '<span style="color:#fcc01a; font-weight:bold;">قادم ⏳</span>';
                 } else {
-                    statusHTML = `<input type="checkbox" class="attendance-check" onchange="updateAttendance('${rec.id}', '${rec.course}', this.checked, this)">`;
+                    statusHTML = `<input type="checkbox" class="attendance-check" onchange="toggleAttendanceOnly('${rec.id}', this.checked, this)">`;
                 }
                 
                 let bgStyle = rec.canceled ? "background-color: #f9f9f9; color:#999;" : "";
-                tbody.innerHTML += `<tr style="${bgStyle}"><td style="padding: 8px;">${rec.course || ''}</td><td style="padding: 8px;">${rec.date || ''}</td><td style="padding: 8px;">${rec.time || ''}</td><td style="padding: 8px; font-weight:bold; color:#3b1e5a; font-size:12px;">${tasksStr}</td><td style="padding: 8px;">${statusHTML}</td></tr>`;
+                tbody.innerHTML += `<tr style="${bgStyle}"><td style="padding: 8px;">${rec.course || ''}</td><td style="padding: 8px;">${rec.date || ''}</td><td style="padding: 8px;">${rec.time || ''}</td><td style="padding: 8px;">${taskHTML}</td><td style="padding: 8px;">${statusHTML}</td></tr>`;
             });
         }
 
@@ -2046,64 +2122,6 @@
         document.getElementById('extra-settings-panel').style.display = 'none';
     }
     document.addEventListener('click', function(e) { if(e.target.id !== 'search-student') document.getElementById('search-suggestions').style.display = 'none'; });
-
-    let pendingAttendanceId = null; let pendingAttendanceCourse = null;
-
-    function updateAttendance(id, course, status, checkboxElem) {
-        if (status) {
-            if(!course || course === 'غير محدد') { database.ref('students/' + id).update({ attended: true, tasks: null, attended_by: currentAdminName }); return; }
-            pendingAttendanceId = id; pendingAttendanceCourse = course;
-            
-            let studentRecord = allStudents.find(s => s.id === id);
-            let phone = studentRecord ? extractPureNumber(studentRecord.phone) : null;
-            let courseKey = course === 'Classic Control' ? 'classic_control' : (course === 'PLC' ? 'plc' : 'motor_drive');
-            let limits = LMS_COURSES[courseKey] || {tasks: 0, exam: false};
-            
-            let completedSet = new Set();
-            let stProg = {};
-            if (phone) {
-                stProg = allProgress[phone] || {};
-                let sRecs = allStudents.filter(s => extractPureNumber(s.phone) === phone && !s.canceled && s.attended && s.tasks && s.course === course);
-                sRecs.forEach(r => { r.tasks.split('|').forEach(t => { if(t.trim()) completedSet.add(t.trim()); }); });
-            }
-
-            let container = document.getElementById('task-checkboxes'); container.innerHTML = '';
-            let hasTasks = false;
-            
-            for(let i=1; i<=limits.tasks; i++) {
-                let tName = `Task ${i}`;
-                let inManual = stProg[courseKey] && stProg[courseKey][`task_${i}`];
-                if (!completedSet.has(tName) && !inManual) {
-                    container.innerHTML += `<label style="background:#f4f4f4; padding:5px 10px; border-radius:5px; border:1px solid #ddd; display:flex; align-items:center; gap:5px; cursor:pointer;"><input type="checkbox" value="Task ${i}" class="task-cb" style="margin:0;"> Task ${i}</label>`;
-                    hasTasks = true;
-                }
-            }
-
-            if (limits.exam) {
-                let inManual = stProg[courseKey] && stProg[courseKey]['exam'];
-                if (!completedSet.has("Final Exam") && !inManual) {
-                    container.innerHTML += `<label style="background:#ffe6e6; padding:5px 10px; border-radius:5px; border:1px solid #ff4d4d; display:flex; align-items:center; gap:5px; cursor:pointer; color:#cc0000; font-weight:bold;"><input type="checkbox" value="Final Exam" class="task-cb" style="margin:0;"> Final Exam</label>`;
-                    hasTasks = true;
-                }
-            }
-
-            if(!hasTasks) {
-                container.innerHTML = `<div style="text-align:center; width:100%; color:#28a745; font-weight:bold; padding:10px;">(الطالب أتم جميع مهام هذا الكورس ✅)</div>`;
-            }
-
-            document.getElementById('task-course-name').innerText = course; document.getElementById('task-modal').style.display = 'flex';
-            if(checkboxElem) checkboxElem.checked = false; 
-        } else {
-            database.ref('students/' + id).update({ attended: false, tasks: null, attended_by: null });
-        }
-    }
-
-    function saveAttendanceWithTasks() {
-        let selectedTasks = []; document.querySelectorAll('.task-cb:checked').forEach(cb => selectedTasks.push(cb.value));
-        let tasksStr = selectedTasks.join(' | ');
-        database.ref('students/' + pendingAttendanceId).update({ attended: true, tasks: tasksStr.length > 0 ? tasksStr : null, attended_by: currentAdminName }).then(() => { document.getElementById('task-modal').style.display = 'none'; pendingAttendanceId = null; });
-    }
-    function cancelTaskSelection() { pendingAttendanceId = null; document.getElementById('task-modal').style.display = 'none'; }
 
     function renderScheduleDay(dayVal) {
         const container = document.getElementById('schedule-slots-container'); if (!dayVal) { container.innerHTML = ''; return; }
@@ -2235,14 +2253,18 @@
             let isChecked = row.attended ? 'checked' : '';
             let byStr = row.attended_by ? ` title="${row.attended_by}"` : '';
 
-            let statusHTML = `<input type="checkbox" class="attendance-check" ${isChecked} onchange="updateAttendance('${row.id}', '${row.course}', this.checked, this)">`;
+            let statusHTML = `<input type="checkbox" class="attendance-check" ${isChecked} onchange="toggleAttendanceOnly('${row.id}', this.checked, this)">`;
             if (isCanceled) statusHTML = '<span style="color:red; font-weight:bold;">ملغي</span>';
-            else if (row.attended) statusHTML = `<span style="color:green; font-weight:bold; cursor:pointer;" onclick="updateAttendance('${row.id}', '${row.course}', false, this)" ${byStr}>حاضر ✔</span>`;
+            else if (row.attended) statusHTML = `<span style="color:green; font-weight:bold; cursor:pointer;" onclick="toggleAttendanceOnly('${row.id}', false, this)" ${byStr}>حاضر ✔</span>`;
             
+            let tasksStr = row.tasks ? row.tasks.split('|').join(' , ') : '';
+            let taskHTML = `<button style="background:none; border:none; cursor:pointer; font-size:16px;" onclick="openTaskModal('${row.id}', '${row.course}', '${row.phone}')" title="تسجيل Tasks">📝</button> <span style="font-size:12px; color:#3b1e5a; font-weight:bold;">${tasksStr}</span>`;
+            if (isCanceled) taskHTML = '-';
+
             let controlsHTML = `<button class="delete-btn" onclick="deleteStudentFinal('${row.id}')">حذف</button>`; 
             if (isCanceled) controlsHTML = `<button class="add-btn" style="padding:5px; margin-bottom:5px; font-size:12px; display:block; width:100%;" onclick="restoreStudent('${row.id}')">استرجاع</button>` + controlsHTML;
             
-            tbody.innerHTML += `<tr style="${bgStyle}"><td><span onclick="selectStudent('${row.phone}')" style="cursor: pointer;">${row.name || ''}</span></td><td onclick="openWhatsApp('${row.phone}')" style="cursor: pointer;" title="مراسلة عبر واتساب">${row.phone || ''}</td><td style="font-weight:bold;">${extractPureNumber(row.group)}</td><td style="font-weight: bold; color: #3b1e5a;">${row.course || ''}</td><td>${row.date || ''}</td><td>${row.time || ''}</td><td>${statusHTML}</td><td>${controlsHTML}</td></tr>`;
+            tbody.innerHTML += `<tr style="${bgStyle}"><td><span onclick="selectStudent('${row.phone}')" style="cursor: pointer;">${row.name || ''}</span></td><td onclick="openWhatsApp('${row.phone}')" style="cursor: pointer;" title="مراسلة عبر واتساب">${row.phone || ''}</td><td style="font-weight:bold;">${extractPureNumber(row.group)}</td><td style="font-weight: bold; color: #3b1e5a;">${row.course || ''}</td><td>${row.date || ''}</td><td>${row.time || ''}</td><td>${taskHTML}</td><td>${statusHTML}</td><td>${controlsHTML}</td></tr>`;
         });
     }
 
