@@ -325,7 +325,7 @@
 
                 <div id="history-table-container" style="display: none; overflow-x: auto;">
                     <table id="historyTable">
-                        <thead><tr><th>الاسم</th><th>رقم الهاتف</th><th>تاريخ رفع القيد</th><th>مرات القيد</th><th>إجراء</th></tr></thead>
+                        <thead><tr><th>الاسم</th><th>رقم الهاتف</th><th>سبب القيد السابق</th><th>تاريخ رفع القيد</th><th>مرات القيد</th><th>إجراء</th></tr></thead>
                         <tbody></tbody>
                     </table>
                 </div>
@@ -501,7 +501,7 @@
     let groupResets = {};
     let globalGroupResetDate = null;
 
-    // --- Dynamic Check Logic ---
+    // --- Dynamic Check Logic (Completely Isolated from unblockDate) ---
     function checkInactivity(records, unblockDate, resetDate, todayStr, limit) {
         let validRecs = records.filter(r => !r.canceled && r.date && r.date !== "بدون موعد");
         if (validRecs.length === 0) return { inactive: false, days: 0, lastAttendedReal: "لا يوجد حضور" };
@@ -513,7 +513,6 @@
         let lastAttendedReal = attendedRecs.length > 0 ? lastAttendedDate : "لا يوجد حضور";
 
         let baseDate = lastAttendedDate;
-        if (unblockDate && unblockDate > baseDate) baseDate = unblockDate;
         if (resetDate && resetDate > baseDate) baseDate = resetDate;
 
         let diff = diffDaysSafely(baseDate, todayStr);
@@ -527,8 +526,7 @@
         let cycleStart = null;
         let absences = 0;
 
-        let effectiveReset = unblockDate;
-        if (resetDate && (!effectiveReset || resetDate > effectiveReset)) effectiveReset = resetDate;
+        let effectiveReset = resetDate || null;
 
         for (let r of validRecs) {
             if (effectiveReset && r.date <= effectiveReset) continue;
@@ -559,7 +557,6 @@
         
         if(globalGroupReset && globalGroupReset > baseDate) baseDate = globalGroupReset;
         if(groupResetDate && groupResetDate > baseDate) baseDate = groupResetDate;
-        if(unblockDate && unblockDate > baseDate) baseDate = unblockDate;
         if(studentResetDate && studentResetDate > baseDate) baseDate = studentResetDate;
 
         let diffDays = diffDaysSafely(baseDate, todayStr);
@@ -574,6 +571,25 @@
             text = m + " شهور و " + d + " أيام";
         }
         return { expired: diffDays >= limitDays, text: text, diffDays: diffDays };
+    }
+
+    function getTargetedUnblockUpdates(reason, todayStr) {
+        let r = String(reason || '').trim();
+        let updates = { 
+            unblock_date: todayStr,
+            last_unblock_reason: r || 'غير محدد'
+        };
+        if (r.includes('غياب')) {
+            updates.absence_reset_date = todayStr;
+        } else if (r.includes('انقطاع')) {
+            updates.inactivity_reset_date = todayStr;
+        } else if (r.includes('مجموعة') || r.includes('صلاحية')) {
+            updates.tenure_reset_date = todayStr;
+        } else {
+            updates.absence_reset_date = todayStr;
+            updates.inactivity_reset_date = todayStr;
+        }
+        return updates;
     }
 
     function getGroupTenureText(groupNum) {
@@ -1035,7 +1051,7 @@
 
     function addAppointment() {
         const container = document.getElementById('appointments-container'); const row = document.createElement('div'); row.className = 'appointment-row'; row.style = 'display: flex; gap: 10px; margin-bottom: 10px; align-items: center;';
-        row.innerHTML = `<input type="date" class="date-input" min="${today}" required onchange="updateTimeOptions(this)" style="margin:0; width: 50%;"><select class="time-input" required style="margin:0; width: 50%;"><option value="" disabled selected>اختر التاريخ أولاً</option></select><button type="button" onclick="this.parentElement.remove()" style="width: 10%; background: #ff4d4d; color: white; border: none; border-radius: 5px; cursor: pointer; padding: 10px; font-weight:bold;">X</button>`; container.appendChild(row);
+        row.innerHTML = `<input type="date" class="date-input" min="${today}" required onchange="updateTimeOptions(this)" style="margin:0; width: 45%;"><select class="time-input" required style="margin:0; width: 45%;"><option value="" disabled selected>اختر التاريخ أولاً</option></select><button type="button" onclick="this.parentElement.remove()" style="width: 10%; background: #ff4d4d; color: white; border: none; border-radius: 5px; cursor: pointer; padding: 10px; font-weight:bold;">X</button>`; container.appendChild(row);
     }
 
     function closeSuccessModal() { document.getElementById('success-modal').style.display = 'none'; }
@@ -1303,7 +1319,9 @@
                     let pureP = extractPureNumber(b.phone);
                     database.ref('blocked_phones/' + pureP).remove();
                     if(b.id !== pureP) database.ref('blocked_phones/' + b.id).remove();
-                    database.ref('student_progress/' + pureP).update({ unblock_date: todayStr });
+                    
+                    let targetedUpdates = getTargetedUnblockUpdates(b.reason, todayStr);
+                    database.ref('student_progress/' + pureP).update(targetedUpdates);
                 }
             });
 
@@ -1389,22 +1407,28 @@
             let prog = allProgress[phone];
             if (prog.unblock_date || prog.ban_count) {
                 let st = phoneMap.get(phone) || { name: 'طالب محذوف', phone: phone };
-                historyList.push({ phone: phone, name: st.name, unblock_date: prog.unblock_date || '-', ban_count: prog.ban_count || 0 });
+                historyList.push({ 
+                    phone: phone, 
+                    name: st.name, 
+                    unblock_date: prog.unblock_date || '-', 
+                    ban_count: prog.ban_count || 0,
+                    last_reason: prog.last_unblock_reason || '-'
+                });
             }
         });
 
         historyList.sort((a,b) => b.ban_count - a.ban_count);
 
         if(historyList.length === 0) {
-            tbody.innerHTML = '<tr><td colspan="5" style="color: #aaa;">لا توجد سجلات سابقة</td></tr>'; return;
+            tbody.innerHTML = '<tr><td colspan="6" style="color: #aaa;">لا توجد سجلات سابقة</td></tr>'; return;
         }
 
         let htmlStr = '';
         historyList.forEach(u => {
             if (u.ban_count === 0 && u.unblock_date === '-') return; 
-            htmlStr += `<tr><td><span onclick="selectStudent('${u.phone}')" style="cursor: pointer; color: black;" title="فتح تقرير الطالب">${u.name}</span></td><td style="font-family:Tahoma;">${u.phone}</td><td style="font-size:12px; color:#28a745; font-weight:bold;">${u.unblock_date}</td><td style="font-weight:bold; color:#cc0000;">${u.ban_count}</td><td><div style="display:flex; gap:5px; justify-content:center;"><button class="delete-btn" style="margin:0; padding:5px 10px; font-size: 12px;" onclick="clearBanHistory('${u.phone}')">حذف السجل 🗑️</button><button class="add-btn" style="margin:0; padding:5px 10px; background-color:#666; font-size: 12px; border: none; border-radius: 3px;" onclick="undoUnblockMistake('${u.phone}', '${u.name}')" title="تراجع عن رفع القيد (خطأ)">↩️</button></div></td></tr>`;
+            htmlStr += `<tr><td><span onclick="selectStudent('${u.phone}')" style="cursor: pointer; color: black;" title="فتح تقرير الطالب">${u.name}</span></td><td style="font-family:Tahoma;">${u.phone}</td><td style="font-size:12px; color:#3b1e5a; font-weight:bold;">${u.last_reason}</td><td style="font-size:12px; color:#28a745; font-weight:bold;">${u.unblock_date}</td><td style="font-weight:bold; color:#cc0000;">${u.ban_count}</td><td><div style="display:flex; gap:5px; justify-content:center;"><button class="delete-btn" style="margin:0; padding:5px 10px; font-size: 12px;" onclick="clearBanHistory('${u.phone}')">حذف السجل 🗑️</button><button class="add-btn" style="margin:0; padding:5px 10px; background-color:#666; font-size: 12px; border: none; border-radius: 3px;" onclick="undoUnblockMistake('${u.phone}', '${u.name}')" title="تراجع عن رفع القيد (خطأ)">↩️</button></div></td></tr>`;
         });
-        tbody.innerHTML = htmlStr || '<tr><td colspan="5" style="color: #aaa;">لا توجد سجلات سابقة</td></tr>';
+        tbody.innerHTML = htmlStr || '<tr><td colspan="6" style="color: #aaa;">لا توجد سجلات سابقة</td></tr>';
     }
 
     window.undoBlockMistake = async function(id, phone) {
@@ -1427,8 +1451,24 @@
         if(confirm('تأكيد التراجع؟')) {
             let pureP = extractPureNumber(phone);
             try {
-                await database.ref('blocked_phones/' + pureP).set({ phone: phone, name: name, reason: 'تراجع عن رفع القيد', ban_date: getLocalDateString() });
-                await database.ref('student_progress/' + pureP).update({ unblock_date: null });
+                let progSnap = await database.ref('student_progress/' + pureP).get();
+                let progData = progSnap.exists() ? progSnap.val() : {};
+                let restoredReason = progData.last_unblock_reason && progData.last_unblock_reason !== '-' ? progData.last_unblock_reason : 'تراجع عن رفع القيد';
+                
+                let revertUpdates = { unblock_date: null, last_unblock_reason: null };
+                if (restoredReason.includes('غياب')) {
+                    revertUpdates.absence_reset_date = null;
+                } else if (restoredReason.includes('انقطاع')) {
+                    revertUpdates.inactivity_reset_date = null;
+                } else if (restoredReason.includes('مجموعة') || restoredReason.includes('صلاحية')) {
+                    revertUpdates.tenure_reset_date = null;
+                } else {
+                    revertUpdates.absence_reset_date = null;
+                    revertUpdates.inactivity_reset_date = null;
+                }
+
+                await database.ref('blocked_phones/' + pureP).set({ phone: phone, name: name, reason: restoredReason, ban_date: getLocalDateString() });
+                await database.ref('student_progress/' + pureP).update(revertUpdates);
                 if(extractPureNumber(currentSelectedStudent) === pureP) selectStudent(phone);
             } catch(e) { alert(e.message); }
         }
@@ -1445,7 +1485,11 @@
                 let pureP = extractPureNumber(b.phone);
                 blockedUpdates[pureP] = null;
                 if (b.id !== pureP) blockedUpdates[b.id] = null;
-                progressUpdates[pureP + '/unblock_date'] = todayStr;
+                
+                let tUpdates = getTargetedUnblockUpdates(b.reason, todayStr);
+                Object.keys(tUpdates).forEach(k => {
+                    progressUpdates[pureP + '/' + k] = tUpdates[k];
+                });
             });
             
             try {
@@ -1462,9 +1506,10 @@
         if(confirm('مسح سجل السوابق وتاريخ رفع القيد للجميع بشكل نهائي؟')) {
             let updates = {};
             Object.keys(allProgress).forEach(phone => {
-                if (allProgress[phone].unblock_date || allProgress[phone].ban_count) {
+                if (allProgress[phone].unblock_date || allProgress[phone].ban_count || allProgress[phone].last_unblock_reason) {
                     updates[phone + '/unblock_date'] = null;
                     updates[phone + '/ban_count'] = 0;
+                    updates[phone + '/last_unblock_reason'] = null;
                 }
             });
             try {
@@ -1480,7 +1525,7 @@
         if(confirm('مسح سجل السوابق وتاريخ رفع القيد لهذا الطالب؟')) {
             let pureP = extractPureNumber(phone);
             try {
-                await database.ref('student_progress/' + pureP).update({ unblock_date: null, ban_count: 0 });
+                await database.ref('student_progress/' + pureP).update({ unblock_date: null, ban_count: 0, last_unblock_reason: null });
             } catch(e) {
                 alert('خطأ: ' + e.message);
             }
@@ -1490,9 +1535,15 @@
     async function unblockFromList(id, phone) {
         if(confirm('تأكيد رفع القيد؟')) {
             let pureP = extractPureNumber(phone);
+            let bRec = blockedPhonesList.find(b => extractPureNumber(b.phone) === pureP);
+            let reason = bRec ? bRec.reason : '';
+            
             await database.ref('blocked_phones/' + pureP).remove();
             if (id !== pureP) await database.ref('blocked_phones/' + id).remove();
-            await database.ref('student_progress/' + pureP).update({ unblock_date: getLocalDateString() });
+            
+            let targetedUpdates = getTargetedUnblockUpdates(reason, getLocalDateString());
+            await database.ref('student_progress/' + pureP).update(targetedUpdates);
+            
             if(extractPureNumber(currentSelectedStudent) === pureP) selectStudent(phone);
         }
     }
@@ -2163,13 +2214,16 @@
             let pureP = extractPureNumber(phone);
             if (currentlyBlocked) {
                 let record = blockedPhonesList.find(b => extractPureNumber(b.phone) === pureP);
+                let reason = record ? record.reason : '';
                 if (record) {
                     await database.ref('blocked_phones/' + record.id).remove();
                 } else {
                     await database.ref('blocked_phones/' + pureP).remove();
                 }
-                await database.ref('student_progress/' + pureP).update({ unblock_date: getLocalDateString() });
-                alert('تم رفع القيد، وتصفير عداد الحظر له من تاريخ اليوم.');
+                
+                let targetedUpdates = getTargetedUnblockUpdates(reason, getLocalDateString());
+                await database.ref('student_progress/' + pureP).update(targetedUpdates);
+                alert('تم رفع القيد وتصفير العداد الخاص به فقط بنجاح.');
             } else {
                 if (confirm(`تأكيد تقييد الطالب؟`)) {
                     let progSnap = await database.ref('student_progress/' + pureP).get();
