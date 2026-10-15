@@ -671,7 +671,7 @@
 
     database.ref('settings/courses').on('value', snap => {
         if(snap.exists()) {
-            let data = val();
+            let data = snap.val();
             Object.keys(data).forEach(k => { if(LMS_COURSES[k]) Object.assign(LMS_COURSES[k], data[k]); });
         }
         renderSystemSettingsUI();
@@ -2079,16 +2079,22 @@
                 let tasksStr = rec.tasks ? rec.tasks.split('|').join(' , ') : '';
                 let byStr = rec.attended_by ? ` title="${rec.attended_by}"` : '';
 
+                let isPast = isPeriodPassed(rec.date, rec.time);
+                let isFuture = !isPeriodStarted(rec.date, rec.time);
+
+                // الإخفاء الذكي لزرار التاسكات
                 let taskHTML = `<button style="background:none; border:none; cursor:pointer; font-size:16px;" onclick="openTaskModal('${rec.id}', '${rec.course}', '${studentPhone}')" title="تسجيل Tasks">📝</button> <span style="font-size:12px; color:#3b1e5a; font-weight:bold;">${tasksStr}</span>`;
-                if (rec.canceled) taskHTML = '-';
+                if (rec.canceled || isPast || isFuture) {
+                    taskHTML = tasksStr ? `<span style="font-size:12px; color:#3b1e5a; font-weight:bold;">${tasksStr}</span>` : '-';
+                }
 
                 if (rec.canceled) {
                     statusHTML = '<span style="color:#999; font-weight:bold;">ملغي</span>';
                 } else if (rec.attended) {
                     statusHTML = `<span style="color:green; font-weight:bold; cursor:pointer;" onclick="toggleAttendanceOnly('${rec.id}', false, this)" ${byStr}>حاضر ✔</span>`;
-                } else if (isPeriodPassed(rec.date, rec.time)) {
+                } else if (isPast) {
                     statusHTML = `<span style="color:red; font-weight:bold; cursor:pointer;" onclick="toggleAttendanceOnly('${rec.id}', true, this)" title="تحضير متأخر">غائب ✘</span>`;
-                } else if (!isPeriodStarted(rec.date, rec.time)) {
+                } else if (isFuture) {
                     statusHTML = '<span style="color:#fcc01a; font-weight:bold;">قادم ⏳</span>';
                 } else {
                     statusHTML = `<input type="checkbox" class="attendance-check" onchange="toggleAttendanceOnly('${rec.id}', this.checked, this)">`;
@@ -2115,7 +2121,6 @@
         }
 
         renderNotesList(studentProgressData.notesLog || {});
-
         buildLMSUI(extractPureNumber(studentPhone), cTasks, studentProgressData); 
         
         let isVIP = checkIfStudentIsVIP(extractPureNumber(studentPhone), allStudents, studentProgressData);
@@ -2310,8 +2315,15 @@
             else if (row.attended) statusHTML = `<span style="color:green; font-weight:bold; cursor:pointer;" onclick="toggleAttendanceOnly('${row.id}', false, this)" ${byStr}>حاضر ✔</span>`;
             
             let tasksStr = row.tasks ? row.tasks.split('|').join(' , ') : '';
+            
+            let isPast = isPeriodPassed(row.date, row.time);
+            let isFuture = !isPeriodStarted(row.date, row.time);
+
+            // الإخفاء الذكي لزرار التاسكات
             let taskHTML = `<button style="background:none; border:none; cursor:pointer; font-size:16px;" onclick="openTaskModal('${row.id}', '${row.course}', '${row.phone}')" title="تسجيل Tasks">📝</button> <span style="font-size:12px; color:#3b1e5a; font-weight:bold;">${tasksStr}</span>`;
-            if (isCanceled) taskHTML = '-';
+            if (isCanceled || isPast || isFuture) {
+                taskHTML = tasksStr ? `<span style="font-size:12px; color:#3b1e5a; font-weight:bold;">${tasksStr}</span>` : '-';
+            }
 
             let controlsHTML = `<button class="delete-btn" onclick="deleteStudentFinal('${row.id}')">حذف</button>`; 
             if (isCanceled) controlsHTML = `<button class="add-btn" style="padding:5px; margin-bottom:5px; font-size:12px; display:block; width:100%;" onclick="restoreStudent('${row.id}')">استرجاع</button>` + controlsHTML;
