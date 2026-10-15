@@ -1683,10 +1683,11 @@
     function calculateProgressDynamic(courseKey, completedTasksSet, studentProgressData) {
         let limits = LMS_COURSES[courseKey] || { tasks: 0, exam: false };
         let extraTasksObj = studentProgressData && studentProgressData[courseKey] && studentProgressData[courseKey].extra_tasks;
-        let extraCount = extraTasksObj ? Object.keys(extraTasksObj).length : 0;
+        let extraKeys = extraTasksObj ? Object.keys(extraTasksObj) : [];
+        let extraCount = extraKeys.length;
         
         let totalItems = limits.tasks + (limits.exam ? 1 : 0) + extraCount;
-        let completed = extraCount;
+        let completed = 0;
 
         for (let i = 1; i <= limits.tasks; i++) {
             let tName = `Task ${i}`;
@@ -1699,6 +1700,14 @@
         let examInManual = studentProgressData && studentProgressData[courseKey] && studentProgressData[courseKey]['exam'];
         if (limits.exam && (examInManual || examInSession)) completed++;
 
+        extraKeys.forEach((key, index) => {
+            let item = extraTasksObj[key];
+            let tName = `Task +${index + 1}`;
+            let isDoneManual = (typeof item === 'object' && item !== null) ? !!item.completed : false;
+            let isDoneSession = completedTasksSet[courseKey] && completedTasksSet[courseKey].has(tName);
+            if (isDoneManual || isDoneSession) completed++;
+        });
+
         return { completed, totalItems, percentage: totalItems === 0 ? 0 : (completed / totalItems) * 100 };
     }
 
@@ -1708,7 +1717,18 @@
         if (!desc) return;
         
         try {
-            await database.ref(`student_progress/${extractPureNumber(phone)}/${courseKey}/extra_tasks`).push(desc);
+            await database.ref(`student_progress/${extractPureNumber(phone)}/${courseKey}/extra_tasks`).push({ desc: desc, completed: false });
+            selectStudent(phone);
+        } catch(e) { alert('خطأ: ' + e.message); }
+    };
+
+    window.toggleExtraTask = async function(phone, courseKey, taskKey, currentDesc, currentState) {
+        let newState = !currentState;
+        try {
+            await database.ref(`student_progress/${extractPureNumber(phone)}/${courseKey}/extra_tasks/${taskKey}`).set({
+                desc: currentDesc,
+                completed: newState
+            });
             selectStudent(phone);
         } catch(e) { alert('خطأ: ' + e.message); }
     };
@@ -1803,12 +1823,22 @@
     window.toggleAllTasks = async function(phone, courseKey, isChecked) {
         let limits = LMS_COURSES[courseKey];
         if(!limits) return;
+        let pureP = extractPureNumber(phone);
         let updates = {};
         for(let i=1; i<=limits.tasks; i++) { updates[`task_${i}`] = isChecked; }
         if(limits.exam) updates['exam'] = isChecked;
         
+        let extraTasksObj = allProgress[pureP] && allProgress[pureP][courseKey] && allProgress[pureP][courseKey].extra_tasks;
+        if (extraTasksObj) {
+            Object.keys(extraTasksObj).forEach(k => {
+                let item = extraTasksObj[k];
+                let d = (typeof item === 'object' && item !== null) ? (item.desc || '') : String(item);
+                updates[`extra_tasks/${k}`] = { desc: d, completed: isChecked };
+            });
+        }
+
         try {
-            await database.ref(`student_progress/${extractPureNumber(phone)}/${courseKey}`).update(updates);
+            await database.ref(`student_progress/${pureP}/${courseKey}`).update(updates);
             selectStudent(phone);
         } catch(e) { alert('خطأ: ' + e.message); }
     };
@@ -1951,13 +1981,30 @@
 
             let extraTasksObj = studentProgressData && studentProgressData[courseKey] && studentProgressData[courseKey].extra_tasks;
             let extraTasksContainer = document.createElement('div');
-            extraTasksContainer.style = 'display:flex; flex-wrap:wrap; gap:5px; margin-top:10px;';
+            extraTasksContainer.style = 'display:flex; flex-wrap:wrap; gap:8px; margin-top:10px;';
             if (extraTasksObj) {
                 let extraKeys = Object.keys(extraTasksObj);
                 extraKeys.forEach((key, index) => {
-                    let desc = extraTasksObj[key];
+                    let item = extraTasksObj[key];
+                    let desc = (typeof item === 'object' && item !== null) ? (item.desc || '') : String(item);
                     let taskName = `Task +${index + 1}`;
-                    extraTasksContainer.innerHTML += `<div class="task-item" style="color:#28a745; cursor:pointer; background:#e8f5e9; padding:5px 10px; border:1px solid #c8e6c9;" onclick="deleteExtraTask('${phone}', '${courseKey}', '${key}')" title="الوصف: ${desc}&#10;(اضغط للحذف)"><span style="font-size:12px;">🌟</span> ${taskName}</div>`;
+                    let inSession = completedTasksSet[courseKey] && completedTasksSet[courseKey].has(taskName);
+                    let inManual = (typeof item === 'object' && item !== null) ? !!item.completed : false;
+                    let isTaskCompleted = inSession || inManual;
+
+                    let icon = isTaskCompleted ? '✅' : '⏳';
+                    let color = isTaskCompleted ? '#28a745' : '#999';
+                    let bg = isTaskCompleted ? '#e8f5e9' : '#f9f9f9';
+                    let border = isTaskCompleted ? '#c8e6c9' : '#ddd';
+                    let safeDesc = desc.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+
+                    extraTasksContainer.innerHTML += `
+                        <div class="task-item" style="color:${color}; background:${bg}; padding:5px 8px; border:1px solid ${border}; display:inline-flex; align-items:center; gap:6px;">
+                            <span style="cursor:pointer; display:inline-flex; align-items:center; gap:4px;" onclick="toggleExtraTask('${phone}', '${courseKey}', '${key}', '${safeDesc}', ${isTaskCompleted})" title="الوصف: ${safeDesc}&#10;(اضغط لتغيير الحالة)">
+                                <span style="font-size:12px;">${icon}</span> ${taskName}
+                            </span>
+                            <span onclick="deleteExtraTask('${phone}', '${courseKey}', '${key}')" style="color:#cc0000; cursor:pointer; font-size:11px; font-weight:bold; padding-right:4px; border-right:1px solid #ccc;" title="حذف التاسك الإضافي">✖</span>
+                        </div>`;
                 });
             }
             panel.appendChild(extraTasksContainer);
@@ -2011,6 +2058,24 @@
                 container.innerHTML += `<label style="background:#f4f4f4; padding:5px 10px; border-radius:5px; border:1px solid #ddd; display:flex; align-items:center; gap:5px; cursor:pointer;"><input type="checkbox" value="Task ${i}" class="task-cb" style="margin:0;" ${checkedAttr}> Task ${i}</label>`;
                 hasTasks = true;
             }
+        }
+
+        let extraTasksObj = stProg[courseKey] && stProg[courseKey].extra_tasks;
+        if (extraTasksObj) {
+            Object.keys(extraTasksObj).forEach((key, index) => {
+                let item = extraTasksObj[key];
+                let tName = `Task +${index + 1}`;
+                let desc = (typeof item === 'object' && item !== null) ? (item.desc || '') : String(item);
+                let inManual = (typeof item === 'object' && item !== null) ? !!item.completed : false;
+                let inThisSession = sessionTasks.includes(tName);
+
+                if (inThisSession || (!allCompletedSet.has(tName) && !inManual)) {
+                    let checkedAttr = inThisSession ? "checked" : "";
+                    let safeDesc = desc.replace(/"/g, '&quot;');
+                    container.innerHTML += `<label style="background:#f4f4f4; padding:5px 10px; border-radius:5px; border:1px solid #ddd; display:flex; align-items:center; gap:5px; cursor:pointer;" title="${safeDesc}"><input type="checkbox" value="${tName}" class="task-cb" style="margin:0;" ${checkedAttr}> ${tName}</label>`;
+                    hasTasks = true;
+                }
+            });
         }
 
         if (limits.exam) {
