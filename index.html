@@ -2099,7 +2099,7 @@
         selectStudent(phone);
     };
 
-    // --- إدارة الشهادات بنظام أزرار التنقل وحذف المستلمين ---
+    // --- إدارة الشهادات بنظام أزرار التنقل وحذف المستلمين من الداخل فقط ---
     window.openCertificateSection = function(secKey) {
         currentSelectedCertSection = secKey;
         renderCertificatesView();
@@ -2222,25 +2222,22 @@
 
         currentCertSectionsData = sections;
 
-        // 1. إذا لم يتم اختيار قسم بعد: عرض الـ 4 أزرار الرئيسية مع زر الحذف بجانب كل قسم
+        // 1. إذا لم يتم اختيار قسم بعد: عرض الـ 4 أزرار الرئيسية فقط بدون أزرار حذف جانبية
         if (!currentSelectedCertSection || !sections[currentSelectedCertSection]) {
             let buttonsHtml = '';
             Object.keys(sections).forEach(secKey => {
                 let sec = sections[secKey];
                 buttonsHtml += `
-                    <div style="display: flex; gap: 5px; margin-bottom: 10px;">
-                        <button class="nav-btn" style="margin: 0; flex: 1;" onclick="openCertificateSection('${secKey}')">
-                            ${sec.title} (الطلاب: ${sec.list.length})
-                        </button>
-                        <button class="delete-btn" style="margin: 0; padding: 0 15px; font-size: 18px;" title="حذف جميع طلاب ${sec.title} بعد استلام الشهادات" onclick="markAllCertificatesDelivered('${secKey}', '${sec.title}')">🗑️</button>
-                    </div>
+                    <button class="nav-btn" onclick="openCertificateSection('${secKey}')">
+                        ${sec.title} (الطلاب: ${sec.list.length})
+                    </button>
                 `;
             });
             container.innerHTML = buttonsHtml;
             return;
         }
 
-        // 2. عند الضغط على قسم معين: عرض تفاصيل الجدول وزر الرجوع وزر تصدير الإكسيل وزر حذف القائمة
+        // 2. عند الضغط على قسم معين: عرض تفاصيل الجدول وزر الرجوع وزر تصدير الإكسيل وزر حذف القائمة من الداخل
         let sec = sections[currentSelectedCertSection];
         let rowsHtml = sec.list.length > 0
             ? sec.list.map(item => `
