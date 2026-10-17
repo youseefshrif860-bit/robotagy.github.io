@@ -82,6 +82,8 @@
         .settings-card { background: rgba(255,255,255,0.05); padding: 15px; border-radius: 5px; border: 1px solid #ddd; margin-bottom: 15px; }
         .settings-card h4 { color: #fcc01a; margin-top: 0; border-bottom: 1px solid #ddd; padding-bottom: 5px; }
 
+        .protected-task-img { max-width: 100%; height: auto; border-radius: 5px; margin-bottom: 10px; user-select: none; -webkit-user-drag: none; pointer-events: none; box-shadow: 0 2px 6px rgba(0,0,0,0.4); }
+
         @media (max-width: 768px) {
             .sidebar { max-width: 100%; }
         }
@@ -90,6 +92,12 @@
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.min.js"></script>
+    <script>
+        if (window.pdfjsLib) {
+            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/2.16.105/pdf.worker.min.js';
+        }
+    </script>
 </head>
 <body>
 
@@ -154,6 +162,30 @@
     <button type="button" class="submit-btn" onclick="searchMyVisits()">بحث</button>
     <button type="button" class="back-btn" style="width: 100%; margin-top: 10px;" onclick="goHome()">إلغاء والعودة</button>
     <div id="manage-results" style="margin-top: 20px;"></div>
+</div>
+
+<!-- نافذة عرض الـ Task المحمية للطالب -->
+<div class="modal-overlay" id="student-task-viewer-modal" style="z-index: 1005;">
+    <div class="modal-content" style="max-width: 600px; text-align: center; user-select: none;" oncontextmenu="return false;">
+        <h3 id="viewer-task-title" style="color:#3b1e5a; margin-top:0; border-bottom: 2px solid #fcc01a; padding-bottom: 10px;"></h3>
+        <p id="viewer-task-comment" style="font-size: 14px; color: #3b1e5a; font-weight: bold; margin-bottom: 15px; display: none;"></p>
+        <div id="viewer-task-container" style="max-height: 65vh; overflow-y: auto; background: #2a1540; padding: 10px; border-radius: 5px;" oncontextmenu="return false;"></div>
+        <button class="modal-close-btn" style="background-color: #3b1e5a; margin-top: 15px;" onclick="closeStudentTaskViewer()">إغلاق</button>
+    </div>
+</div>
+
+<!-- نافذة إعدادات Tasks PDF للأدمن -->
+<div class="modal-overlay" id="pdf-config-modal" style="z-index: 1004;">
+    <div class="modal-content" style="max-width: 600px; text-align: right;">
+        <h3 id="pdf-modal-title" style="color:#3b1e5a; margin-top:0; border-bottom: 2px solid #fcc01a; padding-bottom: 10px;"></h3>
+        <div style="margin-bottom: 15px; background: #f4f4f4; padding: 10px; border-radius: 5px; border: 1px solid #ddd;">
+            <label style="color:#3b1e5a; font-weight:bold; font-size: 14px;">رفع ملف PDF 📁 (لتقطيع الصفحات المحددة إلى صور محمية):</label>
+            <input type="file" id="pdf-file-input" accept="application/pdf" style="margin-top: 8px; margin-bottom: 0; background: white; border: 1px solid #ccc;">
+        </div>
+        <div id="pdf-tasks-list" style="max-height: 350px; overflow-y: auto; border: 1px solid #ddd; padding: 10px; border-radius: 5px; margin-bottom: 15px;"></div>
+        <button class="submit-btn" id="save-pdf-config-btn" onclick="savePdfConfigData()">حفظ ومعالجة الملف</button>
+        <button class="back-btn" style="width:100%; margin-top:10px; border: 1px solid #ccc;" onclick="closePdfConfigModal()">إغلاق</button>
+    </div>
 </div>
 
 <!-- التنبيهات -->
@@ -700,9 +732,9 @@
     let lateBookingOffsetHours = 0;
 
     let LMS_COURSES = {
-        'classic_control': { title: 'Classic Control', tasks: 15, exam: true, limit: 8, key: 'classic_control' },
-        'plc': { title: 'PLC', tasks: 27, exam: true, limit: 8, key: 'plc' },
-        'motor_drive': { title: 'Motor Drive', tasks: 7, exam: false, limit: 2, key: 'motor_drive' }
+        'classic_control': { title: 'Classic Control', tasks: 15, exam: true, limit: 8, upcomingLimit: 0, pdfTasks: {}, key: 'classic_control' },
+        'plc': { title: 'PLC', tasks: 27, exam: true, limit: 8, upcomingLimit: 0, pdfTasks: {}, key: 'plc' },
+        'motor_drive': { title: 'Motor Drive', tasks: 7, exam: false, limit: 2, upcomingLimit: 0, pdfTasks: {}, key: 'motor_drive' }
     };
 
     database.ref('settings/blockLateBooking').on('value', snap => {
@@ -793,23 +825,29 @@
         coursesContainer.innerHTML = '';
         Object.values(LMS_COURSES).forEach(c => {
             let isExam = c.exam ? "checked" : "";
+            let upLim = c.upcomingLimit || 0;
             coursesContainer.innerHTML += `
                 <div class="settings-card">
                     <h4>إعدادات: ${c.title}</h4>
                     <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
-                        <div style="flex:1; min-width:120px;">
+                        <div style="flex:1; min-width:110px;">
                             <label style="font-size:13px;">السعة القصوى للفترة:</label>
                             <input type="number" id="limit-${c.key}" value="${c.limit}" min="1">
                         </div>
-                        <div style="flex:1; min-width:120px;">
+                        <div style="flex:1; min-width:110px;">
                             <label style="font-size:13px;">Tasks Count:</label>
                             <input type="number" id="tasks-${c.key}" value="${c.tasks}" min="0">
                         </div>
-                        <div style="flex:1; min-width:120px;">
-                            <label style="font-size:13px; display:flex; align-items:center; gap:5px; margin-top:20px;">
-                                <input type="checkbox" id="exam-${c.key}" ${isExam} style="width:16px; margin:0;"> تفعيل الاختبار النهائي
-                            </label>
+                        <div style="flex:1; min-width:110px;">
+                            <label style="font-size:13px;">عدد tasks القادمة</label>
+                            <input type="number" id="upcoming-${c.key}" value="${upLim}" min="0">
                         </div>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:5px; border-top:1px dashed rgba(255,255,255,0.2); padding-top:10px;">
+                        <label style="font-size:13px; display:flex; align-items:center; gap:5px; margin:0;">
+                            <input type="checkbox" id="exam-${c.key}" ${isExam} style="width:16px; margin:0;"> تفعيل الاختبار النهائي
+                        </label>
+                        <button type="button" class="admin-btn" style="padding:8px 15px; font-size:13px;" onclick="openPdfConfigModal('${c.key}')">Tasks PDF</button>
                     </div>
                 </div>
             `;
@@ -846,6 +884,144 @@
         `;
     }
 
+    // --- إدارة وقطع صفحات الـ PDF لكل تاسك ---
+    let currentEditingPdfCourse = null;
+
+    window.openPdfConfigModal = function(courseKey) {
+        currentEditingPdfCourse = courseKey;
+        let course = LMS_COURSES[courseKey];
+        document.getElementById('pdf-modal-title').innerText = `محتوى كورس: ${course.title}`;
+        document.getElementById('pdf-file-input').value = '';
+        
+        let container = document.getElementById('pdf-tasks-list');
+        container.innerHTML = '';
+        let pdfTasks = course.pdfTasks || {};
+
+        for (let i = 1; i <= course.tasks; i++) {
+            let tKey = `task_${i}`;
+            let existing = pdfTasks[tKey] || {};
+            let pageVal = existing.page || '';
+            let commentVal = existing.comment ? existing.comment.replace(/"/g, '&quot;') : '';
+            let hasImgBadge = (existing.images && existing.images.length > 0) ? '<span style="color:#28a745; font-size:11px; font-weight:bold;">✔ محفوظ كصورة</span>' : '<span style="color:#999; font-size:11px;">بدون صورة</span>';
+
+            container.innerHTML += `
+                <div style="border-bottom: 1px solid #eee; padding: 8px 0; display: flex; flex-direction: column; gap: 5px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center;">
+                        <strong style="color:#3b1e5a; font-size:14px;">Task ${i}</strong>
+                        ${hasImgBadge}
+                    </div>
+                    <div style="display:flex; gap:8px;">
+                        <input type="text" id="pdf-page-${i}" value="${pageVal}" placeholder="الصفحة (مثال: 5 أو 5-6)" style="margin:0; width:40%; border:1px solid #ccc; font-size:12px; padding:6px;">
+                        <input type="text" id="pdf-comment-${i}" value="${commentVal}" placeholder="ملاحظة أو كومنت..." style="margin:0; width:60%; border:1px solid #ccc; font-size:12px; padding:6px;">
+                    </div>
+                </div>
+            `;
+        }
+        document.getElementById('pdf-config-modal').style.display = 'flex';
+    };
+
+    window.closePdfConfigModal = function() {
+        currentEditingPdfCourse = null;
+        document.getElementById('pdf-config-modal').style.display = 'none';
+    };
+
+    function parsePageNumbers(str, maxPages) {
+        if (!str) return [];
+        let pages = [];
+        let parts = str.split(',');
+        parts.forEach(part => {
+            if (part.includes('-')) {
+                let [start, end] = part.split('-').map(x => parseInt(x.trim()));
+                if (!isNaN(start) && !isNaN(end) && start <= end) {
+                    for (let p = start; p <= end; p++) {
+                        if (p >= 1 && p <= maxPages) pages.push(p);
+                    }
+                }
+            } else {
+                let p = parseInt(part.trim());
+                if (!isNaN(p) && p >= 1 && p <= maxPages) pages.push(p);
+            }
+        });
+        return [...new Set(pages)];
+    }
+
+    async function renderPdfPageToBase64(pdfDoc, pageNum) {
+        const page = await pdfDoc.getPage(pageNum);
+        const viewport = page.getViewport({ scale: 1.5 });
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        canvas.height = viewport.height;
+        canvas.width = viewport.width;
+        await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+        return canvas.toDataURL('image/jpeg', 0.75);
+    }
+
+    window.savePdfConfigData = async function() {
+        if (!currentEditingPdfCourse) return;
+        let courseKey = currentEditingPdfCourse;
+        let course = LMS_COURSES[courseKey];
+        let btn = document.getElementById('save-pdf-config-btn');
+        let fileInput = document.getElementById('pdf-file-input');
+        let file = fileInput.files[0];
+
+        btn.disabled = true;
+        btn.innerText = 'جاري المعالجة والحفظ...';
+
+        try {
+            let pdfDoc = null;
+            if (file) {
+                if (!window.pdfjsLib) {
+                    alert('مكتبة معالجة الـ PDF لم تحمل بعد، تأكد من اتصالك بالإنترنت.');
+                    btn.disabled = false; btn.innerText = 'حفظ ومعالجة الملف'; return;
+                }
+                const arrayBuffer = await file.arrayBuffer();
+                pdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+            }
+
+            let existingPdfTasks = course.pdfTasks || {};
+            let updatedPdfTasks = {};
+
+            for (let i = 1; i <= course.tasks; i++) {
+                let tKey = `task_${i}`;
+                let pageStr = document.getElementById(`pdf-page-${i}`).value.trim();
+                let commentStr = document.getElementById(`pdf-comment-${i}`).value.trim();
+                let oldData = existingPdfTasks[tKey] || {};
+                let imagesArr = oldData.images || [];
+
+                if (pdfDoc && pageStr) {
+                    let targetPages = parsePageNumbers(pageStr, pdfDoc.numPages);
+                    if (targetPages.length > 0) {
+                        imagesArr = [];
+                        for (let pNum of targetPages) {
+                            let base64Img = await renderPdfPageToBase64(pdfDoc, pNum);
+                            imagesArr.push(base64Img);
+                        }
+                    }
+                } else if (!pageStr) {
+                    imagesArr = [];
+                }
+
+                if (pageStr || commentStr || imagesArr.length > 0) {
+                    updatedPdfTasks[tKey] = {
+                        page: pageStr,
+                        comment: commentStr,
+                        images: imagesArr
+                    };
+                }
+            }
+
+            await database.ref(`settings/courses/${courseKey}/pdfTasks`).set(updatedPdfTasks);
+            LMS_COURSES[courseKey].pdfTasks = updatedPdfTasks;
+            alert('تم حفظ ومعالجة بيانات الـ Tasks بنجاح.');
+            closePdfConfigModal();
+        } catch (err) {
+            alert('حدث خطأ أثناء المعالجة: ' + err.message);
+        }
+
+        btn.disabled = false;
+        btn.innerText = 'حفظ ومعالجة الملف';
+    };
+
     function toggleBlockLateBooking() { database.ref('settings/blockLateBooking').set(!isLateBookingBlocked); }
     
     function saveSystemSettings() {
@@ -876,7 +1052,10 @@
 
         let updates = {};
         Object.values(LMS_COURSES).forEach(c => {
-            updates[c.key] = { limit: parseInt(document.getElementById(`limit-${c.key}`).value), tasks: parseInt(document.getElementById(`tasks-${c.key}`).value), exam: document.getElementById(`exam-${c.key}`).checked };
+            updates[`${c.key}/limit`] = parseInt(document.getElementById(`limit-${c.key}`).value);
+            updates[`${c.key}/tasks`] = parseInt(document.getElementById(`tasks-${c.key}`).value);
+            updates[`${c.key}/upcomingLimit`] = parseInt(document.getElementById(`upcoming-${c.key}`).value) || 0;
+            updates[`${c.key}/exam`] = document.getElementById(`exam-${c.key}`).checked;
         });
         database.ref('settings/courses').update(updates);
 
@@ -1001,6 +1180,38 @@
         return isAllCompleted;
     }
 
+    window.viewStudentTask = function(courseKey, taskKey, taskNum) {
+        let course = LMS_COURSES[courseKey];
+        if (!course || !course.pdfTasks || !course.pdfTasks[taskKey]) return;
+        let tData = course.pdfTasks[taskKey];
+
+        document.getElementById('viewer-task-title').innerText = `${course.title} - Task ${taskNum}`;
+        let commentEl = document.getElementById('viewer-task-comment');
+        if (tData.comment) {
+            commentEl.innerText = tData.comment;
+            commentEl.style.display = 'block';
+        } else {
+            commentEl.style.display = 'none';
+        }
+
+        let imgContainer = document.getElementById('viewer-task-container');
+        imgContainer.innerHTML = '';
+        if (tData.images && tData.images.length > 0) {
+            tData.images.forEach(imgSrc => {
+                imgContainer.innerHTML += `<img src="${imgSrc}" class="protected-task-img" oncontextmenu="return false;" ondragstart="return false;">`;
+            });
+        } else {
+            imgContainer.innerHTML = '<div style="color:white; padding:20px;">لا توجد صورة مرفقة لهذا التاسك</div>';
+        }
+
+        document.getElementById('student-task-viewer-modal').style.display = 'flex';
+    };
+
+    window.closeStudentTaskViewer = function() {
+        document.getElementById('student-task-viewer-modal').style.display = 'none';
+        document.getElementById('viewer-task-container').innerHTML = '';
+    };
+
     async function searchMyVisits() {
         const rawPhone = document.getElementById('manage-phone').value;
         const mPhone = extractPureNumber(rawPhone);
@@ -1011,7 +1222,20 @@
         const btn = document.querySelector('#manage-view .submit-btn'); btn.innerText = 'جاري البحث...';
         
         try {
-            const snap = await database.ref('students').get(); let resultsHTML = '';
+            const [snap, progSnap, coursesSnap] = await Promise.all([
+                database.ref('students').get(),
+                database.ref('student_progress/' + mPhone).get(),
+                database.ref('settings/courses').get()
+            ]);
+
+            if (coursesSnap.exists()) {
+                let cData = coursesSnap.val();
+                Object.keys(cData).forEach(k => { if(LMS_COURSES[k]) Object.assign(LMS_COURSES[k], cData[k]); });
+            }
+
+            let studentProgressData = progSnap.exists() ? progSnap.val() : {};
+            let resultsHTML = '';
+
             if (snap.exists()) {
                 let data = snap.val(); let studentAllRecords = [];
                 Object.keys(data).forEach(key => {
@@ -1031,6 +1255,54 @@
                         upcomingRecords.forEach(app => {
                             resultsHTML += `<div style="background: rgba(255,255,255,0.1); padding: 15px; border-radius: 5px; margin-bottom: 10px; display:flex; justify-content:space-between; align-items:center;"><div><div style="color:#fcc01a; font-weight:bold; font-size:16px;">${app.course}</div><div style="font-size:14px; margin-top:5px;">${app.date} <br> ${app.time}</div></div><button class="delete-btn" style="padding:10px 15px; background-color:#ff4d4d;" onclick="cancelMyApp('${app.id}')">إلغاء</button></div>`;
                         });
+
+                        // حساب وعرض الـ Tasks القادمة للكورسات المحجوزة فقط
+                        let cTasks = { classic_control: new Set(), plc: new Set(), motor_drive: new Set() };
+                        studentAllRecords.filter(s => !s.canceled && s.attended && s.tasks).forEach(r => {
+                            let cKey = r.course === 'Classic Control' ? 'classic_control' : (r.course === 'PLC' ? 'plc' : 'motor_drive');
+                            r.tasks.split('|').forEach(t => { if(t.trim()) cTasks[cKey].add(t.trim()); });
+                        });
+
+                        let bookedCoursesKeys = [...new Set(upcomingRecords.map(r => r.course === 'Classic Control' ? 'classic_control' : (r.course === 'PLC' ? 'plc' : 'motor_drive')))];
+                        let upcomingTasksCardsHTML = '';
+
+                        bookedCoursesKeys.forEach(cKey => {
+                            let courseCfg = LMS_COURSES[cKey];
+                            let showCount = parseInt(courseCfg.upcomingLimit) || 0;
+                            if (showCount > 0) {
+                                let uncompletedNums = [];
+                                for (let i = 1; i <= courseCfg.tasks; i++) {
+                                    let tName = `Task ${i}`;
+                                    let inSession = cTasks[cKey] && cTasks[cKey].has(tName);
+                                    let inManual = studentProgressData && studentProgressData[cKey] && studentProgressData[cKey][`task_${i}`];
+                                    if (!inSession && !inManual) {
+                                        uncompletedNums.push(i);
+                                        if (uncompletedNums.length >= showCount) break;
+                                    }
+                                }
+
+                                uncompletedNums.forEach(num => {
+                                    let tKey = `task_${num}`;
+                                    let tPdfData = (courseCfg.pdfTasks && courseCfg.pdfTasks[tKey]) ? courseCfg.pdfTasks[tKey] : null;
+                                    let commentHtml = (tPdfData && tPdfData.comment) ? `<div style="font-size:13px; color:#ddd; margin-top:5px;">${tPdfData.comment}</div>` : '';
+                                    let viewBtnHtml = (tPdfData && tPdfData.images && tPdfData.images.length > 0) ? `<button class="admin-btn" style="padding:8px 12px; font-size:13px;" onclick="viewStudentTask('${cKey}', '${tKey}', ${num})">عرض الـ Task</button>` : '';
+
+                                    upcomingTasksCardsHTML += `
+                                        <div style="background: rgba(255,255,255,0.1); padding: 15px; border-radius: 5px; margin-bottom: 10px; display:flex; justify-content:space-between; align-items:center; border-right: 4px solid #fcc01a;">
+                                            <div>
+                                                <div style="color:#fcc01a; font-weight:bold; font-size:15px;">Task ${num} - ${courseCfg.title}</div>
+                                                ${commentHtml}
+                                            </div>
+                                            ${viewBtnHtml}
+                                        </div>
+                                    `;
+                                });
+                            }
+                        });
+
+                        if (upcomingTasksCardsHTML !== '') {
+                            resultsHTML += `<h4 style="color:#fcc01a; border-bottom: 1px solid #fcc01a; padding-bottom: 5px; margin-top: 20px; margin-bottom:15px;">الـ Tasks القادمة</h4>` + upcomingTasksCardsHTML;
+                        }
                     } else { resultsHTML += '<p style="text-align:center; color:#ddd; font-weight:bold;">لا توجد مواعيد قادمة.</p>'; }
                 } else { resultsHTML = `<p style="text-align:center; color:#ff4d4d; background:white; padding:10px; border-radius:5px; font-weight:bold;">${SYSTEM_MESSAGES.not_found}</p>`; }
             } else { resultsHTML = `<p style="text-align:center; color:#ff4d4d;">${SYSTEM_MESSAGES.not_found}</p>`; }
@@ -2058,6 +2330,9 @@
         }
     };
 
+    let pendingAttendanceId = null;
+    let pendingAttendanceCourse = null;
+
     window.openTaskModal = function(id, course, phoneStr) {
         if(!course || course === 'غير محدد') { alert('الكورس غير محدد'); return; }
         pendingAttendanceId = id; pendingAttendanceCourse = course;
@@ -2482,7 +2757,6 @@
             if (isCanceled) statusHTML = '<span style="color:red; font-weight:bold;">ملغي</span>';
             else if (row.attended) statusHTML = `<span style="color:green; font-weight:bold; cursor:pointer;" onclick="toggleAttendanceOnly('${row.id}', false, this)" ${byStr}>حاضر ✔</span>`;
             
-            // في جدول الفترة اليومي: زرار الـ 📝 فقط بدون أي نصوص زحمة
             let taskHTML = `<button style="background:none; border:none; cursor:pointer; font-size:16px;" onclick="openTaskModal('${row.id}', '${row.course}', '${row.phone}')" title="تسجيل Tasks">📝</button>`;
             if (isCanceled) taskHTML = '-';
 
