@@ -67,7 +67,8 @@
         .course-accordion { background-color: #f4f4f4; color: #3b1e5a; cursor: pointer; padding: 12px; width: 100%; border: 2px solid #ddd; text-align: right; font-weight: bold; font-size: 15px; border-radius: 5px; margin-top: 10px; display: flex; justify-content: space-between; align-items: center; transition: 0.3s; }
         .course-accordion:hover, .course-accordion.active { background-color: #e6e6e6; border-color: #fcc01a; }
         .course-panel { padding: 15px; display: none; background-color: white; border: 1px solid #ddd; border-top: none; border-radius: 0 0 5px 5px; }
-        .tasks-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; align-items: start; }
+        /* تعديل لعرض المهام بشكل أوسع لتناسب الأيقونات بجوار الاسم */
+        .tasks-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(135px, 1fr)); gap: 10px; align-items: start; }
         .task-item { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; font-size: 13px; font-family: Tahoma; padding: 6px; border-radius: 5px; transition: 0.2s; border: 1px solid transparent; }
         .task-item:hover { background-color: #f9f9f9; border-color: #eee; }
         .exam-item { display: flex; align-items: center; gap: 5px; font-size: 14px; font-weight: bold; margin-top: 15px; border-top: 1px dashed #ddd; padding-top: 10px; padding-bottom: 5px; border-radius: 4px; transition: 0.2s; }
@@ -1247,16 +1248,33 @@
         document.getElementById('login-view').style.display = 'none';
         document.getElementById('manage-view').style.display = 'none';
         document.getElementById('student-view').style.display = 'block';
+        
+        // --- تدمير الداتا في الخلفية ---
+        document.getElementById('manage-phone').value = '';
+        document.getElementById('manage-group').value = '';
+        document.getElementById('manage-results').innerHTML = '';
+        
+        // إجبار قطع الاتصال لتوفير الموارد
+        scheduleStudentOffline();
     }
 
     function showLogin() {
         document.getElementById('student-view').style.display = 'none';
         document.getElementById('manage-view').style.display = 'none';
+        
+        // مسح نتائج إدارة المواعيد إن كانت مفتوحة
+        document.getElementById('manage-results').innerHTML = '';
+
         if (auth.currentUser) { document.getElementById('login-view').style.display = 'none'; document.getElementById('admin-view').style.display = 'block'; } 
         else { document.getElementById('admin-view').style.display = 'none'; document.getElementById('login-view').style.display = 'block'; }
     }
 
-    function closeLogin() { goHome(); document.getElementById('login-msg').innerText = ''; }
+    function closeLogin() { 
+        document.getElementById('loginForm').reset(); 
+        document.getElementById('login-msg').innerText = ''; 
+        goHome(); 
+    }
+
     function showManageView() {
         document.getElementById('student-view').style.display = 'none';
         document.getElementById('login-view').style.display = 'none';
@@ -1385,7 +1403,12 @@
 
     window.closeStudentTaskViewer = function() {
         document.getElementById('student-task-viewer-modal').style.display = 'none';
+        
+        // --- تدمير محتويات التاسك من الخلفية ---
         document.getElementById('viewer-task-container').innerHTML = '';
+        document.getElementById('viewer-task-notes').innerHTML = '';
+        let subInput = document.getElementById('student-submit-link-input');
+        if (subInput) subInput.value = '';
     };
 
     // --- عرض تعليقات الأدمن للطالب عند الضغط على الجرس ---
@@ -2806,32 +2829,41 @@
                 let icon = isTaskCompleted ? '✅' : '⏳'; let color = isTaskCompleted ? '#28a745' : '#999';
                 let subData = courseSubmissions[taskKey];
 
-                // إظهار أيقونة 🔗 تحت التاسك كرابط مباشر للطالب وتحتها إيموشن الرسائل 💬 لكتابة الكومنت
-                let subHtml = '';
+                // تجهيز أيقونات اللينك والكومنت لتكون بجوار الاسم
+                let subHtmlIcons = '';
+                let subHtmlBox = '';
                 if (!isTaskCompleted && subData && subData.link) {
                     let safeLink = subData.link.replace(/"/g, '&quot;');
                     let existingComment = subData.comment ? subData.comment.replace(/"/g, '&quot;') : '';
                     let chatBoxId = `chat-box-${courseKey}-${taskKey}`;
                     let commentIndicatorColor = subData.comment ? '#ff3b30' : '#3b1e5a';
 
-                    subHtml = `
-                        <div style="display:flex; flex-direction:column; align-items:flex-start; gap:3px; width:100%; margin-top:2px; padding-right:4px;">
-                            <a href="${safeLink}" target="_blank" onclick="event.stopPropagation();" style="text-decoration:none; font-size:16px; line-height:1;" title="فتح رابط تسليم الطالب">🔗</a>
+                    // الأيقونات (تظهر بجوار اسم التاسك)
+                    subHtmlIcons = `
+                        <div style="display:flex; align-items:center; gap:8px;">
+                            <a href="${safeLink}" target="_blank" onclick="event.stopPropagation();" style="text-decoration:none; font-size:15px; line-height:1;" title="فتح رابط تسليم الطالب">🔗</a>
                             <span onclick="event.stopPropagation(); toggleTaskCommentBox('${chatBoxId}')" style="cursor:pointer; font-size:15px; line-height:1; color:${commentIndicatorColor};" title="إرسال ملاحظة للطالب">💬</span>
-                            <div id="${chatBoxId}" class="chat-bubble-box" onclick="event.stopPropagation();" style="display:${subData.comment ? 'block' : 'none'};">
-                                <input type="text" id="comment-input-${courseKey}-${taskKey}" class="chat-bubble-input" value="${existingComment}" placeholder="ملاحظة للطالب...">
-                                <button type="button" class="chat-bubble-send" onclick="saveAdminTaskComment('${phone}', '${courseKey}', '${taskKey}')">إرسال</button>
-                            </div>
+                        </div>
+                    `;
+                    // صندوق الكتابة (يظهر بالأسفل عند الضغط على أيقونة الدردشة)
+                    subHtmlBox = `
+                        <div id="${chatBoxId}" class="chat-bubble-box" onclick="event.stopPropagation();" style="display:${subData.comment ? 'block' : 'none'}; width: 100%; margin-top: 5px;">
+                            <input type="text" id="comment-input-${courseKey}-${taskKey}" class="chat-bubble-input" value="${existingComment}" placeholder="ملاحظة للطالب...">
+                            <button type="button" class="chat-bubble-send" onclick="saveAdminTaskComment('${phone}', '${courseKey}', '${taskKey}')">إرسال</button>
                         </div>
                     `;
                 }
 
+                // دمج المكونات في الكارت الخاص بالتاسك
                 tasksGrid.innerHTML += `
-                    <div class="task-item" style="color:${color};">
-                        <div style="cursor:pointer; display:flex; align-items:center; gap:5px;" onclick="toggleLegacyTask('${phone}', '${courseKey}', '${taskKey}', ${!!isTaskCompleted})" title="تعديل يدوي">
-                            <span style="font-size:12px;">${icon}</span> ${taskName}
+                    <div class="task-item" style="color:${color}; width: 100%; box-sizing: border-box;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
+                            <div style="cursor:pointer; display:flex; align-items:center; gap:5px;" onclick="toggleLegacyTask('${phone}', '${courseKey}', '${taskKey}', ${!!isTaskCompleted})" title="تعديل يدوي">
+                                <span style="font-size:12px;">${icon}</span> ${taskName}
+                            </div>
+                            ${subHtmlIcons}
                         </div>
-                        ${subHtml}
+                        ${subHtmlBox}
                     </div>
                 `;
             }
@@ -3002,7 +3034,13 @@
         pendingAttendanceId = null; 
     };
 
-    function cancelTaskSelection() { pendingAttendanceId = null; document.getElementById('task-modal').style.display = 'none'; }
+    function cancelTaskSelection() { 
+        pendingAttendanceId = null; 
+        document.getElementById('task-modal').style.display = 'none'; 
+        
+        // --- تدمير عناصر الـ Tasks من الخلفية ---
+        document.getElementById('task-checkboxes').innerHTML = '';
+    }
 
     async function selectStudent(studentPhoneParam) {
         let todayStr = getLocalDateString();
@@ -3078,7 +3116,7 @@
                 if(bRec) undoBlockMistake(bRec.id, studentPhone);
             };
         } else { 
-            blockBtn.innerText = "تقييد الطالب (منع تسجيل)"; 
+            blockBtn.innerText = "تقييد الطالب (من منع تسجيل)"; 
             blockBtn.style.backgroundColor = "#ff4d4d"; 
             blockBtn.onclick = () => toggleBlockStudent(studentPhone, latestName, false); 
             
@@ -3203,12 +3241,6 @@
             blockBtn.disabled = false;
             selectStudent(phone);
         }
-    }
-    
-    function closeReportModal() { 
-        currentSelectedStudent = null; 
-        document.getElementById('report-modal').style.display = 'none'; 
-        document.getElementById('extra-settings-panel').style.display = 'none';
     }
     
     document.addEventListener('click', function(e) {
