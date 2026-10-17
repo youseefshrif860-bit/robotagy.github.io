@@ -481,7 +481,7 @@
                     <div>مرات الغياب: <b id="report-absent" style="color: red;"></b></div>
                     <div style="font-weight: bold; color: #cc0000; font-size: 14px; margin-top: 2px;" id="report-absence-cycle"></div>
                     <div style="margin-top:5px; padding-top:5px; border-top:1px dashed #ddd; font-size: 13px;">عمر المجموعة: <b id="report-group-tenure" style="color: #28a745;"></b></div>
-                    <div id="report-vip-status" style="margin-top:5px; font-size: 18px; display:none;" title="خريج (VIP)">⭐</div>
+                    <div id="report-vip-status" style="margin-top:5px; font-size: 20px; display:none; cursor:help;" title="خريج (VIP)">⭐</div>
                 </div>
             </div>
             
@@ -1887,12 +1887,18 @@
 
     function logoutAdmin() { auth.signOut().then(() => { goHome(); switchDashboardView('dates'); backToDates(); scheduleStudentOffline(); }); }
 
+    let currentSelectedCertSection = null;
+    let currentCertSectionsData = {};
+
     function switchDashboardView(viewId) {
         document.querySelectorAll('.view-section').forEach(el => el.classList.remove('active'));
         document.querySelectorAll('.sidebar-btn').forEach(el => el.classList.remove('active'));
         document.getElementById('view-' + viewId).classList.add('active');
         document.getElementById('btn-nav-' + viewId).classList.add('active');
-        if (viewId === 'certificates') renderCertificatesView();
+        if (viewId === 'certificates') {
+            currentSelectedCertSection = null;
+            renderCertificatesView();
+        }
     }
 
     let allStudents = []; let blockedPhonesList = []; let allProgress = {}; 
@@ -2093,7 +2099,57 @@
         selectStudent(phone);
     };
 
-    // --- إدارة الشهادات والفلترة الذكية وتصدير إكسيل ---
+    // --- إدارة الشهادات بنظام أزرار التنقل وحذف المستلمين ---
+    window.openCertificateSection = function(secKey) {
+        currentSelectedCertSection = secKey;
+        renderCertificatesView();
+    };
+
+    window.backToCertificateSections = function() {
+        currentSelectedCertSection = null;
+        renderCertificatesView();
+    };
+
+    window.markCertificateDelivered = async function(phone, secKey) {
+        if (!confirm('تأكيد تسليم الشهادة لهذا الطالب وحذفه من القائمة؟')) return;
+        let pureP = extractPureNumber(phone);
+        try {
+            let updates = {};
+            updates[`${pureP}/cert_delivered/${secKey}`] = true;
+            if (secKey === 'automation_control') {
+                let item = currentCertSectionsData[secKey] && currentCertSectionsData[secKey].list.find(x => extractPureNumber(x.phone) === pureP);
+                let count = item ? item.completedCount : 3;
+                updates[`${pureP}/cert_delivered/automation_control_count`] = count;
+            }
+            await database.ref('student_progress').update(updates);
+        } catch(e) {
+            alert('خطأ: ' + e.message);
+        }
+    };
+
+    window.markAllCertificatesDelivered = async function(secKey, secTitle) {
+        let sec = currentCertSectionsData[secKey];
+        if (!sec || sec.list.length === 0) {
+            alert('القائمة فارغة بالفعل.');
+            return;
+        }
+        if (!confirm(`تأكيد تسليم الشهادات لجميع الطلاب في قسم (${secTitle}) وعددهم (${sec.list.length}) وحذفهم من القائمة؟`)) return;
+        let updates = {};
+        sec.list.forEach(item => {
+            let pureP = extractPureNumber(item.phone);
+            updates[`${pureP}/cert_delivered/${secKey}`] = true;
+            if (secKey === 'automation_control') {
+                updates[`${pureP}/cert_delivered/automation_control_count`] = item.completedCount || 3;
+            }
+        });
+        try {
+            await database.ref('student_progress').update(updates);
+            alert('تم حذف القائمة وتسجيل استلام الشهادات بنجاح.');
+        } catch(e) {
+            alert('خطأ: ' + e.message);
+        }
+    };
+
     window.renderCertificatesView = function() {
         let container = document.getElementById('certificates-sections-container');
         if (!container) return;
@@ -2122,6 +2178,7 @@
 
         phoneMap.forEach((st, purePhone) => {
             let stProg = allProgress[purePhone] || {};
+            let certDel = stProg.cert_delivered || {};
             let stSessionTasks = cTasksByStudent[purePhone] || { classic_control: new Set(), plc: new Set(), motor_drive: new Set() };
 
             let cProg = calculateProgressDynamic('classic_control', stSessionTasks, stProg);
@@ -2139,6 +2196,11 @@
 
             // إذا أتم أكثر من كورس يظهر في Automation Control فقط ويُستبعد من الجداول الفردية
             if (completedCount >= 2) {
+                let deliveredAuto = certDel.automation_control;
+                let deliveredCount = certDel.automation_control_count || (deliveredAuto ? 3 : 0);
+                // لا يظهر إذا استلم الشهادة بالفعل، إلا إذا كان قد استلمها على كورسين ثم أتم الكورس الثالث
+                if (deliveredAuto && completedCount <= deliveredCount) return;
+
                 let remainingNote = '';
                 if (completedCount === 2) {
                     let remCourse = !doneClassic ? 'Classic Control' : (!donePLC ? 'PLC' : 'Motor Drive');
@@ -2147,48 +2209,68 @@
                 sections.automation_control.list.push({
                     nameHtml: `${st.name || ''}${remainingNote}`,
                     phone: st.phone || purePhone,
-                    group: pureGrp
+                    group: pureGrp,
+                    completedCount: completedCount
                 });
             } else {
-                let item = { nameHtml: st.name || '', phone: st.phone || purePhone, group: pureGrp };
-                if (doneClassic) sections.classic_control.list.push(item);
-                else if (donePLC) sections.plc.list.push(item);
-                else if (doneMotor) sections.motor_drive.list.push(item);
+                let item = { nameHtml: st.name || '', phone: st.phone || purePhone, group: pureGrp, completedCount: 1 };
+                if (doneClassic && !certDel.classic_control) sections.classic_control.list.push(item);
+                else if (donePLC && !certDel.plc) sections.plc.list.push(item);
+                else if (doneMotor && !certDel.motor_drive) sections.motor_drive.list.push(item);
             }
         });
 
-        let html = '';
-        Object.keys(sections).forEach(secKey => {
-            let sec = sections[secKey];
-            let rowsHtml = sec.list.length > 0
-                ? sec.list.map(item => `
-                    <tr>
-                        <td><span onclick="selectStudent('${item.phone}')" style="cursor:pointer; color:black; font-weight:bold;">${item.nameHtml}</span></td>
-                        <td onclick="openWhatsApp('${item.phone}')" style="cursor:pointer; font-family:Tahoma;">${item.phone}</td>
-                        <td style="font-weight:bold; color:#3b1e5a;">${item.group}</td>
-                    </tr>
-                `).join('')
-                : `<tr><td colspan="3" style="color:#888;">لا يوجد طلاب في هذا القسم حالياً</td></tr>`;
+        currentCertSectionsData = sections;
 
-            html += `
-                <div class="cert-section-card">
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                        <h4 style="color:#fcc01a; margin:0; font-size:17px;">${sec.title} (${sec.list.length})</h4>
-                        <button class="add-btn" style="width:auto; margin:0; padding:8px 15px; background-color:#28a745;" onclick="exportCertificateSectionToExcel('${secKey}', '${sec.title}')">تصدير إكسيل</button>
+        // 1. إذا لم يتم اختيار قسم بعد: عرض الـ 4 أزرار الرئيسية مع زر الحذف بجانب كل قسم
+        if (!currentSelectedCertSection || !sections[currentSelectedCertSection]) {
+            let buttonsHtml = '';
+            Object.keys(sections).forEach(secKey => {
+                let sec = sections[secKey];
+                buttonsHtml += `
+                    <div style="display: flex; gap: 5px; margin-bottom: 10px;">
+                        <button class="nav-btn" style="margin: 0; flex: 1;" onclick="openCertificateSection('${secKey}')">
+                            ${sec.title} (الطلاب: ${sec.list.length})
+                        </button>
+                        <button class="delete-btn" style="margin: 0; padding: 0 15px; font-size: 18px;" title="حذف جميع طلاب ${sec.title} بعد استلام الشهادات" onclick="markAllCertificatesDelivered('${secKey}', '${sec.title}')">🗑️</button>
                     </div>
-                    <div style="overflow-x:auto;">
-                        <table id="cert-table-${secKey}" style="margin-top:5px;">
-                            <thead>
-                                <tr><th>الاسم</th><th>الهاتف</th><th>المجموعة</th></tr>
-                            </thead>
-                            <tbody>${rowsHtml}</tbody>
-                        </table>
-                    </div>
+                `;
+            });
+            container.innerHTML = buttonsHtml;
+            return;
+        }
+
+        // 2. عند الضغط على قسم معين: عرض تفاصيل الجدول وزر الرجوع وزر تصدير الإكسيل وزر حذف القائمة
+        let sec = sections[currentSelectedCertSection];
+        let rowsHtml = sec.list.length > 0
+            ? sec.list.map(item => `
+                <tr>
+                    <td><span onclick="selectStudent('${item.phone}')" style="cursor:pointer; color:black; font-weight:bold;">${item.nameHtml}</span></td>
+                    <td onclick="openWhatsApp('${item.phone}')" style="cursor:pointer; font-family:Tahoma;">${item.phone}</td>
+                    <td style="font-weight:bold; color:#3b1e5a;">${item.group}</td>
+                    <td><button class="delete-btn" style="margin:0; padding:5px 10px; font-size:14px;" title="تم تسليم الشهادة (حذف من القائمة)" onclick="markCertificateDelivered('${item.phone}', '${currentSelectedCertSection}')">🗑️</button></td>
+                </tr>
+            `).join('')
+            : `<tr><td colspan="4" style="color:#888;">لا يوجد طلاب في هذا القسم حالياً</td></tr>`;
+
+        container.innerHTML = `
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                <button class="back-btn" style="margin:0;" onclick="backToCertificateSections()">الرجوع</button>
+                <div style="display:flex; gap:8px; align-items:center;">
+                    <button class="delete-btn" style="margin:0; padding:10px 15px; font-size:16px;" title="حذف القائمة بالكامل بعد تسليم الشهادات" onclick="markAllCertificatesDelivered('${currentSelectedCertSection}', '${sec.title}')">🗑️</button>
+                    <button class="add-btn" style="width:auto; margin:0; padding:10px 15px; background-color:#28a745;" onclick="exportCertificateSectionToExcel('${currentSelectedCertSection}', '${sec.title}')">تصدير إكسيل 📊</button>
                 </div>
-            `;
-        });
-
-        container.innerHTML = html;
+            </div>
+            <h3 style="text-align:center; color:#fcc01a; margin-top:0;">${sec.title} (${sec.list.length})</h3>
+            <div style="overflow-x:auto;">
+                <table id="cert-table-${currentSelectedCertSection}" style="margin-top:5px;">
+                    <thead>
+                        <tr><th>الاسم</th><th>الهاتف</th><th>المجموعة</th><th>إجراء</th></tr>
+                    </thead>
+                    <tbody>${rowsHtml}</tbody>
+                </table>
+            </div>
+        `;
     };
 
     window.exportCertificateSectionToExcel = function(secKey, secTitle) {
@@ -2201,6 +2283,12 @@
         cloneTable.style.direction = 'rtl';
         cloneTable.querySelectorAll('th').forEach(th => { th.style.backgroundColor = '#fcc01a'; th.style.color = '#3b1e5a'; th.style.padding = '10px'; });
         cloneTable.querySelectorAll('td').forEach(td => { td.style.padding = '8px'; });
+        // إزالة عمود "إجراء" من ملف الإكسيل المصدر
+        cloneTable.querySelectorAll('tr').forEach(tr => {
+            if (tr.children.length > 3) {
+                tr.removeChild(tr.lastElementChild);
+            }
+        });
         let blob = new Blob(['\ufeff', `<html dir="rtl" lang="ar"><head><meta charset="UTF-8"></head><body><h2 style="text-align: center; color: #3b1e5a; font-family: Tahoma;">شهادات ${secTitle} - معمل روبوتاجي</h2>${cloneTable.outerHTML}</body></html>`], { type: 'application/vnd.ms-excel' });
         let url = URL.createObjectURL(blob);
         let a = document.createElement('a');
@@ -3228,9 +3316,23 @@
         renderNotesList(studentProgressData.notesLog || {});
         buildLMSUI(extractPureNumber(studentPhone), cTasks, studentProgressData); 
         
+        // تحديث شارة التخرج/الشهادة: تتحول من ⭐ إلى 🎓 عند حذف الطالب من الشهادات (استلام الشهادة)
         let isVIP = checkIfStudentIsVIP(extractPureNumber(studentPhone), allStudents, studentProgressData);
+        let certDel = studentProgressData.cert_delivered || {};
+        let deliveredCertsList = [];
+        if (certDel.classic_control) deliveredCertsList.push('Classic Control');
+        if (certDel.plc) deliveredCertsList.push('PLC');
+        if (certDel.motor_drive) deliveredCertsList.push('Motor Drive');
+        if (certDel.automation_control) deliveredCertsList.push('Automation Control');
+
         let vipBadge = document.getElementById('report-vip-status');
-        if (isVIP) {
+        if (deliveredCertsList.length > 0) {
+            vipBadge.innerText = '🎓';
+            vipBadge.title = 'استلم شهادة: ' + deliveredCertsList.join(' + ');
+            vipBadge.style.display = 'block';
+        } else if (isVIP) {
+            vipBadge.innerText = '⭐';
+            vipBadge.title = 'خريج (VIP)';
             vipBadge.style.display = 'block';
         } else {
             vipBadge.style.display = 'none';
