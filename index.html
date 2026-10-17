@@ -855,14 +855,30 @@
         window.open(url, '_blank');
     };
 
-    window.contactLab = function() {
-        if (!globalLabPhone) {
-            showErrorModal(SYSTEM_MESSAGES.no_support); return;
+  window.closeReportModal = function() { 
+        currentSelectedStudent = null; 
+        
+        // إغلاق النافذة الأساسية للتقرير
+        let reportModal = document.getElementById('report-modal'); 
+        if (reportModal) {
+            reportModal.style.display = 'none'; 
         }
-        let purePhone = extractPureNumber(globalLabPhone);
-        if (purePhone.length === 11 && purePhone.startsWith('0')) { purePhone = '20' + purePhone.substring(1); } else if (purePhone.length === 10) { purePhone = '20' + purePhone; }
-        let url = `https://wa.me/${purePhone}`;
-        window.open(url, '_blank');
+        
+        // إغلاق الإعدادات الإضافية المفتوحة داخل التقرير
+        let extraPanel = document.getElementById('extra-settings-panel'); 
+        if (extraPanel) {
+            extraPanel.style.display = 'none';
+        }
+        
+        // --- تدمير الداتا المخفية من الخلفية لتوفير الموارد ---
+        let tbody = document.getElementById('report-tbody'); 
+        if (tbody) tbody.innerHTML = '';
+        
+        let lmsContainer = document.getElementById('lms-container'); 
+        if (lmsContainer) lmsContainer.innerHTML = '';
+        
+        let notesContainer = document.getElementById('notes-list-container'); 
+        if (notesContainer) notesContainer.innerHTML = '';
     };
 
     window.toggleBanRule = function(ruleKey) {
