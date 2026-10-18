@@ -241,7 +241,7 @@
     <form id="loginForm">
         <input type="email" id="admin-email" required placeholder="البريد الإلكتروني">
         <input type="password" id="admin-password" required placeholder="كلمة المرور">
-        <button type="submit" class="submit-btn">دخول</button>
+        <button type="submit" class="submit-btn" id="login-submit-btn">دخول</button>
         <button type="button" class="back-btn" style="width: 100%; margin-top: 10px;" onclick="closeLogin()">إلغاء</button>
     </form>
     <p id="login-msg" style="text-align:center; color:#ff4d4d; font-weight:bold; margin-top: 15px;"></p>
@@ -557,7 +557,7 @@
     const isStrictlyNumber = (str) => { let s = extractPureNumber(str); return s.length > 0; };
     const normalizeText = (str) => String(str || '').replace(/[\s\u200B-\u200D\uFEFF]/g, '').trim();
 
-    // --- نظام حماية الاتصالات الذكي (goOffline / goOnline) ---
+    // --- نظام حماية الاتصالات الذكي والسريع (60 ثانية خمول بدلاً من 4 ثواني لتجنب بطء إعادة الاتصال) ---
     let idleConnectionTimer = null;
     function scheduleStudentOffline() {
         if (auth.currentUser) return; // الأدمن متصل دائماً أثناء جلسته
@@ -566,7 +566,7 @@
             if (!auth.currentUser) {
                 database.goOffline();
             }
-        }, 4000);
+        }, 60000);
     }
 
     async function runWithOnlineConnection(asyncFn) {
@@ -578,6 +578,13 @@
             scheduleStudentOffline();
         }
     }
+
+    // إعادة تفعيل الاتصال فور تفاعل الطالب مع الحقول ليكون الحجز والبحث لحظياً
+    document.addEventListener('focusin', () => {
+        clearTimeout(idleConnectionTimer);
+        database.goOnline();
+        scheduleStudentOffline();
+    });
 
     function getLocalDateString() {
         const now = new Date();
@@ -812,29 +819,68 @@
     };
     let globalSchedule = JSON.parse(JSON.stringify(defaultSchedule));
 
-    // جلب الإعدادات الأولية للطالب ثم قطع الاتصال فوراً لتوفير الكونكشنز
+    // جلب الإعدادات الخفيفة فقط عند فتح الموقع بدون تحميل صور الـ PDF الثقيلة لتسريع الفتح والحجز
     async function initPublicSettingsOnce() {
         await runWithOnlineConnection(async () => {
-            const snap = await database.ref('settings').get();
-            if (snap.exists()) {
-                const s = snap.val();
-                if (s.lab_phone !== undefined) globalLabPhone = s.lab_phone;
-                if (s.messages) Object.assign(SYSTEM_MESSAGES, s.messages);
-                if (s.blockLateBooking !== undefined) isLateBookingBlocked = s.blockLateBooking;
-                if (s.lateBookingOffset !== undefined) lateBookingOffsetHours = parseFloat(s.lateBookingOffset) || 0;
-                if (s.courses) {
-                    Object.keys(s.courses).forEach(k => { if (LMS_COURSES[k]) Object.assign(LMS_COURSES[k], s.courses[k]); });
-                }
-                if (s.periodsData) globalPeriods = s.periodsData;
-                if (s.schedule) globalSchedule = s.schedule;
-                if (s.ban_rules) {
-                    if (s.ban_rules.absence) Object.assign(banRules.absence, s.ban_rules.absence);
-                    if (s.ban_rules.inactivity) Object.assign(banRules.inactivity, s.ban_rules.inactivity);
-                    if (s.ban_rules.tenure) Object.assign(banRules.tenure, s.ban_rules.tenure);
-                }
-                if (s.group_resets) groupResets = s.group_resets;
-                if (s.global_group_reset) globalGroupResetDate = s.global_group_reset;
+            const [
+                labPhoneSnap, msgsSnap, lateBlockSnap, lateOffsetSnap,
+                periodsSnap, scheduleSnap, banRulesSnap, groupResetsSnap, globalResetSnap,
+                ccLimit, ccTasks, ccUp, ccExam,
+                plcLimit, plcTasks, plcUp, plcExam,
+                mdLimit, mdTasks, mdUp, mdExam
+            ] = await Promise.all([
+                database.ref('settings/lab_phone').get(),
+                database.ref('settings/messages').get(),
+                database.ref('settings/blockLateBooking').get(),
+                database.ref('settings/lateBookingOffset').get(),
+                database.ref('settings/periodsData').get(),
+                database.ref('settings/schedule').get(),
+                database.ref('settings/ban_rules').get(),
+                database.ref('settings/group_resets').get(),
+                database.ref('settings/global_group_reset').get(),
+                database.ref('settings/courses/classic_control/limit').get(),
+                database.ref('settings/courses/classic_control/tasks').get(),
+                database.ref('settings/courses/classic_control/upcomingLimit').get(),
+                database.ref('settings/courses/classic_control/exam').get(),
+                database.ref('settings/courses/plc/limit').get(),
+                database.ref('settings/courses/plc/tasks').get(),
+                database.ref('settings/courses/plc/upcomingLimit').get(),
+                database.ref('settings/courses/plc/exam').get(),
+                database.ref('settings/courses/motor_drive/limit').get(),
+                database.ref('settings/courses/motor_drive/tasks').get(),
+                database.ref('settings/courses/motor_drive/upcomingLimit').get(),
+                database.ref('settings/courses/motor_drive/exam').get()
+            ]);
+
+            if (labPhoneSnap.exists()) globalLabPhone = labPhoneSnap.val();
+            if (msgsSnap.exists()) Object.assign(SYSTEM_MESSAGES, msgsSnap.val());
+            if (lateBlockSnap.exists()) isLateBookingBlocked = lateBlockSnap.val();
+            if (lateOffsetSnap.exists()) lateBookingOffsetHours = parseFloat(lateOffsetSnap.val()) || 0;
+            if (periodsSnap.exists()) globalPeriods = periodsSnap.val();
+            if (scheduleSnap.exists()) globalSchedule = scheduleSnap.val();
+            if (banRulesSnap.exists()) {
+                const br = banRulesSnap.val();
+                if (br.absence) Object.assign(banRules.absence, br.absence);
+                if (br.inactivity) Object.assign(banRules.inactivity, br.inactivity);
+                if (br.tenure) Object.assign(banRules.tenure, br.tenure);
             }
+            if (groupResetsSnap.exists()) groupResets = groupResetsSnap.val();
+            if (globalResetSnap.exists()) globalGroupResetDate = globalResetSnap.val();
+
+            if (ccLimit.exists()) LMS_COURSES.classic_control.limit = ccLimit.val();
+            if (ccTasks.exists()) LMS_COURSES.classic_control.tasks = ccTasks.val();
+            if (ccUp.exists()) LMS_COURSES.classic_control.upcomingLimit = ccUp.val();
+            if (ccExam.exists()) LMS_COURSES.classic_control.exam = ccExam.val();
+
+            if (plcLimit.exists()) LMS_COURSES.plc.limit = plcLimit.val();
+            if (plcTasks.exists()) LMS_COURSES.plc.tasks = plcTasks.val();
+            if (plcUp.exists()) LMS_COURSES.plc.upcomingLimit = plcUp.val();
+            if (plcExam.exists()) LMS_COURSES.plc.exam = plcExam.val();
+
+            if (mdLimit.exists()) LMS_COURSES.motor_drive.limit = mdLimit.val();
+            if (mdTasks.exists()) LMS_COURSES.motor_drive.tasks = mdTasks.val();
+            if (mdUp.exists()) LMS_COURSES.motor_drive.upcomingLimit = mdUp.val();
+            if (mdExam.exists()) LMS_COURSES.motor_drive.exam = mdExam.val();
         });
     }
     initPublicSettingsOnce();
@@ -1034,16 +1080,26 @@
         `;
     }
 
-    // --- إدارة وقطع صفحات الـ PDF أو الروابط وتفعيل التسليم لكل تاسك ---
+    // --- إدارة وقطع صفحات الـ PDF أو الروابط وتفعيل التسليم لكل تاسك (يتم جلب الصور عند فتح النافذة فقط) ---
     let currentEditingPdfCourse = null;
 
-    window.openPdfConfigModal = function(courseKey) {
+    window.openPdfConfigModal = async function(courseKey) {
         currentEditingPdfCourse = courseKey;
         let course = LMS_COURSES[courseKey];
         document.getElementById('pdf-modal-title').innerText = `محتوى كورس: ${course.title}`;
         document.getElementById('pdf-file-input').value = '';
         
         let container = document.getElementById('pdf-tasks-list');
+        container.innerHTML = '<div style="text-align:center; padding:20px; color:#3b1e5a; font-weight:bold;">جاري تحميل إعدادات ومرفقات الـ Tasks...</div>';
+        document.getElementById('pdf-config-modal').style.display = 'flex';
+
+        try {
+            let snap = await database.ref(`settings/courses/${courseKey}/pdfTasks`).get();
+            course.pdfTasks = snap.exists() ? snap.val() : {};
+        } catch(e) {
+            console.error(e);
+        }
+
         container.innerHTML = '';
         let pdfTasks = course.pdfTasks || {};
 
@@ -1079,7 +1135,6 @@
                 </div>
             `;
         }
-        document.getElementById('pdf-config-modal').style.display = 'flex';
     };
 
     window.closePdfConfigModal = function() {
@@ -1292,11 +1347,14 @@
         document.getElementById('manage-group').value = '';
         document.getElementById('manage-results').innerHTML = '';
         
-        // إجبار قطع الاتصال لتوفير الموارد
         scheduleStudentOffline();
     }
 
     function showLogin() {
+        // فتح الاتصال مسبقاً بمجرد فتح شاشة الدخول ليكون الدخول لحظياً
+        clearTimeout(idleConnectionTimer);
+        database.goOnline();
+
         document.getElementById('student-view').style.display = 'none';
         document.getElementById('manage-view').style.display = 'none';
         
@@ -1314,6 +1372,11 @@
     }
 
     function showManageView() {
+        // فتح الاتصال مسبقاً بمجرد الدخول لصفحة إدارة مواعيدي ليكون البحث سريعاً جداً
+        clearTimeout(idleConnectionTimer);
+        database.goOnline();
+        scheduleStudentOffline();
+
         document.getElementById('student-view').style.display = 'none';
         document.getElementById('login-view').style.display = 'none';
         document.getElementById('admin-view').style.display = 'none';
@@ -1356,24 +1419,42 @@
         return isAllCompleted;
     }
 
-    // --- نافذة عرض التاسك للطالب + إرسال رابط التسليم ---
+    // --- نافذة عرض التاسك للطالب + إرسال رابط التسليم (تسحب بيانات التاسك المطلوب فقط عند الضغط عليه) ---
     let activeViewerCourseKey = null;
     let activeViewerTaskKey = null;
     let activeStudentManagePhone = null;
     let currentStudentManageProgress = {};
 
-    window.viewStudentTask = function(courseKey, taskKey, taskNum) {
+    window.viewStudentTask = async function(courseKey, taskKey, taskNum) {
         let course = LMS_COURSES[courseKey];
         if (!course) return;
-        let tData = (course.pdfTasks && course.pdfTasks[taskKey]) ? course.pdfTasks[taskKey] : {};
 
         activeViewerCourseKey = courseKey;
         activeViewerTaskKey = taskKey;
 
         document.getElementById('viewer-task-title').innerText = `${course.title} - Task ${taskNum}`;
+        let imgContainer = document.getElementById('viewer-task-container');
+        let notesEl = document.getElementById('viewer-task-notes');
+        let subBox = document.getElementById('viewer-submission-box');
+        let subInput = document.getElementById('student-submit-link-input');
+
+        imgContainer.innerHTML = '<div style="color:#fcc01a; padding:15px; font-weight:bold;">جاري تحميل الـ Task...</div>';
+        imgContainer.style.display = 'block';
+        notesEl.style.display = 'none';
+        subBox.style.display = 'none';
+        document.getElementById('student-task-viewer-modal').style.display = 'flex';
+
+        let tData = {};
+        try {
+            await runWithOnlineConnection(async () => {
+                const snap = await database.ref(`settings/courses/${courseKey}/pdfTasks/${taskKey}`).get();
+                if (snap.exists()) tData = snap.val();
+            });
+        } catch(e) {
+            console.error(e);
+        }
 
         // 1. عرض الصور المحمية في الأعلى (إن وجدت)
-        let imgContainer = document.getElementById('viewer-task-container');
         imgContainer.innerHTML = '';
         if (tData.images && tData.images.length > 0) {
             tData.images.forEach(imgSrc => {
@@ -1385,7 +1466,6 @@
         }
 
         // 2. عرض صندوق الملاحظات (نقط Bullet Points + الروابط باللون الأزرق القابل للضغط)
-        let notesEl = document.getElementById('viewer-task-notes');
         let formattedNotes = formatSmartTaskNotes(tData.page, tData.comment);
         if (formattedNotes) {
             notesEl.innerHTML = formattedNotes;
@@ -1396,8 +1476,6 @@
         }
 
         // 3. إظهار خانة تسليم الرابط إذا كان التاسك مفعلاً للتسليم من الأدمن
-        let subBox = document.getElementById('viewer-submission-box');
-        let subInput = document.getElementById('student-submit-link-input');
         if (tData.allowSubmission) {
             let existingSub = currentStudentManageProgress && currentStudentManageProgress[courseKey] && currentStudentManageProgress[courseKey].submissions && currentStudentManageProgress[courseKey].submissions[taskKey];
             subInput.value = (existingSub && existingSub.link) ? existingSub.link : '';
@@ -1405,8 +1483,6 @@
         } else {
             subBox.style.display = 'none';
         }
-
-        document.getElementById('student-task-viewer-modal').style.display = 'flex';
     };
 
     window.submitStudentTaskLink = async function() {
@@ -1483,16 +1559,11 @@
         
         try {
             await runWithOnlineConnection(async () => {
-                const [snap, progSnap, coursesSnap] = await Promise.all([
+                // جلب بيانات الطلاب وتقدم الطالب فقط بدون سحب شجرة settings/courses الثقيلة التي تحتوي على صور الـ PDF
+                const [snap, progSnap] = await Promise.all([
                     database.ref('students').get(),
-                    database.ref('student_progress/' + mPhone).get(),
-                    database.ref('settings/courses').get()
+                    database.ref('student_progress/' + mPhone).get()
                 ]);
-
-                if (coursesSnap.exists()) {
-                    let cData = coursesSnap.val();
-                    Object.keys(cData).forEach(k => { if(LMS_COURSES[k]) Object.assign(LMS_COURSES[k], cData[k]); });
-                }
 
                 let studentProgressData = progSnap.exists() ? progSnap.val() : {};
                 currentStudentManageProgress = studentProgressData;
@@ -1699,7 +1770,13 @@
 
         try {
             await runWithOnlineConnection(async () => {
-                const freshBlockedSnap = await database.ref('blocked_phones').get();
+                // جلب جميع البيانات المطلوبة للحجز بالتوازي في نفس اللحظة لتسريع التسجيل
+                const [freshBlockedSnap, snapshot, progSnap] = await Promise.all([
+                    database.ref('blocked_phones').get(),
+                    database.ref('students').get(),
+                    database.ref('student_progress/' + phone).get()
+                ]);
+
                 let freshBlockedList = [];
                 if (freshBlockedSnap.exists()) {
                     let bData = freshBlockedSnap.val();
@@ -1707,7 +1784,6 @@
                 }
                 if (freshBlockedList.includes(phone)) { showErrorModal(SYSTEM_MESSAGES.blocked); resetBtn(); return; }
 
-                const snapshot = await database.ref('students').get();
                 let dbData = [];
                 if (snapshot.exists()) { const data = snapshot.val(); Object.keys(data).forEach(key => dbData.push(data[key])); }
 
@@ -1722,7 +1798,6 @@
                     }
                 }
                 
-                const progSnap = await database.ref('student_progress/' + phone).get();
                 let progressDataObj = progSnap.exists() ? progSnap.val() : {};
                 let unblockDate = progressDataObj.unblock_date || null;
                 let currentBans = progressDataObj.ban_count || 0;
@@ -1877,12 +1952,31 @@
     };
 
     document.getElementById('loginForm').addEventListener('submit', function(e) {
-        e.preventDefault(); const email = document.getElementById('admin-email').value; const pass = document.getElementById('admin-password').value;
+        e.preventDefault();
+        const email = document.getElementById('admin-email').value.trim();
+        const pass = document.getElementById('admin-password').value;
+        const btn = document.getElementById('login-submit-btn');
+        btn.innerText = 'جاري الدخول...';
+        btn.disabled = true;
+        document.getElementById('login-msg').innerText = '';
+
         clearTimeout(idleConnectionTimer);
         database.goOnline();
         auth.setPersistence(firebase.auth.Auth.Persistence.SESSION).then(() => { return auth.signInWithEmailAndPassword(email, pass); })
-        .then(() => { document.getElementById('login-view').style.display = 'none'; document.getElementById('admin-view').style.display = 'block'; document.getElementById('loginForm').reset(); loadData(); })
-        .catch(() => { document.getElementById('login-msg').innerText = 'بيانات الدخول غير صحيحة'; scheduleStudentOffline(); });
+        .then(() => {
+            btn.innerText = 'دخول';
+            btn.disabled = false;
+            document.getElementById('login-view').style.display = 'none';
+            document.getElementById('admin-view').style.display = 'block';
+            document.getElementById('loginForm').reset();
+            loadData();
+        })
+        .catch(() => {
+            btn.innerText = 'دخول';
+            btn.disabled = false;
+            document.getElementById('login-msg').innerText = 'بيانات الدخول غير صحيحة';
+            scheduleStudentOffline();
+        });
     });
 
     function logoutAdmin() { auth.signOut().then(() => { goHome(); switchDashboardView('dates'); backToDates(); scheduleStudentOffline(); }); }
@@ -1929,13 +2023,12 @@
             renderSystemSettingsUI();
         });
 
-        database.ref('settings/courses').on('value', snap => {
-            if(snap.exists()) {
-                let data = snap.val();
-                Object.keys(data).forEach(k => { if(LMS_COURSES[k]) Object.assign(LMS_COURSES[k], data[k]); });
-            }
-            renderSystemSettingsUI();
-            if (document.getElementById('view-certificates').classList.contains('active')) renderCertificatesView();
+        // مراقبة أعداد وإعدادات الكورسات الخفيفة فقط دون سحب صور الـ PDF الثقيلة لتسريع فتح لوحة الإدارة
+        ['classic_control', 'plc', 'motor_drive'].forEach(k => {
+            database.ref(`settings/courses/${k}/limit`).on('value', s => { if(s.exists()) { LMS_COURSES[k].limit = s.val(); renderSystemSettingsUI(); } });
+            database.ref(`settings/courses/${k}/tasks`).on('value', s => { if(s.exists()) { LMS_COURSES[k].tasks = s.val(); renderSystemSettingsUI(); if (document.getElementById('view-certificates').classList.contains('active')) renderCertificatesView(); } });
+            database.ref(`settings/courses/${k}/upcomingLimit`).on('value', s => { if(s.exists()) { LMS_COURSES[k].upcomingLimit = s.val(); renderSystemSettingsUI(); } });
+            database.ref(`settings/courses/${k}/exam`).on('value', s => { if(s.exists()) { LMS_COURSES[k].exam = s.val(); renderSystemSettingsUI(); if (document.getElementById('view-certificates').classList.contains('active')) renderCertificatesView(); } });
         });
 
         database.ref('settings/periodsData').on('value', snap => { if (snap.exists()) globalPeriods = snap.val(); renderPeriodsEdit(); });
@@ -3206,8 +3299,8 @@
         document.getElementById('report-total').innerText = validRecords.length;
         document.getElementById('report-absent').innerText = absent;
 
-        const progSnap = await database.ref('student_progress/' + extractPureNumber(studentPhone)).get(); 
-        const studentProgressData = progSnap.exists() ? progSnap.val() : {};
+        // استخدام البيانات المحملة مسبقاً في الذاكرة (allProgress) لتسريع فتح التقرير فوراً
+        const studentProgressData = allProgress[extractPureNumber(studentPhone)] || {};
         let unblockDate = studentProgressData.unblock_date || null;
 
         let inactCheck = checkInactivity(allStudentRecords, unblockDate, studentProgressData.inactivity_reset_date, todayStr, banRules.inactivity.limit);
@@ -3239,7 +3332,7 @@
                 if(bRec) undoBlockMistake(bRec.id, studentPhone);
             };
         } else { 
-            blockBtn.innerText = "تقييد الطالب (من منع تسجيل)"; 
+            blockBtn.innerText = "تقييد الطالب (منع تسجيل)"; 
             blockBtn.style.backgroundColor = "#ff4d4d"; 
             blockBtn.onclick = () => toggleBlockStudent(studentPhone, latestName, false); 
             
