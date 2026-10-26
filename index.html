@@ -1115,9 +1115,6 @@
         let cutoffTime = new Date(targetStartObj.getTime() - (lateBookingOffsetHours * 60 * 60 * 1000));
         return new Date() >= cutoffTime;
     }
-    // التعديل: اليوم يعتبر "مغلق" فقط لو كل الفترات متقفلة في الجدول نفسه.
-    // مبقناش ناخد في اعتبارنا blockLateBooking هنا عشان اليوم مايتقفلش للطالب
-    // بمجرد إن الفترات عدّت وقت بدايتها.
     function isDayFullyClosed(dateStr) {
         if (!dateStr) return true;
         const parts = dateStr.split('-');
@@ -2586,13 +2583,23 @@
                 const courses = filterEnrolledCourses(dip.courses || [], st);
                 if (courses.length === 0) html += `<div style="text-align:center; color:#999; padding:10px;">لا توجد كورسات مسجلة للطالب في هذه الدورة</div>`;
                 else {
+                    // ✅ التعديل الأساسي: بنستخدم allStudents (realtime) لو متاحة، وبنشمل كل كورسات الدورة
+                    // بدل ما كنا بنقصر على الكورسات المشترك فيها بس — وده اللي كان بيخلي التاسكات مش بتظهر.
                     const cTasks = {};
-                    allSt.filter(s => extractPureNumber(s.phone) === purePhone && s.attended && s.tasks).forEach(r => {
-                        const courseKey = courseNameToKey(r.course);
-                        if (!courses.some(c => courseNameToKey(c.name) === courseKey)) return;
+                    const allDipCourseKeys = new Set((dip.courses || []).map(c => courseNameToKey(c.name)));
+                    const sourceStudents = (typeof allStudents !== 'undefined' && Array.isArray(allStudents) && allStudents.length > 0) ? allStudents : allSt;
+                    sourceStudents.forEach(s => {
+                        if (!s) return;
+                        if (extractPureNumber(s.phone) !== purePhone) return;
+                        if (s.attended !== true || !s.tasks || s.canceled) return;
+                        const courseKey = courseNameToKey(s.course);
+                        if (!allDipCourseKeys.has(courseKey)) return;
                         const configKey = `${enr.dipId}_${courseKey}`;
                         if (!cTasks[configKey]) cTasks[configKey] = new Set();
-                        r.tasks.split('|').forEach(t => { if (t.trim()) cTasks[configKey].add(t.trim()); });
+                        String(s.tasks).split('|').forEach(t => {
+                            const trimmed = t.trim();
+                            if (trimmed) cTasks[configKey].add(trimmed);
+                        });
                     });
                     html += `<div style="font-size: 13px; font-weight: bold; color: #3b1e5a; margin-bottom: 8px;">📖 الكورسات وتقدم الـ Tasks:</div>`;
                     courses.forEach(course => {
