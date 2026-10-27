@@ -490,12 +490,18 @@
     </div>
     <div id="cert-due-view" style="display: none;">
         <button class="back-btn" style="margin-bottom: 15px;" onclick="backToCertGroupDetail()">← رجوع</button>
-        <h3 style="text-align: center; color: #fcc01a; margin-top: 0;">📜 شهادات مستحقة - <span id="cert-due-group-title"></span></h3>
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 15px;">
+            <h3 style="color: #fcc01a; margin: 0;">📜 شهادات مستحقة - <span id="cert-due-group-title"></span></h3>
+            <button class="add-btn" style="width: auto; margin: 0; padding: 10px 20px; background-color: #28a745;" onclick="exportCertDueToExcel()">📊 تصدير إكسيل</button>
+        </div>
         <div id="cert-due-container"></div>
     </div>
     <div id="cert-graduates-view" style="display: none;">
         <button class="back-btn" style="margin-bottom: 15px;" onclick="backToCertGroupDetail()">← رجوع</button>
-        <h3 style="text-align: center; color: #fcc01a; margin-top: 0;">🎓 خريجين - <span id="cert-graduates-group-title"></span></h3>
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 15px;">
+            <h3 style="color: #fcc01a; margin: 0;">🎓 خريجين - <span id="cert-graduates-group-title"></span></h3>
+            <button class="add-btn" style="width: auto; margin: 0; padding: 10px 20px; background-color: #28a745;" onclick="exportCertGraduatesToExcel()">📊 تصدير إكسيل</button>
+        </div>
         <div id="cert-graduates-container"></div>
     </div>
 </div>
@@ -699,7 +705,6 @@
         return String(name || '').trim().toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
     }
 
-    /* ============ فلترة الكورسات المسجّل بها الطالب ============ */
     function filterEnrolledCourses(coursesArr, student) {
         if (!Array.isArray(coursesArr)) return [];
         if (!student || typeof student !== 'object') return coursesArr.slice();
@@ -791,35 +796,16 @@
         const attendedRecords = (allRecords || []).filter(r =>
             r && r.attended === true && r.date && r.date !== 'بدون موعد' && !r.canceled
         );
-
         if (attendedRecords.length === 0) {
-            return {
-                days: 0,
-                lastAttendedReal: 'لا يوجد حضور',
-                lastAttendedDate: null,
-                effectiveDate: null,
-                isBlocked: false
-            };
+            return { days: 0, lastAttendedReal: 'لا يوجد حضور', lastAttendedDate: null, effectiveDate: null, isBlocked: false };
         }
-
         attendedRecords.sort((a, b) => new Date(b.date) - new Date(a.date));
         const lastAttended = attendedRecords[0].date;
-
         let effectiveDate = lastAttended;
-        if (inactivityResetDate && inactivityResetDate > effectiveDate) {
-            effectiveDate = inactivityResetDate;
-        }
-
+        if (inactivityResetDate && inactivityResetDate > effectiveDate) effectiveDate = inactivityResetDate;
         let days = 0;
         try { days = Math.max(0, diffDaysSafely(effectiveDate, todayStr)); } catch(e) { days = 0; }
-
-        return {
-            days,
-            lastAttendedReal: lastAttended,
-            lastAttendedDate: lastAttended,
-            effectiveDate,
-            isBlocked: days >= limit
-        };
+        return { days, lastAttendedReal: lastAttended, lastAttendedDate: lastAttended, effectiveDate, isBlocked: days >= limit };
     }
 
     function convertLinksToBlueHTML(str) {
@@ -878,9 +864,7 @@
     let lateBookingOffsetHours = 0;
 
     function makeSharedConfigKey(diplomaName, courseName) {
-        const norm = (s) => String(s || '').trim().toLowerCase()
-            .replace(/\s+/g, '_')
-            .replace(/[^\w\u0600-\u06FF]/g, '');
+        const norm = (s) => String(s || '').trim().toLowerCase().replace(/\s+/g, '_').replace(/[^\w\u0600-\u06FF]/g, '');
         return `${norm(diplomaName)}__${norm(courseName)}`;
     }
     const makeSharedPdfTaskKey = makeSharedConfigKey;
@@ -892,7 +876,6 @@
     function getCourseConfig(diplomaId, courseName) {
         const dip = allDiplomas[diplomaId];
         const diplomaName = dip ? (dip.name || '').trim() : '';
-
         if (diplomaName) {
             const sharedKey = makeSharedConfigKey(diplomaName, courseName);
             const sharedCfg = sharedCourseConfig[sharedKey];
@@ -905,7 +888,6 @@
                 };
             }
         }
-
         const legacyKey = makeCourseConfigKey(diplomaId, courseName);
         const legacyCfg = diplomaCourseConfig[legacyKey] || {};
         return {
@@ -2036,12 +2018,10 @@
             currentDiplomaGroup = null;
             document.getElementById('diploma-groups-view').style.display = 'block';
             document.getElementById('diploma-group-detail-view').style.display = 'none';
-
             const courseSearchContainer = document.getElementById('diploma-course-search-container');
             if (courseSearchContainer) courseSearchContainer.style.display = 'none';
             const courseSearchInput = document.getElementById('diploma-search-input');
             if (courseSearchInput) courseSearchInput.value = '';
-
             loadAndRenderDiplomas();
         }
         if (view === 'add') setupAddDiplomaView();
@@ -2179,10 +2159,8 @@
         document.getElementById('diploma-group-detail-view').style.display = 'block';
         document.getElementById('diploma-group-title').innerText = groupName;
         document.getElementById('diploma-search-input').value = '';
-
         const courseSearchContainer = document.getElementById('diploma-course-search-container');
         if (courseSearchContainer) courseSearchContainer.style.display = 'flex';
-
         renderDiplomasGrid();
     };
 
@@ -2190,12 +2168,10 @@
         currentDiplomaGroup = null;
         document.getElementById('diploma-groups-view').style.display = 'block';
         document.getElementById('diploma-group-detail-view').style.display = 'none';
-
         const courseSearchContainer = document.getElementById('diploma-course-search-container');
         if (courseSearchContainer) courseSearchContainer.style.display = 'none';
         const courseSearchInput = document.getElementById('diploma-search-input');
         if (courseSearchInput) courseSearchInput.value = '';
-
         loadAndRenderDiplomas();
     };
 
@@ -2420,7 +2396,6 @@
         }
     };
 
-    /* ============ مودال تعديل كورسات الطالب ============ */
     let editingCoursesDipId = null;
     let editingCoursesStudentId = null;
     let editingCoursesPhone = null;
@@ -2433,14 +2408,11 @@
         if (!st) { alert('الطالب غير موجود'); return; }
         const courses = dip.courses || [];
         if (courses.length === 0) { alert('لا توجد كورسات في هذه الدورة'); return; }
-
         editingCoursesDipId = dipId;
         editingCoursesStudentId = stId;
         editingCoursesPhone = phone;
-
         const enrolledList = filterEnrolledCourses(courses, st);
         const isExplicit = ('enrolled_courses' in st) && st.enrolled_courses !== null && st.enrolled_courses !== undefined;
-
         document.getElementById('edit-student-courses-meta').innerHTML = `
             <div><b>👤 الطالب:</b> ${escapeForAttr(st.name || '')}</div>
             <div><b>📚 الدورة:</b> ${escapeForAttr(dip.name || '')} - رقم ${escapeForAttr(dip.number || '')}</div>
@@ -2451,7 +2423,6 @@
             </div>
             <div style="margin-top:4px; font-size:12px; color:#888;">شيل علامة ✓ من أي كورس عشان تستبعده للطالب ده بس.</div>
         `;
-
         const list = document.getElementById('edit-student-courses-list');
         list.innerHTML = '';
         courses.forEach(c => {
@@ -2462,7 +2433,6 @@
                 <span style="margin-right:auto; font-size:11px; color:#999; font-weight:normal;">(${c.lectures} محاضرة)</span>
             </label>`;
         });
-
         document.getElementById('edit-student-courses-modal').style.display = 'flex';
     };
 
@@ -2478,42 +2448,27 @@
         const dipIdSnapshot = editingCoursesDipId;
         const stIdSnapshot = editingCoursesStudentId;
         const phoneSnapshot = editingCoursesPhone;
-
         const dip = allDiplomas[dipIdSnapshot];
         const allCourses = dip ? (dip.courses || []) : [];
-
         const checked = [];
-        document.querySelectorAll('#edit-student-courses-list .enrolled-course-cb:checked').forEach(cb => {
-            checked.push(cb.value);
-        });
-
+        document.querySelectorAll('#edit-student-courses-list .enrolled-course-cb:checked').forEach(cb => { checked.push(cb.value); });
         if (checked.length === 0) {
             if (!confirm('⚠️ لم تختر أي كورس. الطالب لن يظهر مسجلاً في أي كورس داخل هذه الدورة. تأكيد الحفظ؟')) return;
         }
-
         const isAll = allCourses.length > 0 && checked.length === allCourses.length;
         const ecObj = {};
         checked.forEach(n => { ecObj[n] = true; });
-
         try {
             const ref = database.ref(`new_system/diploma_students/${dipIdSnapshot}/${stIdSnapshot}/enrolled_courses`);
-            if (isAll) {
-                await ref.remove();
-            } else {
-                await ref.set(ecObj);
-            }
+            if (isAll) await ref.remove();
+            else await ref.set(ecObj);
             alert('✅ تم حفظ الكورسات المسجّل بها الطالب');
             closeEditStudentCoursesModal();
-
             if (currentDiplomaId === dipIdSnapshot && document.getElementById('diploma-detail-view').style.display === 'block') {
                 await renderDiplomaStudents();
             }
-            if (currentLabDipId === dipIdSnapshot) {
-                await renderLabDipCopyStudents();
-            }
-            if (phoneSnapshot) {
-                await openDiplomaStudentReport(phoneSnapshot);
-            }
+            if (currentLabDipId === dipIdSnapshot) { await renderLabDipCopyStudents(); }
+            if (phoneSnapshot) { await openDiplomaStudentReport(phoneSnapshot); }
         } catch(e) { alert('خطأ: ' + e.message); }
     };
 
@@ -2572,18 +2527,15 @@
                 const payBadge = isFullyPaid
                     ? `<span style="color:#28a745; font-weight:bold;">✅ مدفوع بالكامل (${paid.toLocaleString()} / ${price.toLocaleString()} ج.م)</span>${discountBadge}`
                     : `<span style="color:#cc0000; font-weight:bold;">⚠️ غير مكتمل (${paid.toLocaleString()} / ${price.toLocaleString()} ج.م) — متبقي ${(price - paid).toLocaleString()} ج.م</span>${discountBadge}`;
-
                 const allCoursesForEnr = dip.courses || [];
                 const enrolledCoursesList = filterEnrolledCourses(allCoursesForEnr, st);
                 const isFullyEnrolled = enrolledCoursesList.length === allCoursesForEnr.length;
                 const priceEditBtn = `<button onclick="editStudentCoursePrice('${enr.dipId}', '${enr.stId}', ${price}, '${escapeForJs(st.phone || '')}')" style="background:#fcc01a; color:#3b1e5a; border:none; border-radius:5px; padding:5px 10px; font-size:12px; font-weight:bold; cursor:pointer; white-space:nowrap;">✏️ تعديل السعر</button>`;
                 const coursesEditBtn = `<button onclick="openEditStudentCoursesModal('${enr.dipId}', '${enr.stId}', '${escapeForJs(st.phone || '')}')" style="background:#28a745; color:white; border:none; border-radius:5px; padding:5px 10px; font-size:12px; font-weight:bold; cursor:pointer; white-space:nowrap;">🎯 تعديل الكورسات</button>`;
-
                 html += `<div style="background: white; border: 2px solid ${isActive ? '#fcc01a' : '#ddd'}; border-radius: 10px; padding: 15px; margin-bottom: 15px;"><div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; border-bottom: 1px solid #eee; padding-bottom: 10px; margin-bottom: 12px;"><div><div style="font-size: 17px; font-weight: bold; color: #3b1e5a;">${escapeForAttr(dip.name || 'دورة')} — رقم ${escapeForAttr(dip.number || '')}</div><div style="font-size: 13px; color: #666; margin-top: 4px;">📅 من ${startDate} إلى ${endDate || '?'}</div></div>${statusBadge}</div><div style="background: #f9f9f9; padding: 10px; border-radius: 6px; margin-bottom: 12px; font-size: 14px; color:#3b1e5a; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;"><div>💰 <b>الرسوم:</b> ${payBadge}</div><div style="display:flex; gap:6px; flex-wrap:wrap;">${priceEditBtn}${coursesEditBtn}</div></div><div style="background: #fff8e1; padding: 8px 10px; border-radius: 6px; margin-bottom: 12px; font-size: 13px; color:#3b1e5a; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; border:1px dashed #fcc01a;"><div>📚 <b>الكورسات:</b> ${isFullyEnrolled ? `مسجّل في كل الكورسات (${allCoursesForEnr.length})` : `مسجّل في ${enrolledCoursesList.length} من ${allCoursesForEnr.length} كورس`}</div></div>`;
                 const courses = filterEnrolledCourses(dip.courses || [], st);
                 if (courses.length === 0) html += `<div style="text-align:center; color:#999; padding:10px;">لا توجد كورسات مسجلة للطالب في هذه الدورة</div>`;
                 else {
-                    // ✅ بنستخدم allStudents (realtime) لو متاحة، وبنشمل كل كورسات الدورة بدل الكورسات المشترك فيها بس
                     const cTasks = {};
                     const allDipCourseKeys = new Set((dip.courses || []).map(c => courseNameToKey(c.name)));
                     const sourceStudents = (typeof allStudents !== 'undefined' && Array.isArray(allStudents) && allStudents.length > 0) ? allStudents : allSt;
@@ -2760,36 +2712,20 @@
         } catch(e) { alert('تعذر حذف الطالب وبياناته: ' + e.message); }
     };
 
-    /* ============ تصدير جدول طلاب دورة معينة لإكسيل ============ */
     window.exportDiplomaStudentsToExcel = function() {
         if (!currentDiplomaId) { alert('لم يتم تحديد دورة.'); return; }
         const dip = allDiplomas[currentDiplomaId];
         if (!dip) { alert('الدورة غير موجودة.'); return; }
-
         const students = allDiplomaStudents[currentDiplomaId] || {};
         const keys = Object.keys(students);
         if (keys.length === 0) { alert('لا يوجد طلاب في هذه الدورة لتصديرهم.'); return; }
-
         const defaultPrice = dip.price || 0;
         const courses = dip.courses || [];
-
-        let headerHtml = `<tr>
-            <th>#</th>
-            <th>الاسم</th>
-            <th>الهاتف</th>
-            <th>الكلية</th>
-            <th>العنوان</th>
-            <th>المدفوع</th>
-            <th>المطلوب</th>
-            <th>الحالة</th>`;
-        courses.forEach(c => {
-            headerHtml += `<th>${escapeForAttr(c.name)}<br>(${c.lectures})</th>`;
-        });
+        let headerHtml = `<tr><th>#</th><th>الاسم</th><th>الهاتف</th><th>الكلية</th><th>العنوان</th><th>المدفوع</th><th>المطلوب</th><th>الحالة</th>`;
+        courses.forEach(c => { headerHtml += `<th>${escapeForAttr(c.name)}<br>(${c.lectures})</th>`; });
         headerHtml += `</tr>`;
-
         let rowsHtml = '';
         let totalPaid = 0, totalExpected = 0, fullyPaidCount = 0;
-
         keys.forEach((sid, index) => {
             const st = students[sid];
             const paid = parseInt(st.paid) || 0;
@@ -2799,23 +2735,10 @@
             const isFullyPaid = paid >= dipPrice;
             const attendance = st.attendance || {};
             const stEnrolledNamesSet = new Set(filterEnrolledCourses(courses, st).map(c => c.name));
-
             totalPaid += paid;
             totalExpected += dipPrice;
             if (isFullyPaid) fullyPaidCount++;
-
-            let rowHtml = `<tr>
-                <td style="text-align:center;">${index + 1}</td>
-                <td style="font-weight:bold;">${escapeForAttr(st.name || '')}</td>
-                <td style="text-align:center; mso-number-format:'\\@';">${escapeForAttr(st.phone || '')}</td>
-                <td>${escapeForAttr(st.college || '-')}</td>
-                <td>${escapeForAttr(st.address || '-')}</td>
-                <td style="text-align:center;">${paid}</td>
-                <td style="text-align:center;">${dipPrice}${hasCustomPrice ? ' ★' : ''}</td>
-                <td style="text-align:center; color:${isFullyPaid ? '#28a745' : '#cc0000'}; font-weight:bold;">
-                    ${isFullyPaid ? 'مدفوع بالكامل' : 'غير مكتمل'}
-                </td>`;
-
+            let rowHtml = `<tr><td style="text-align:center;">${index + 1}</td><td style="font-weight:bold;">${escapeForAttr(st.name || '')}</td><td style="text-align:center; mso-number-format:'\\@';">${escapeForAttr(st.phone || '')}</td><td>${escapeForAttr(st.college || '-')}</td><td>${escapeForAttr(st.address || '-')}</td><td style="text-align:center;">${paid}</td><td style="text-align:center;">${dipPrice}${hasCustomPrice ? ' ★' : ''}</td><td style="text-align:center; color:${isFullyPaid ? '#28a745' : '#cc0000'}; font-weight:bold;">${isFullyPaid ? 'مدفوع بالكامل' : 'غير مكتمل'}</td>`;
             courses.forEach(course => {
                 if (!stEnrolledNamesSet.has(course.name)) {
                     rowHtml += `<td style="text-align:center; color:#bbb; font-weight:bold;">—</td>`;
@@ -2830,13 +2753,10 @@
                 }
                 rowHtml += `<td style="text-align:center; font-size:12px;">${marks}</td>`;
             });
-
             rowHtml += `</tr>`;
             rowsHtml += rowHtml;
         });
-
         const remaining = totalExpected - totalPaid;
-
         const html = `<html dir="rtl" lang="ar"><head><meta charset="UTF-8">
             <style>
                 body { font-family: Tahoma, Arial, sans-serif; }
@@ -2863,7 +2783,6 @@
                 <tbody>${rowsHtml}</tbody>
             </table>
         </body></html>`;
-
         const blob = new Blob(['\ufeff', html], { type: 'application/vnd.ms-excel' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -3085,29 +3004,22 @@
     let currentCertSubView = null;
     let certDataCache = { diplomas: {}, students: {}, progress: {}, allStudentRecords: [] };
 
-    // ✅ دالة صارمة: لازم الطالب يكون حاضر في كل التاسكات المطلوبة
-    // (باستخدام allStudents realtime، وفلترة بالـ group، واستبعاد الملغي)
     function isStudentEligibleForDiplomaCert(dipId, dip, studentProgressData, allStudentRecords, studentPhone, studentObj) {
         if (!dip.courses || dip.courses.length === 0) return false;
         const coursesToCheck = filterEnrolledCourses(dip.courses, studentObj);
         if (coursesToCheck.length === 0) return false;
-
         const diplomaGroupNum = extractPureNumber(dip.number);
         const allDipCourseKeys = new Set((dip.courses || []).map(c => courseNameToKey(c.name)));
         const cTasks = {};
-
         const sourceStudents = (typeof allStudents !== 'undefined' && Array.isArray(allStudents) && allStudents.length > 0)
             ? allStudents
             : (allStudentRecords || []);
-
         sourceStudents.forEach(r => {
             if (!r) return;
             if (extractPureNumber(r.phone) !== studentPhone) return;
-            // ✅ صارم: لازم حضور فعلي + مش ملغي + عنده tasks
             if (r.attended !== true || !r.tasks || r.canceled === true) return;
             const courseKey = courseNameToKey(r.course);
             if (!allDipCourseKeys.has(courseKey)) return;
-            // ✅ صارم: نفس رقم الدبلومة
             const recGroup = extractPureNumber(r.group);
             if (recGroup && diplomaGroupNum && recGroup !== diplomaGroupNum) return;
             const configKey = `${dipId}_${courseKey}`;
@@ -3117,7 +3029,6 @@
                 if (trimmed) cTasks[configKey].add(trimmed);
             });
         });
-
         for (const course of coursesToCheck) {
             const prog = calculateProgressDynamic(dipId, course.name, cTasks, studentProgressData);
             if (prog.percentage < 100 || prog.totalItems === 0) return false;
@@ -3153,10 +3064,8 @@
             certDataCache.progress = progSnap.exists() ? progSnap.val() : {};
             let allSt = []; if (allStSnap.exists()) allStSnap.forEach(c => allSt.push({ id: c.key, ...c.val() }));
             certDataCache.allStudentRecords = allSt;
-            // 🔑 تحميل إعدادات التاسكات — بدونها getDynamicTasksCount = 0 والشهادة لا تستحق
             if (labTasksSnap.exists()) labCourseTasks = labTasksSnap.val();
             if (sharedCfgSnap.exists()) sharedCourseConfig = sharedCfgSnap.val();
-            // ضمان اتساق allDiplomas لو الـ realtime listener لسه ما اشتغلش
             if (Object.keys(allDiplomas).length === 0 && Object.keys(certDataCache.diplomas).length > 0) {
                 allDiplomas = certDataCache.diplomas;
             }
@@ -3164,14 +3073,12 @@
     }
 
     function buildCertGroups() {
-        // مزامنة احتياطية مع الـ realtime
         if (Object.keys(allDiplomas).length === 0 && Object.keys(certDataCache.diplomas).length > 0) {
             allDiplomas = certDataCache.diplomas;
         }
         if (Object.keys(allDiplomaStudents).length === 0 && Object.keys(certDataCache.students).length > 0) {
             allDiplomaStudents = certDataCache.students;
         }
-
         const groups = {};
         const diplomas = certDataCache.diplomas || {};
         const allDipStudents = certDataCache.students || {};
@@ -3179,7 +3086,6 @@
         const allRecs = (typeof allStudents !== 'undefined' && Array.isArray(allStudents) && allStudents.length > 0)
             ? allStudents
             : (certDataCache.allStudentRecords || []);
-
         Object.keys(diplomas).forEach(dipId => {
             const dip = diplomas[dipId];
             const name = (dip.name || 'بدون اسم').trim();
@@ -3274,9 +3180,16 @@
     function renderCertDueList(list) {
         const container = document.getElementById('cert-due-container');
         if (list.length === 0) { container.innerHTML = '<div class="empty-state" style="background: white; color: #888; border-radius: 10px; padding: 30px;">لا توجد شهادات مستحقة</div>'; return; }
-        let html = `<div class="excel-table-container"><table class="excel-table"><thead><tr><th style="width: 40px;">#</th><th>الاسم</th><th>الهاتف</th><th>رقم الدورة</th><th style="width: 100px;">تم الاستلام</th></tr></thead><tbody>`;
+        let html = `<div class="excel-table-container"><table class="excel-table"><thead><tr><th style="width: 40px;">#</th><th>الاسم</th><th>الهاتف</th><th>الكلية</th><th>رقم الدورة</th><th style="width: 100px;">تم الاستلام</th></tr></thead><tbody>`;
         list.forEach((item, index) => {
-            html += `<tr><td style="background:#f0f0f0; font-weight:bold; color:#3b1e5a;">${index + 1}</td><td style="font-weight:bold; color:#3b1e5a;">${item.name || ''}</td><td onclick="openWhatsApp('${item.phone}')" style="cursor:pointer; font-family:Tahoma;">${item.phone || ''}</td><td>${item.dip.number || ''}</td><td><input type="checkbox" class="attendance-check" onchange="toggleCertReceived('${item.dipId}', '${extractPureNumber(item.phone)}', this)"></td></tr>`;
+            html += `<tr>
+                <td style="background:#f0f0f0; font-weight:bold; color:#3b1e5a;">${index + 1}</td>
+                <td style="font-weight:bold; color:#3b1e5a;">${escapeForAttr(item.name || '')}</td>
+                <td onclick="openWhatsApp('${item.phone}')" style="cursor:pointer; font-family:Tahoma;">${escapeForAttr(item.phone || '')}</td>
+                <td>${escapeForAttr(item.college || '-')}</td>
+                <td>${escapeForAttr(item.dip.number || '')}</td>
+                <td><input type="checkbox" class="attendance-check" onchange="toggleCertReceived('${item.dipId}', '${extractPureNumber(item.phone)}', this)"></td>
+            </tr>`;
         });
         html += `</tbody></table></div>`;
         container.innerHTML = html;
@@ -3285,14 +3198,65 @@
     function renderCertGraduatesList(list) {
         const container = document.getElementById('cert-graduates-container');
         if (list.length === 0) { container.innerHTML = '<div class="empty-state" style="background: white; color: #888; border-radius: 10px; padding: 30px;">لا يوجد خريجين</div>'; return; }
-        let html = `<div class="excel-table-container"><table class="excel-table"><thead><tr><th style="width: 40px;">#</th><th>الاسم</th><th>الهاتف</th><th>رقم الدورة</th><th>تاريخ الاستلام</th><th>بواسطة</th><th>إجراء</th></tr></thead><tbody>`;
+        let html = `<div class="excel-table-container"><table class="excel-table"><thead><tr><th style="width: 40px;">#</th><th>الاسم</th><th>الهاتف</th><th>الكلية</th><th>رقم الدورة</th><th>تاريخ الاستلام</th><th>بواسطة</th><th>إجراء</th></tr></thead><tbody>`;
         list.forEach((item, index) => {
             const purePhone = extractPureNumber(item.phone);
-            html += `<tr><td style="background:#f0f0f0; font-weight:bold; color:#3b1e5a;">${index + 1}</td><td style="font-weight:bold; color:#3b1e5a;">${item.name || ''}</td><td onclick="openWhatsApp('${item.phone}')" style="cursor:pointer; font-family:Tahoma;">${item.phone || ''}</td><td>${item.dip.number || ''}</td><td>${item.cert_received_at || '-'}</td><td style="font-size:12px; color:#666;">${item.cert_received_by || '-'}</td><td><button class="delete-btn" style="margin:0; padding:5px 12px;" onclick="toggleCertReceived('${item.dipId}', '${purePhone}', false)">تراجع ↩️</button></td></tr>`;
+            html += `<tr>
+                <td style="background:#f0f0f0; font-weight:bold; color:#3b1e5a;">${index + 1}</td>
+                <td style="font-weight:bold; color:#3b1e5a;">${escapeForAttr(item.name || '')}</td>
+                <td onclick="openWhatsApp('${item.phone}')" style="cursor:pointer; font-family:Tahoma;">${escapeForAttr(item.phone || '')}</td>
+                <td>${escapeForAttr(item.college || '-')}</td>
+                <td>${escapeForAttr(item.dip.number || '')}</td>
+                <td>${escapeForAttr(item.cert_received_at || '-')}</td>
+                <td style="font-size:12px; color:#666;">${escapeForAttr(item.cert_received_by || '-')}</td>
+                <td><button class="delete-btn" style="margin:0; padding:5px 12px;" onclick="toggleCertReceived('${item.dipId}', '${purePhone}', false)">تراجع ↩️</button></td>
+            </tr>`;
         });
         html += `</tbody></table></div>`;
         container.innerHTML = html;
     }
+
+    /* ============ تصدير الشهادات المستحقة لإكسيل ============ */
+    window.exportCertDueToExcel = function() {
+        const groups = buildCertGroups();
+        const g = groups[currentCertGroup] || { due: [], graduates: [] };
+        const list = g.due || [];
+        if (list.length === 0) { alert('لا توجد شهادات مستحقة لتصديرها.'); return; }
+        let headerHtml = `<tr><th>#</th><th>الاسم</th><th>الهاتف</th><th>الكلية</th><th>رقم الدورة</th></tr>`;
+        let rowsHtml = '';
+        list.forEach((item, index) => {
+            rowsHtml += `<tr><td style="text-align:center;">${index + 1}</td><td style="font-weight:bold;">${escapeForAttr(item.name || '')}</td><td style="text-align:center; mso-number-format:'\\@';">${escapeForAttr(item.phone || '')}</td><td>${escapeForAttr(item.college || '-')}</td><td style="text-align:center;">${escapeForAttr(item.dip.number || '')}</td></tr>`;
+        });
+        const html = `<html dir="rtl" lang="ar"><head><meta charset="UTF-8"><style>body { font-family: Tahoma, Arial, sans-serif; } h2 { text-align: center; color: #3b1e5a; margin-bottom: 4px; } table { width: 100%; border-collapse: collapse; direction: rtl; } th { background: #fcc01a; color: #3b1e5a; padding: 8px; border: 1px solid #999; text-align: center; font-size: 13px; } td { padding: 6px; border: 1px solid #999; font-size: 12px; }</style></head><body><h2>شهادات مستحقة - ${escapeForAttr(currentCertGroup || '')}</h2><p style="text-align:center; color:#666; font-size:12px;">تاريخ التصدير: ${getLocalDateTimeString()}</p><p style="text-align:center; color:#666; font-size:12px;"><b>عدد الطلاب: ${list.length}</b></p><table border="1"><thead>${headerHtml}</thead><tbody>${rowsHtml}</tbody></table></body></html>`;
+        const blob = new Blob(['\ufeff', html], { type: 'application/vnd.ms-excel' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `شهادات_مستحقة_${currentCertGroup || ''}_${getLocalDateString()}.xls`;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    };
+
+    /* ============ تصدير الخريجين لإكسيل ============ */
+    window.exportCertGraduatesToExcel = function() {
+        const groups = buildCertGroups();
+        const g = groups[currentCertGroup] || { due: [], graduates: [] };
+        const list = g.graduates || [];
+        if (list.length === 0) { alert('لا يوجد خريجين لتصديرهم.'); return; }
+        let headerHtml = `<tr><th>#</th><th>الاسم</th><th>الهاتف</th><th>الكلية</th><th>رقم الدورة</th><th>تاريخ الاستلام</th><th>بواسطة</th></tr>`;
+        let rowsHtml = '';
+        list.forEach((item, index) => {
+            rowsHtml += `<tr><td style="text-align:center;">${index + 1}</td><td style="font-weight:bold;">${escapeForAttr(item.name || '')}</td><td style="text-align:center; mso-number-format:'\\@';">${escapeForAttr(item.phone || '')}</td><td>${escapeForAttr(item.college || '-')}</td><td style="text-align:center;">${escapeForAttr(item.dip.number || '')}</td><td style="text-align:center;">${escapeForAttr(item.cert_received_at || '-')}</td><td>${escapeForAttr(item.cert_received_by || '-')}</td></tr>`;
+        });
+        const html = `<html dir="rtl" lang="ar"><head><meta charset="UTF-8"><style>body { font-family: Tahoma, Arial, sans-serif; } h2 { text-align: center; color: #3b1e5a; margin-bottom: 4px; } table { width: 100%; border-collapse: collapse; direction: rtl; } th { background: #fcc01a; color: #3b1e5a; padding: 8px; border: 1px solid #999; text-align: center; font-size: 13px; } td { padding: 6px; border: 1px solid #999; font-size: 12px; }</style></head><body><h2>خريجين - ${escapeForAttr(currentCertGroup || '')}</h2><p style="text-align:center; color:#666; font-size:12px;">تاريخ التصدير: ${getLocalDateTimeString()}</p><p style="text-align:center; color:#666; font-size:12px;"><b>عدد الخريجين: ${list.length}</b></p><table border="1"><thead>${headerHtml}</thead><tbody>${rowsHtml}</tbody></table></body></html>`;
+        const blob = new Blob(['\ufeff', html], { type: 'application/vnd.ms-excel' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `خريجين_${currentCertGroup || ''}_${getLocalDateString()}.xls`;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    };
 
     window.toggleCertReceived = async function(dipId, purePhone, thirdParam) {
         let isReceived, checkboxElem = null;
@@ -3407,14 +3371,35 @@
     let activeViewerCourseName = null;
     let activeViewerTaskKey = null;
 
+    /* ✅ Search from diploma_students (groups) instead of records */
     window.handleSearch = function(query) {
         const container = document.getElementById('search-suggestions');
         if (!container) return;
-
         const q = String(query || '').trim();
         if (!q) { container.style.display = 'none'; return; }
 
-        if (!Array.isArray(allStudents) || allStudents.length === 0) {
+        const phoneMap = new Map();
+        Object.keys(allDiplomaStudents || {}).forEach(dipId => {
+            const stds = allDiplomaStudents[dipId] || {};
+            const dip = allDiplomas[dipId] || {};
+            Object.keys(stds).forEach(sid => {
+                const st = stds[sid];
+                if (!st) return;
+                const phone = extractPureNumber(st.phone);
+                if (!phone) return;
+                if (!phoneMap.has(phone)) {
+                    phoneMap.set(phone, {
+                        name: st.name || '',
+                        phone: st.phone || '',
+                        group: dip.number || '',
+                        diplomaName: dip.name || ''
+                    });
+                }
+            });
+        });
+
+        const uniqueStudents = Array.from(phoneMap.values());
+        if (uniqueStudents.length === 0) {
             container.innerHTML = '<div class="suggestion-item" style="color:#cc0000; font-weight:bold;">لا توجد بيانات طلاب محملة</div>';
             container.style.display = 'block';
             return;
@@ -3422,15 +3407,6 @@
 
         const qNorm = normalizeArabic(q);
         const qPure = extractPureNumber(q);
-
-        const phoneMap = new Map();
-        const sortedAll = [...allStudents].sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
-        sortedAll.forEach(s => {
-            const phone = extractPureNumber(s.phone);
-            if (phone) phoneMap.set(phone, s);
-        });
-
-        const uniqueStudents = Array.from(phoneMap.values());
 
         const matches = uniqueStudents.filter(s => {
             const nameMatch = s.name && normalizeArabic(s.name).includes(qNorm);
@@ -3446,7 +3422,10 @@
                 const safeName = escapeForAttr(s.name || '');
                 const safePhone = escapeForAttr(s.phone || '');
                 const jsPhone = escapeForJs(s.phone || '');
-                return `<div class="suggestion-item" onclick="selectStudent('${jsPhone}')">${safeName} - <span style="color:#666; font-size:13px;">${safePhone}</span></div>`;
+                const groupInfo = s.group
+                    ? ` - <span style="color:#28a745; font-size:12px; font-weight:bold;">جروب ${escapeForAttr(s.group)}</span>`
+                    : '';
+                return `<div class="suggestion-item" onclick="selectStudent('${jsPhone}')">${safeName} - <span style="color:#666; font-size:13px;">${safePhone}</span>${groupInfo}</div>`;
             }).join('');
         }
         container.style.display = 'block';
@@ -3488,11 +3467,7 @@
         const diplomaName = dip ? (dip.name || '').trim() : '';
         const sharedKey = makeSharedConfigKey(diplomaName, courseName);
         const tData = (sharedPdfTasks[sharedKey] && sharedPdfTasks[sharedKey].pdfTasks && sharedPdfTasks[sharedKey].pdfTasks[taskKey]) || {};
-
-        if (tData.page && /^https?:\/\//i.test(tData.page)) {
-            window.open(tData.page, '_blank', 'noopener');
-            return;
-        }
+        if (tData.page && /^https?:\/\//i.test(tData.page)) { window.open(tData.page, '_blank', 'noopener'); return; }
         if (tData.images && tData.images.length > 0) {
             activeViewerDiplomaId = diplomaId;
             activeViewerCourseName = courseName;
@@ -3500,9 +3475,7 @@
             document.getElementById('viewer-task-title').innerText = `${courseName} - Task ${taskNum}`;
             const imgContainer = document.getElementById('viewer-task-container');
             imgContainer.innerHTML = '';
-            tData.images.forEach(imgSrc => {
-                imgContainer.innerHTML += `<img src="${imgSrc}" class="protected-task-img" oncontextmenu="return false;" ondragstart="return false;">`;
-            });
+            tData.images.forEach(imgSrc => { imgContainer.innerHTML += `<img src="${imgSrc}" class="protected-task-img" oncontextmenu="return false;" ondragstart="return false;">`; });
             imgContainer.style.display = 'block';
             const notesEl = document.getElementById('viewer-task-notes');
             const formattedNotes = formatSmartTaskNotes(tData.page, tData.comment);
@@ -4093,6 +4066,24 @@
             studentPhone = allStudentRecords[allStudentRecords.length - 1].phone;
             pureGroupNum = extractPureNumber(allStudentRecords[allStudentRecords.length - 1].group);
             validRecords = allStudentRecords.filter(s => !s.canceled && s.date && s.date !== "بدون موعد");
+        } else {
+            // fallback: search from diploma_students
+            let foundInfo = false;
+            Object.keys(allDiplomaStudents || {}).forEach(dipId => {
+                if (foundInfo) return;
+                const stds = allDiplomaStudents[dipId] || {};
+                Object.keys(stds).forEach(sid => {
+                    if (foundInfo) return;
+                    const st = stds[sid];
+                    if (st && extractPureNumber(st.phone) === targetPhone) {
+                        latestName = st.name || 'طالب';
+                        studentPhone = st.phone || targetPhone;
+                        const dip = allDiplomas[dipId] || {};
+                        if (dip.number) pureGroupNum = extractPureNumber(dip.number);
+                        foundInfo = true;
+                    }
+                });
+            });
         }
         let absent = validRecords.filter(s => !s.attended && isPeriodPassed(s.date, s.time)).length;
         document.getElementById('report-name').innerText = 'السجل الأكاديمي: ' + latestName;
