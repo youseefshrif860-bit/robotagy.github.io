@@ -705,6 +705,16 @@
         return String(name || '').trim().toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
     }
 
+    /* ============ ترتيب حسب الكلية ============ */
+    function compareByCollege(a, b) {
+        const ca = String((a && a.college) || '').trim();
+        const cb = String((b && b.college) || '').trim();
+        if (!ca && !cb) return 0;
+        if (!ca) return 1;   // بدون كلية تروح الآخر
+        if (!cb) return -1;
+        return ca.localeCompare(cb, 'ar');
+    }
+
     function filterEnrolledCourses(coursesArr, student) {
         if (!Array.isArray(coursesArr)) return [];
         if (!student || typeof student !== 'object') return coursesArr.slice();
@@ -2574,6 +2584,8 @@
             const snap = await database.ref('new_system/diploma_students/' + currentDiplomaId).get();
             const students = snap.exists() ? snap.val() : {};
             const keys = Object.keys(students);
+            /* ====== ترتيب حسب الكلية ====== */
+            keys.sort((a, b) => compareByCollege(students[a], students[b]));
             let html = `<div class="excel-table-container"><table class="excel-table"><thead><tr><th style="width: 40px;">#</th><th>الاسم</th><th>الهاتف</th><th>الكلية</th><th>العنوان</th><th>الرسوم</th>${(dip.courses || []).map(c => `<th>${c.name}<br><span style="font-size: 11px; font-weight: normal; color: #ddd;">(${c.lectures})</span></th>`).join('')}<th>إجراء</th></tr></thead><tbody>`;
             if (keys.length === 0) html += `<tr><td colspan="${6 + (dip.courses || []).length + 1}" style="padding: 20px; color: #888; text-align: center;">لا يوجد طلاب مسجلين في هذه الدورة</td></tr>`;
             else {
@@ -2718,6 +2730,8 @@
         if (!dip) { alert('الدورة غير موجودة.'); return; }
         const students = allDiplomaStudents[currentDiplomaId] || {};
         const keys = Object.keys(students);
+        /* ====== ترتيب حسب الكلية ====== */
+        keys.sort((a, b) => compareByCollege(students[a], students[b]));
         if (keys.length === 0) { alert('لا يوجد طلاب في هذه الدورة لتصديرهم.'); return; }
         const defaultPrice = dip.price || 0;
         const courses = dip.courses || [];
@@ -2907,6 +2921,8 @@
         let progressMap = {};
         try { const progSnap = await database.ref('new_system/student_progress').get(); progressMap = progSnap.exists() ? progSnap.val() : {}; } catch(e) {}
         const keys = Object.keys(students);
+        /* ====== ترتيب حسب الكلية ====== */
+        keys.sort((a, b) => compareByCollege(students[a], students[b]));
         const courseList = dip.courses || [];
         const diplomaGroupNum = extractPureNumber(dip.number);
         let html = `<div class="excel-table-container"><table class="excel-table"><thead><tr><th style="width: 40px;">#</th><th>الاسم</th><th>الرقم</th><th>الكلية</th><th style="background:#28a745;">Wires</th>${courseList.map(c => `<th>${c.name}</th>`).join('')}<th class="no-export">إجراء</th></tr></thead><tbody>`;
@@ -3178,6 +3194,8 @@
     };
 
     function renderCertDueList(list) {
+        /* ====== ترتيب حسب الكلية ====== */
+        list.sort(compareByCollege);
         const container = document.getElementById('cert-due-container');
         if (list.length === 0) { container.innerHTML = '<div class="empty-state" style="background: white; color: #888; border-radius: 10px; padding: 30px;">لا توجد شهادات مستحقة</div>'; return; }
         let html = `<div class="excel-table-container"><table class="excel-table"><thead><tr><th style="width: 40px;">#</th><th>الاسم</th><th>الهاتف</th><th>الكلية</th><th>رقم الدورة</th><th style="width: 100px;">تم الاستلام</th></tr></thead><tbody>`;
@@ -3196,6 +3214,8 @@
     }
 
     function renderCertGraduatesList(list) {
+        /* ====== ترتيب حسب الكلية ====== */
+        list.sort(compareByCollege);
         const container = document.getElementById('cert-graduates-container');
         if (list.length === 0) { container.innerHTML = '<div class="empty-state" style="background: white; color: #888; border-radius: 10px; padding: 30px;">لا يوجد خريجين</div>'; return; }
         let html = `<div class="excel-table-container"><table class="excel-table"><thead><tr><th style="width: 40px;">#</th><th>الاسم</th><th>الهاتف</th><th>الكلية</th><th>رقم الدورة</th><th>تاريخ الاستلام</th><th>بواسطة</th><th>إجراء</th></tr></thead><tbody>`;
@@ -3220,7 +3240,7 @@
     window.exportCertDueToExcel = function() {
         const groups = buildCertGroups();
         const g = groups[currentCertGroup] || { due: [], graduates: [] };
-        const list = g.due || [];
+        const list = (g.due || []).slice().sort(compareByCollege);
         if (list.length === 0) { alert('لا توجد شهادات مستحقة لتصديرها.'); return; }
         let headerHtml = `<tr><th>#</th><th>الاسم</th><th>الهاتف</th><th>الكلية</th><th>رقم الدورة</th></tr>`;
         let rowsHtml = '';
@@ -3241,7 +3261,7 @@
     window.exportCertGraduatesToExcel = function() {
         const groups = buildCertGroups();
         const g = groups[currentCertGroup] || { due: [], graduates: [] };
-        const list = g.graduates || [];
+        const list = (g.graduates || []).slice().sort(compareByCollege);
         if (list.length === 0) { alert('لا يوجد خريجين لتصديرهم.'); return; }
         let headerHtml = `<tr><th>#</th><th>الاسم</th><th>الهاتف</th><th>الكلية</th><th>رقم الدورة</th><th>تاريخ الاستلام</th><th>بواسطة</th></tr>`;
         let rowsHtml = '';
@@ -3371,7 +3391,6 @@
     let activeViewerCourseName = null;
     let activeViewerTaskKey = null;
 
-    /* ✅ Search from diploma_students (groups) instead of records */
     window.handleSearch = function(query) {
         const container = document.getElementById('search-suggestions');
         if (!container) return;
@@ -4067,7 +4086,6 @@
             pureGroupNum = extractPureNumber(allStudentRecords[allStudentRecords.length - 1].group);
             validRecords = allStudentRecords.filter(s => !s.canceled && s.date && s.date !== "بدون موعد");
         } else {
-            // fallback: search from diploma_students
             let foundInfo = false;
             Object.keys(allDiplomaStudents || {}).forEach(dipId => {
                 if (foundInfo) return;
