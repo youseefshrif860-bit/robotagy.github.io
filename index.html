@@ -28,6 +28,18 @@
         table { width: 100%; border-collapse: collapse; margin-top: 15px; background-color: white; color: black; border-radius: 5px; overflow: hidden; }
         th, td { border: 1px solid #ddd; padding: 8px 6px; text-align: center; font-size: 14px; white-space: nowrap; }
         th { background-color: #fcc01a; color: #3b1e5a; font-size: 14px; padding: 10px 6px; }
+        .followup-btn { position: relative; background: #f8f5fb; border: 2px solid #c5b8d8; color: #8a7aa0; border-radius: 50%; width: 36px; height: 36px; font-size: 17px; cursor: pointer; padding: 0; line-height: 1; transition: all 0.2s; }
+        .followup-btn:hover { border-color: #fcc01a; }
+        .followup-btn.has-notes { background: #fcc01a; border-color: #3b1e5a; color: #3b1e5a; box-shadow: 0 0 0 3px rgba(252,192,26,0.35); }
+        .followup-badge { position: absolute; top: -6px; right: -6px; background: #cc0000; color: #fff; border-radius: 10px; min-width: 18px; height: 18px; font-size: 11px; font-weight: bold; line-height: 18px; padding: 0 4px; box-sizing: border-box; }
+        .followup-item { background: #f8f5fb; border-right: 4px solid #fcc01a; border-radius: 6px; padding: 10px 12px; margin-bottom: 10px; }
+        .followup-item-text { color: #3b1e5a; font-size: 15px; line-height: 1.7; white-space: pre-wrap; word-break: break-word; }
+        .followup-item-meta { color: #999; font-size: 11px; margin-top: 6px; }
+        #edit-student-info-modal input { border: 2px solid #c5b8d8; background: #f8f5fb; padding: 11px; border-radius: 8px; margin-bottom: 10px; font-size: 15px; width: 100%; box-sizing: border-box; }
+        #edit-student-info-modal input:focus { border-color: #fcc01a; background: #fff; outline: none; box-shadow: 0 0 0 3px rgba(252,192,26,0.2); }
+        #edit-student-info-modal label { display: block; font-size: 13px; font-weight: bold; color: #3b1e5a; margin-bottom: 4px; }
+        #followup-new-text { width: 100%; box-sizing: border-box; border: 2px solid #c5b8d8; background: #f8f5fb; border-radius: 8px; padding: 10px; font-size: 15px; font-family: inherit; resize: vertical; min-height: 70px; }
+        #followup-new-text:focus { border-color: #fcc01a; background: #fff; outline: none; }
         .delete-btn { background-color: #ff4d4d; color: white; border: none; padding: 6px 12px; border-radius: 3px; cursor: pointer; font-weight: bold; font-size: 13px; }
         .delete-all-btn { background-color: #cc0000; color: white; border: none; padding: 11px 16px; border-radius: 5px; cursor: pointer; font-weight: bold; margin-bottom: 15px; font-size: 15px; }
         .nav-btn { background-color: #fcc01a; color: #3b1e5a; border: none; padding: 16px; font-size: 19px; font-weight: bold; cursor: pointer; border-radius: 5px; text-align: center; width: 100%; margin-bottom: 10px; transition: 0.3s; }
@@ -330,6 +342,35 @@
         <strong style="color: #ff4d4d; display: block; margin-bottom: 10px; font-size: 17px;">تنبيه النظام</strong>
         <p id="error-modal-msg" style="margin: 0; color: black; line-height: 1.8; font-size: 15px; font-weight: bold;"></p>
         <button class="modal-close-btn" style="background-color: #ff4d4d;" onclick="closeErrorModal()">إغلاق</button>
+    </div>
+</div>
+
+<div class="modal-overlay" id="followup-modal" style="z-index: 100001;">
+    <div class="modal-content" style="max-width: 460px; text-align: right;">
+        <h3 style="color:#3b1e5a; margin-top:0; border-bottom: 2px solid #fcc01a; padding-bottom: 10px;">💬 متابعة الطالب</h3>
+        <div id="followup-student-name" style="font-size: 14px; font-weight: bold; color: #3b1e5a; margin-bottom: 12px;"></div>
+        <div id="followup-list" style="max-height: 40vh; overflow-y: auto; margin-bottom: 12px;"></div>
+        <textarea id="followup-new-text" placeholder="اكتب تعليق متابعة جديد..."></textarea>
+        <button class="submit-btn" id="followup-save-btn" style="margin-top: 10px;" onclick="saveFollowup()">💾 إضافة التعليق</button>
+        <button class="back-btn" style="width:100%; margin-top:10px; border: 1px solid #ddd;" onclick="closeFollowupModal()">إغلاق</button>
+    </div>
+</div>
+
+<div class="modal-overlay" id="edit-student-info-modal" style="z-index: 100000;">
+    <div class="modal-content" style="max-width: 440px; text-align: right;">
+        <h3 style="color:#3b1e5a; margin-top:0; border-bottom: 2px solid #fcc01a; padding-bottom: 10px;">✏️ تعديل بيانات الطالب</h3>
+        <label>الاسم</label>
+        <input type="text" id="edit-st-name" placeholder="الاسم">
+        <label>رقم الهاتف (11 رقم)</label>
+        <input type="tel" id="edit-st-phone" placeholder="رقم الهاتف">
+        <label>البريد الإلكتروني</label>
+        <input type="email" id="edit-st-email" placeholder="البريد الإلكتروني (اختياري)" dir="ltr" style="text-align:right;">
+        <label>الكلية</label>
+        <input type="text" id="edit-st-college" placeholder="الكلية">
+        <label>العنوان</label>
+        <input type="text" id="edit-st-address" placeholder="العنوان">
+        <button class="submit-btn" style="margin-top: 6px;" onclick="saveStudentInfo()">💾 حفظ التعديل</button>
+        <button class="back-btn" style="width:100%; margin-top:10px; border: 1px solid #ddd;" onclick="closeEditStudentInfoModal()">إلغاء</button>
     </div>
 </div>
 
@@ -2516,7 +2557,7 @@
                 const dipA = allDiplomasData[a.dipId] || {}; const dipB = allDiplomasData[b.dipId] || {};
                 return (isLabDiplomaActive(dipB, todayStr) ? 1 : 0) - (isLabDiplomaActive(dipA, todayStr) ? 1 : 0);
             });
-            let html = `<div style="background: linear-gradient(135deg, #f8f5fb, #efe9f5); border: 2px solid #fcc01a; border-radius: 10px; padding: 18px; margin-bottom: 20px;"><div style="font-size: 22px; font-weight: bold; color: #3b1e5a; margin-bottom: 12px;">👤 ${escapeForAttr(firstSt.name || 'بدون اسم')}</div><div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; font-size: 15px; color: #3b1e5a;"><div>📞 <b>الهاتف:</b> <span onclick="openWhatsApp('${firstSt.phone}')" style="cursor:pointer; color:#0066cc; text-decoration:underline;">${escapeForAttr(firstSt.phone || '-')}</span></div><div>🏠 <b>العنوان:</b> ${escapeForAttr(firstSt.address || '-')}</div><div>🎓 <b>الكلية:</b> ${escapeForAttr(firstSt.college || '-')}</div><div>📚 <b>عدد الدورات:</b> ${enrollments.length}</div></div></div>`;
+            let html = `<div style="background: linear-gradient(135deg, #f8f5fb, #efe9f5); border: 2px solid #fcc01a; border-radius: 10px; padding: 18px; margin-bottom: 20px;"><div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom: 12px;"><div style="font-size: 22px; font-weight: bold; color: #3b1e5a;">👤 ${escapeForAttr(firstSt.name || 'بدون اسم')}</div><button onclick="openEditStudentInfoModal('${escapeForJs(firstSt.phone || '')}')" style="background:#fcc01a; color:#3b1e5a; border:none; border-radius:5px; padding:6px 12px; font-size:13px; font-weight:bold; cursor:pointer; white-space:nowrap;">✏️ تعديل البيانات</button></div><div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; font-size: 15px; color: #3b1e5a;"><div>📞 <b>الهاتف:</b> <span onclick="openWhatsApp('${firstSt.phone}')" style="cursor:pointer; color:#0066cc; text-decoration:underline;">${escapeForAttr(firstSt.phone || '-')}</span></div><div>🏠 <b>العنوان:</b> ${escapeForAttr(firstSt.address || '-')}</div><div>🎓 <b>الكلية:</b> ${escapeForAttr(firstSt.college || '-')}</div><div>📚 <b>عدد الدورات:</b> ${enrollments.length}</div></div></div>`;
             html += `<h4 style="color:#3b1e5a; border-bottom: 2px solid #fcc01a; padding-bottom: 8px; margin-bottom: 15px; font-size: 16px;">📚 الدورات المسجل بها وتقدمه</h4>`;
             enrollments.forEach(enr => {
                 const dip = allDiplomasData[enr.dipId] || {};
@@ -2576,6 +2617,152 @@
         } catch(e) { body.innerHTML = `<div style="text-align:center; padding:20px; color:#cc0000; font-weight:bold;">خطأ: ${escapeForAttr(e.message)}</div>`; }
     };
 
+    /* ============ المتابعة (تعليقات الطلاب) ============ */
+    let followupDipId = null;
+    let followupStudentId = null;
+
+    const followupBtnHtml = (dipId, sid, st) => {
+        const n = st && st.followups ? Object.keys(st.followups).length : 0;
+        const title = n ? `${n} تعليق متابعة — اضغط للعرض` : 'لا توجد تعليقات — اضغط للإضافة';
+        return `<button class="followup-btn ${n ? 'has-notes' : ''}" onclick="openFollowupModal('${escapeForJs(dipId)}', '${escapeForJs(sid)}')" title="${title}">💬${n ? `<span class="followup-badge">${n}</span>` : ''}</button>`;
+    };
+
+    const refreshStudentTablesAfterChange = async () => {
+        const dd = document.getElementById('diploma-detail-view');
+        if (currentDiplomaId && dd && dd.style.display === 'block') await renderDiplomaStudents();
+        const lg = document.getElementById('lab-group-copy-detail-view');
+        if (currentLabDipId && lg && lg.style.display === 'block') await renderLabDipCopyStudents();
+    };
+
+    const renderFollowupList = (followups) => {
+        const list = document.getElementById('followup-list');
+        const ids = Object.keys(followups || {}).sort((a, b) => (followups[b].ts || 0) - (followups[a].ts || 0));
+        if (ids.length === 0) { list.innerHTML = '<div style="text-align:center; color:#999; padding:14px; font-size:14px;">لا توجد تعليقات سابقة لهذا الطالب</div>'; return; }
+        list.innerHTML = ids.map(id => {
+            const f = followups[id];
+            return `<div class="followup-item"><div class="followup-item-text">${escapeForAttr(f.text || '')}</div><div class="followup-item-meta">🕒 ${escapeForAttr(f.at || '')} • 👤 ${escapeForAttr(f.by || 'غير معروف')}</div></div>`;
+        }).join('');
+    };
+
+    window.openFollowupModal = async function(dipId, sid) {
+        if (!auth.currentUser) { showErrorModal('هذه الميزة للإدارة فقط.'); return; }
+        followupDipId = dipId; followupStudentId = sid;
+        document.getElementById('followup-new-text').value = '';
+        document.getElementById('followup-list').innerHTML = '<div style="text-align:center; color:#666; padding:14px;">⏳ جاري التحميل...</div>';
+        document.getElementById('followup-modal').style.display = 'flex';
+        try {
+            const snap = await database.ref(`new_system/diploma_students/${dipId}/${sid}`).get();
+            const st = snap.exists() ? snap.val() : {};
+            document.getElementById('followup-student-name').innerText = '👤 ' + (st.name || '');
+            renderFollowupList(st.followups || {});
+        } catch(e) { document.getElementById('followup-list').innerHTML = `<div style="color:#cc0000; padding:10px;">خطأ: ${escapeForAttr(e.message)}</div>`; }
+    };
+
+    window.closeFollowupModal = function() {
+        followupDipId = null; followupStudentId = null;
+        document.getElementById('followup-modal').style.display = 'none';
+    };
+
+    window.saveFollowup = async function() {
+        if (!followupDipId || !followupStudentId) return;
+        const text = document.getElementById('followup-new-text').value.trim();
+        if (!text) { alert('يرجى كتابة التعليق أولاً.'); return; }
+        const btn = document.getElementById('followup-save-btn');
+        const dipId = followupDipId, sid = followupStudentId;
+        btn.disabled = true;
+        try {
+            const base = `new_system/diploma_students/${dipId}/${sid}/followups`;
+            await database.ref(base).push({ text, by: currentAdminName || 'غير معروف', at: getLocalDateTimeString(), ts: Date.now() });
+            document.getElementById('followup-new-text').value = '';
+            const snap = await database.ref(base).get();
+            renderFollowupList(snap.exists() ? snap.val() : {});
+            await refreshStudentTablesAfterChange();
+        } catch(e) { alert('خطأ: ' + e.message); }
+        finally { btn.disabled = false; }
+    };
+
+    /* ============ تعديل البيانات الشخصية للطالب ============ */
+    let editingInfoOldPhone = null;
+    let editingInfoReportPhone = null;
+
+    window.openEditStudentInfoModal = async function(phone) {
+        const pure = extractPureNumber(phone); if (!pure) return;
+        try {
+            const snap = await database.ref('new_system/diploma_students').get();
+            const all = snap.exists() ? snap.val() : {};
+            let found = null;
+            Object.keys(all).forEach(dipId => Object.values(all[dipId] || {}).forEach(st => { if (!found && st && extractPureNumber(st.phone) === pure) found = st; }));
+            if (!found) { alert('الطالب غير موجود'); return; }
+            editingInfoOldPhone = pure;
+            document.getElementById('edit-st-name').value = found.name || '';
+            document.getElementById('edit-st-phone').value = found.phone || pure;
+            document.getElementById('edit-st-email').value = found.email || '';
+            document.getElementById('edit-st-college').value = found.college || '';
+            document.getElementById('edit-st-address').value = found.address || '';
+            document.getElementById('edit-student-info-modal').style.display = 'flex';
+        } catch(e) { alert('خطأ: ' + e.message); }
+    };
+
+    window.closeEditStudentInfoModal = function() {
+        editingInfoOldPhone = null;
+        document.getElementById('edit-student-info-modal').style.display = 'none';
+    };
+
+    window.saveStudentInfo = async function() {
+        if (!editingInfoOldPhone) return;
+        const oldPhone = editingInfoOldPhone;
+        const name = document.getElementById('edit-st-name').value.trim();
+        const phone = extractPureNumber(document.getElementById('edit-st-phone').value);
+        const email = document.getElementById('edit-st-email').value.trim();
+        const college = document.getElementById('edit-st-college').value.trim();
+        const address = document.getElementById('edit-st-address').value.trim();
+        if (!name || phone.length !== 11) { alert('يرجى إدخال الاسم ورقم هاتف صحيح (11 رقم).'); return; }
+        if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { alert('صيغة البريد الإلكتروني غير صحيحة.'); return; }
+        try {
+            const snap = await database.ref('new_system/diploma_students').get();
+            const all = snap.exists() ? snap.val() : {};
+            const updates = {};
+            let count = 0;
+            Object.keys(all).forEach(dipId => {
+                Object.keys(all[dipId] || {}).forEach(sid => {
+                    const st = all[dipId][sid];
+                    const p = extractPureNumber(st && st.phone);
+                    if (p === oldPhone) {
+                        const b = `new_system/diploma_students/${dipId}/${sid}`;
+                        updates[`${b}/name`] = name; updates[`${b}/phone`] = phone;
+                        updates[`${b}/college`] = college; updates[`${b}/address`] = address;
+                        updates[`${b}/email`] = email || null;
+                        count++;
+                    } else if (phone !== oldPhone && p === phone) {
+                        throw new Error('رقم الهاتف الجديد مسجل بالفعل لطالب آخر.');
+                    }
+                });
+            });
+            if (count === 0) { alert('الطالب غير موجود'); return; }
+            if (phone !== oldPhone) {
+                /* نقل بيانات التقدّم وتحديث سجلات الحجز المرتبطة بالرقم القديم */
+                const progSnap = await database.ref('new_system/student_progress/' + oldPhone).get();
+                if (progSnap.exists()) {
+                    const newProg = await database.ref('new_system/student_progress/' + phone).get();
+                    if (newProg.exists()) throw new Error('يوجد بيانات تقدّم مسجلة للرقم الجديد بالفعل.');
+                    updates['new_system/student_progress/' + phone] = progSnap.val();
+                    updates['new_system/student_progress/' + oldPhone] = null;
+                }
+            }
+            (allStudents || []).forEach(s => {
+                if (extractPureNumber(s.phone) === oldPhone && s.id) {
+                    updates[`new_system/students/${s.id}/name`] = name;
+                    if (phone !== oldPhone) updates[`new_system/students/${s.id}/phone`] = phone;
+                }
+            });
+            await database.ref().update(updates);
+            alert('✅ تم حفظ بيانات الطالب');
+            closeEditStudentInfoModal();
+            await refreshStudentTablesAfterChange();
+            await openDiplomaStudentReport(phone);
+        } catch(e) { alert('خطأ: ' + e.message); }
+    };
+
     window.renderDiplomaStudents = async function() {
         const container = document.getElementById('diploma-students-container');
         const dip = allDiplomas[currentDiplomaId]; if (!dip) return;
@@ -2586,8 +2773,8 @@
             const keys = Object.keys(students);
             /* ====== ترتيب حسب الكلية ====== */
             keys.sort((a, b) => compareByCollege(students[a], students[b]));
-            let html = `<div class="excel-table-container"><table class="excel-table"><thead><tr><th style="width: 40px;">#</th><th>الاسم</th><th>الهاتف</th><th>الكلية</th><th>العنوان</th><th>الرسوم</th>${(dip.courses || []).map(c => `<th>${c.name}<br><span style="font-size: 11px; font-weight: normal; color: #ddd;">(${c.lectures})</span></th>`).join('')}<th>إجراء</th></tr></thead><tbody>`;
-            if (keys.length === 0) html += `<tr><td colspan="${6 + (dip.courses || []).length + 1}" style="padding: 20px; color: #888; text-align: center;">لا يوجد طلاب مسجلين في هذه الدورة</td></tr>`;
+            let html = `<div class="excel-table-container"><table class="excel-table"><thead><tr><th style="width: 40px;">#</th><th>الاسم</th><th>الهاتف</th><th>الكلية</th><th>العنوان</th><th>الرسوم</th>${(dip.courses || []).map(c => `<th>${c.name}<br><span style="font-size: 11px; font-weight: normal; color: #ddd;">(${c.lectures})</span></th>`).join('')}<th>المتابعة</th><th>إجراء</th></tr></thead><tbody>`;
+            if (keys.length === 0) html += `<tr><td colspan="${6 + (dip.courses || []).length + 2}" style="padding: 20px; color: #888; text-align: center;">لا يوجد طلاب مسجلين في هذه الدورة</td></tr>`;
             else {
                 keys.forEach((sid, index) => {
                     const st = students[sid];
@@ -2617,6 +2804,7 @@
                         }
                         html += `</div></td>`;
                     });
+                    html += `<td style="padding: 6px; border: 1px solid #ddd; text-align: center;">${followupBtnHtml(currentDiplomaId, sid, st)}</td>`;
                     html += `<td style="padding: 6px; border: 1px solid #ddd; text-align: center;"><button class="delete-btn" style="margin:0; padding:4px 8px; font-size:12px;" onclick="deleteDiplomaStudent('${sid}')">حذف</button></td></tr>`;
                 });
             }
@@ -2925,8 +3113,8 @@
         keys.sort((a, b) => compareByCollege(students[a], students[b]));
         const courseList = dip.courses || [];
         const diplomaGroupNum = extractPureNumber(dip.number);
-        let html = `<div class="excel-table-container"><table class="excel-table"><thead><tr><th style="width: 40px;">#</th><th>الاسم</th><th>الرقم</th><th>الكلية</th><th style="background:#28a745;">Wires</th>${courseList.map(c => `<th>${c.name}</th>`).join('')}<th class="no-export">إجراء</th></tr></thead><tbody>`;
-        if (keys.length === 0) html += `<tr><td colspan="${6 + courseList.length}" style="padding: 20px; color: #888; text-align: center;">لا يوجد طلاب مسجلين في هذه الدورة</td></tr>`;
+        let html = `<div class="excel-table-container"><table class="excel-table"><thead><tr><th style="width: 40px;">#</th><th>الاسم</th><th>الرقم</th><th>الكلية</th><th style="background:#28a745;">Wires</th>${courseList.map(c => `<th>${c.name}</th>`).join('')}<th class="no-export">المتابعة</th><th class="no-export">إجراء</th></tr></thead><tbody>`;
+        if (keys.length === 0) html += `<tr><td colspan="${7 + courseList.length}" style="padding: 20px; color: #888; text-align: center;">لا يوجد طلاب مسجلين في هذه الدورة</td></tr>`;
         else {
             keys.forEach((sid, index) => {
                 const st = students[sid];
@@ -2968,6 +3156,7 @@
                     const color = isDone ? '#28a745' : (completed > 0 ? '#fcc01a' : '#cc0000');
                     html += `<td style="padding: 6px; border: 1px solid #ddd; text-align: center; font-weight: bold; color: ${color};">${completed} / ${totalTasks}</td>`;
                 });
+                html += `<td class="no-export" style="padding: 6px; border: 1px solid #ddd; text-align: center;">${followupBtnHtml(currentLabDipId, sid, st)}</td>`;
                 html += `<td class="no-export" style="padding: 6px; border: 1px solid #ddd; text-align: center;"><button class="delete-btn" style="margin:0; padding:5px 8px; font-size:12px;" onclick="deleteLabGroupStudent('${escapeForJs(sid)}')">حذف الطالب</button></td></tr>`;
             });
         }
